@@ -15,6 +15,13 @@ const orderSchema = new mongoose.Schema(
                 price: Number,
                 qty: Number,
                 image: String,
+
+                // ✅ CUSTOMIZATION PER ITEM
+                customization: {
+                    text: { type: String, default: "" },       // Customer ka naam/message
+                    imageUrl: { type: String, default: "" },   // Cloudinary URL
+                    note: { type: String, default: "" },       // Extra instructions
+                },
             },
         ],
 
@@ -22,24 +29,18 @@ const orderSchema = new mongoose.Schema(
         phone: String,
         address: String,
         email: String,
-
         totalAmount: Number,
 
         orderStatus: {
             type: String,
             enum: [
-                "PLACED",
-                "CONFIRMED",
-                "PACKED",
-                "SHIPPED",
-                "OUT_FOR_DELIVERY",
-                "DELIVERED",
-                "CANCELLED",
+                "PLACED", "CONFIRMED", "PACKED",
+                "SHIPPED", "OUT_FOR_DELIVERY",
+                "DELIVERED", "CANCELLED",
             ],
             default: "PLACED",
         },
 
-        // 🔥 STATUS TIMESTAMPS
         statusTimeline: {
             placedAt: { type: Date, default: Date.now },
             confirmedAt: Date,
@@ -47,7 +48,6 @@ const orderSchema = new mongoose.Schema(
             shippedAt: Date,
             deliveredAt: Date,
         },
-
     },
     { timestamps: true }
 );

@@ -7,6 +7,7 @@ import authRoutes from "./routes/authRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
+import uploadRoutes from "./routes/uploadRoutes.js"; // ✅ NEW
 
 dotenv.config();
 connectDB();
@@ -25,7 +26,6 @@ const allowedOrigins = [
     // "https://admin.rvgifts.com",
 ];
 
-// Dev mein local IP bhi allow
 if (process.env.NODE_ENV !== "production") {
     allowedOrigins.push(
         "http://10.137.66.92:5173",
@@ -35,7 +35,7 @@ if (process.env.NODE_ENV !== "production") {
 
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin) return callback(null, true); // Postman / mobile
+        if (!origin) return callback(null, true);
         if (allowedOrigins.includes(origin)) return callback(null, true);
         console.warn(`⚠️  CORS blocked: ${origin}`);
         callback(new Error(`CORS blocked: ${origin}`));
@@ -68,6 +68,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/uploads", uploadRoutes); // ✅ NEW
 
 /* =========================
    404 HANDLER
@@ -89,7 +90,6 @@ app.use((err, req, res, next) => {
     if (err.message?.startsWith("CORS blocked")) {
         return res.status(403).json({ success: false, message: err.message });
     }
-
     console.error("SERVER ERROR:", err.message);
     res.status(err.status || 500).json({
         success: false,

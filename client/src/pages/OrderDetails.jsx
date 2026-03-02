@@ -3,7 +3,8 @@ import { useParams, Link } from "react-router-dom";
 import api from "../api/axios";
 import {
     FaArrowLeft, FaBoxOpen, FaMapMarkerAlt,
-    FaPhone, FaUser, FaCheckCircle, FaShoppingBag
+    FaPhone, FaUser, FaCheckCircle, FaShoppingBag,
+    FaTimesCircle,
 } from "react-icons/fa";
 
 const STATUS_CONFIG = {
@@ -17,6 +18,7 @@ const STATUS_CONFIG = {
 };
 
 const FLOW_STEPS = ["PLACED", "CONFIRMED", "PACKED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"];
+const CANCELLABLE = ["PLACED", "CONFIRMED"];
 
 const getItemImage = (item) => item.images?.[0]?.url || item.image || null;
 
@@ -25,6 +27,9 @@ const OrderDetails = () => {
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [cancelling, setCancelling] = useState(false);
+    const [confirmCancel, setConfirmCancel] = useState(false);
+    const [cancelError, setCancelError] = useState("");
 
     useEffect(() => {
         const fetchOrder = async () => {
@@ -40,6 +45,20 @@ const OrderDetails = () => {
         };
         if (id) fetchOrder();
     }, [id]);
+
+    const handleCancel = async () => {
+        try {
+            setCancelling(true);
+            setCancelError("");
+            const { data } = await api.patch(`/orders/${id}/cancel`);
+            setOrder(data.order);
+            setConfirmCancel(false);
+        } catch (err) {
+            setCancelError(err.response?.data?.message || "Failed to cancel order");
+        } finally {
+            setCancelling(false);
+        }
+    };
 
     if (loading) return (
         <div className="min-h-screen bg-stone-50 flex items-center justify-center">
@@ -61,12 +80,13 @@ const OrderDetails = () => {
     const cfg = STATUS_CONFIG[order.orderStatus] || STATUS_CONFIG.PLACED;
     const stepIdx = FLOW_STEPS.indexOf(order.orderStatus);
     const isCancelled = order.orderStatus === "CANCELLED";
+    const canCancel = CANCELLABLE.includes(order.orderStatus);
 
     return (
         <div className="min-h-screen bg-stone-50 py-8 px-4">
             <div className="max-w-3xl mx-auto space-y-4">
 
-                {/* ── Header ── */}
+                {/* Header */}
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <Link to="/orders" className="flex items-center gap-1.5 text-zinc-400 text-xs font-semibold hover:text-zinc-700 transition-colors mb-2">
@@ -74,7 +94,9 @@ const OrderDetails = () => {
                         </Link>
                         <h1 className="text-2xl font-black text-zinc-900">Order Details</h1>
                         <p className="text-xs text-zinc-400 mt-0.5">
-                            #{order._id.slice(-8).toUpperCase()} · Placed on {new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            #{order._id.slice(-8).toUpperCase()} · Placed on {new Date(order.createdAt).toLocaleDateString("en-IN", {
+                                day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+                            })}
                         </p>
                     </div>
                     <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${cfg.color}`}>
@@ -83,7 +105,20 @@ const OrderDetails = () => {
                     </span>
                 </div>
 
-                {/* ── Order Tracking ── */}
+                {/* Cancelled Banner */}
+                {isCancelled && (
+                    <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3">
+                        <FaTimesCircle className="text-red-400 shrink-0" size={20} />
+                        <div>
+                            <p className="font-bold text-red-700 text-sm">Order Cancelled</p>
+                            <p className="text-red-500 text-xs mt-0.5">
+                                {order.cancellationReason || "This order has been cancelled."}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Order Tracking */}
                 {!isCancelled && (
                     <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-5">
                         <h2 className="font-black text-zinc-800 text-sm mb-4">Order Tracking</h2>
@@ -104,7 +139,8 @@ const OrderDetails = () => {
                         </div>
                         <div className="flex justify-between mt-2">
                             {FLOW_STEPS.map((step, i) => (
-                                <p key={step} className={`text-[9px] font-semibold text-center ${i <= stepIdx ? "text-emerald-600" : "text-zinc-300"}`}
+                                <p key={step}
+                                    className={`text-[9px] font-semibold text-center ${i <= stepIdx ? "text-emerald-600" : "text-zinc-300"}`}
                                     style={{ width: `${100 / FLOW_STEPS.length}%` }}>
                                     {STATUS_CONFIG[step]?.label.split(" ")[0]}
                                 </p>
@@ -113,7 +149,7 @@ const OrderDetails = () => {
                     </div>
                 )}
 
-                {/* ── Ordered Items ── */}
+                {/* Ordered Items */}
                 <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-5">
                     <h2 className="font-black text-zinc-800 text-sm mb-4">Ordered Items</h2>
                     <div className="space-y-3">
@@ -132,6 +168,11 @@ const OrderDetails = () => {
                                     <div className="flex-1 min-w-0">
                                         <p className="font-semibold text-zinc-800 text-sm truncate">{item.name}</p>
                                         <p className="text-xs text-zinc-400 mt-0.5">Qty: {item.qty} × ₹{item.price.toLocaleString("en-IN")}</p>
+                                        {item.selectedSize && (
+                                            <span className="inline-block mt-1 text-[10px] font-bold bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded">
+                                                Size: {item.selectedSize}
+                                            </span>
+                                        )}
                                     </div>
                                     <p className="font-black text-zinc-800 text-sm shrink-0">
                                         ₹{(item.qty * item.price).toLocaleString("en-IN")}
@@ -142,10 +183,8 @@ const OrderDetails = () => {
                     </div>
                 </div>
 
-                {/* ── Price + Customer ── */}
+                {/* Price + Customer */}
                 <div className="grid md:grid-cols-2 gap-4">
-
-                    {/* Price Summary */}
                     <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-5">
                         <h2 className="font-black text-zinc-800 text-sm mb-4">Price Summary</h2>
                         <div className="space-y-2.5 text-sm">
@@ -176,7 +215,6 @@ const OrderDetails = () => {
                         </div>
                     </div>
 
-                    {/* Customer Info */}
                     <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-5">
                         <h2 className="font-black text-zinc-800 text-sm mb-4">Delivery Info</h2>
                         <div className="space-y-3">
@@ -196,13 +234,42 @@ const OrderDetails = () => {
                     </div>
                 </div>
 
-                {/* ── CTA ── */}
-                <Link
-                    to="/"
-                    className="flex items-center justify-center gap-2 w-full py-3.5 bg-zinc-900 text-white rounded-xl font-bold text-sm hover:bg-amber-500 transition-all active:scale-95"
-                >
+                {/* ✅ CANCEL ORDER SECTION */}
+                {canCancel && (
+                    <div className="bg-white rounded-2xl border border-red-100 shadow-sm p-5">
+                        <h2 className="font-black text-zinc-800 text-sm mb-1">Cancel Order</h2>
+                        <p className="text-xs text-zinc-400 mb-4">
+                            You can cancel this order since it hasn't been packed yet.
+                        </p>
+                        {cancelError && (
+                            <p className="text-red-500 text-xs mb-3 font-medium">⚠️ {cancelError}</p>
+                        )}
+                        {confirmCancel ? (
+                            <div className="flex gap-2">
+                                <button onClick={handleCancel} disabled={cancelling}
+                                    className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-bold hover:bg-red-600 transition-all active:scale-95 disabled:opacity-60">
+                                    {cancelling ? "Cancelling..." : "Yes, Cancel Order"}
+                                </button>
+                                <button onClick={() => { setConfirmCancel(false); setCancelError(""); }}
+                                    className="flex-1 py-2.5 bg-stone-100 text-zinc-700 rounded-xl text-sm font-bold hover:bg-stone-200 transition-all">
+                                    No, Keep Order
+                                </button>
+                            </div>
+                        ) : (
+                            <button onClick={() => setConfirmCancel(true)}
+                                className="w-full py-2.5 border border-red-200 text-red-500 rounded-xl text-sm font-semibold hover:bg-red-50 transition-all">
+                                Cancel Order
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {/* Continue Shopping */}
+                <Link to="/"
+                    className="flex items-center justify-center gap-2 w-full py-3.5 bg-zinc-900 text-white rounded-xl font-bold text-sm hover:bg-amber-500 transition-all active:scale-95">
                     <FaShoppingBag size={13} /> Continue Shopping
                 </Link>
+
             </div>
         </div>
     );

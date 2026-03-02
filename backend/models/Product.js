@@ -18,7 +18,6 @@ const productSchema = new mongoose.Schema(
             required: true,
         },
 
-        // normalized slug (printed-tshirt, photo-frame)
         category: {
             type: String,
             required: true,
@@ -38,6 +37,19 @@ const productSchema = new mongoose.Schema(
         tags: {
             type: [String],
             default: [],
+        },
+
+        // ✅ SIZES — e.g. ["S", "M", "L", "XL", "XXL"]
+        sizes: {
+            type: [String],
+            default: [],
+        },
+
+        // ✅ PRODUCT HIGHLIGHTS — e.g. { fabric: "Cotton", sleeve: "Full", color: "Purple" }
+        highlights: {
+            type: Map,
+            of: String,
+            default: {},
         },
 
         rating: {
@@ -65,7 +77,6 @@ const productSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-/* 🔍 TEXT SEARCH (NAME / DESCRIPTION / TAGS) */
 productSchema.index({
     name: "text",
     description: "text",

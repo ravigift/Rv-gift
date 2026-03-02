@@ -2,17 +2,15 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useCart } from "../hooks/useCart";
-import { FaStar, FaRegStar, FaSearch, FaFire, FaGift } from "react-icons/fa";
+import { FaStar, FaRegStar, FaSearch, FaFire, FaGift, FaArrowRight, FaTruck, FaShieldAlt, FaHeadset } from "react-icons/fa";
 
-// ── Skeleton Card ──
+/* ── Skeleton Card ── */
 const SkeletonCard = () => (
     <div className="bg-white rounded-2xl border border-stone-100 overflow-hidden animate-pulse">
         <div className="h-52 bg-stone-200" />
         <div className="p-4 space-y-3">
             <div className="h-4 bg-stone-200 rounded w-3/4" />
             <div className="h-3 bg-stone-100 rounded w-1/2" />
-            <div className="h-3 bg-stone-100 rounded w-full" />
-            <div className="h-3 bg-stone-100 rounded w-2/3" />
             <div className="h-6 bg-stone-200 rounded w-1/3 mt-2" />
             <div className="flex gap-2 mt-2">
                 <div className="h-9 bg-stone-100 rounded-xl flex-1" />
@@ -22,44 +20,30 @@ const SkeletonCard = () => (
     </div>
 );
 
-// ── Product Card ──
+/* ── Product Card ── */
 const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
     const navigate = useNavigate();
     const { cartItems } = useCart();
     const inCart = cartItems.some(i => i._id === product._id);
-
-    const imageUrl = product.images?.[0]?.url || product.image ||
-        "https://via.placeholder.com/400x400?text=No+Image";
+    const imageUrl = product.images?.[0]?.url || product.image || "https://via.placeholder.com/400x400?text=No+Image";
     const rating = product.rating || 0;
     const numReviews = product.numReviews || 0;
 
     return (
-        <div
-            onClick={() => navigate(`/products/${product._id}`)}
-            className="group bg-white rounded-2xl border border-stone-100 hover:border-stone-200 hover:shadow-xl shadow-sm transition-all duration-300 cursor-pointer flex flex-col overflow-hidden"
-        >
-            {/* Image */}
+        <div onClick={() => navigate(`/products/${product._id}`)}
+            className="group bg-white rounded-2xl border border-stone-100 hover:border-stone-200 hover:shadow-xl shadow-sm transition-all duration-300 cursor-pointer flex flex-col overflow-hidden">
             <div className="relative h-52 bg-stone-50 flex items-center justify-center overflow-hidden">
-                <img
-                    src={imageUrl}
-                    alt={product.name}
+                <img src={imageUrl} alt={product.name}
                     className="w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-500"
-                    onError={e => { e.target.src = "https://via.placeholder.com/400x400?text=No+Image"; }}
-                />
+                    onError={e => { e.target.src = "https://via.placeholder.com/400x400?text=No+Image"; }} />
                 {product.isCustomizable && (
                     <span className="absolute top-2 left-2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                         Customizable
                     </span>
                 )}
             </div>
-
-            {/* Info */}
             <div className="p-4 flex flex-col flex-1">
-                <h3 className="font-bold text-zinc-800 text-sm line-clamp-1 mb-1 group-hover:text-amber-600 transition-colors">
-                    {product.name}
-                </h3>
-
-                {/* Rating */}
+                <h3 className="font-bold text-zinc-800 text-sm line-clamp-1 mb-1 group-hover:text-amber-600 transition-colors">{product.name}</h3>
                 <div className="flex items-center gap-1.5 mb-2">
                     {numReviews > 0 ? (
                         <>
@@ -69,35 +53,19 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                             <span className="text-[11px] text-zinc-400">({numReviews})</span>
                         </>
                     ) : (
-                        <div className="flex gap-0.5">
-                            {[1, 2, 3, 4, 5].map(s => <FaRegStar key={s} size={10} className="text-stone-300" />)}
-                        </div>
+                        <div className="flex gap-0.5">{[1, 2, 3, 4, 5].map(s => <FaRegStar key={s} size={10} className="text-stone-300" />)}</div>
                     )}
                 </div>
-
-                <p className="text-zinc-400 text-xs line-clamp-2 leading-relaxed mb-3">
-                    {product.description}
-                </p>
-
+                <p className="text-zinc-400 text-xs line-clamp-2 leading-relaxed mb-3">{product.description}</p>
                 <div className="mt-auto">
-                    <p className="text-emerald-600 text-xl font-black mb-3">
-                        ₹{product.price.toLocaleString("en-IN")}
-                    </p>
+                    <p className="text-emerald-600 text-xl font-black mb-3">₹{product.price.toLocaleString("en-IN")}</p>
                     <div className="flex gap-2">
-                        <button
-                            onClick={e => { e.stopPropagation(); onAddToCart(product); }}
-                            disabled={inCart}
-                            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 ${inCart
-                                    ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                                    : "bg-zinc-900 text-white hover:bg-zinc-800"
-                                }`}
-                        >
+                        <button onClick={e => { e.stopPropagation(); onAddToCart(product); }} disabled={inCart}
+                            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 ${inCart ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-zinc-900 text-white hover:bg-zinc-800"}`}>
                             {inCart ? "✔ In Cart" : "Add to Cart"}
                         </button>
-                        <button
-                            onClick={e => { e.stopPropagation(); onBuyNow(product); }}
-                            className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600 active:scale-95 shadow-sm shadow-emerald-100 transition-all"
-                        >
+                        <button onClick={e => { e.stopPropagation(); onBuyNow(product); }}
+                            className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600 active:scale-95 shadow-sm shadow-emerald-100 transition-all">
                             Buy Now
                         </button>
                     </div>
@@ -107,24 +75,21 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
     );
 };
 
-// ── Main Home ──
+/* ── Main Home ── */
 const Home = () => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const searchQuery = searchParams.get("search") || "";
     const activeCategory = searchParams.get("category") || "";
-
     const { addItem } = useCart();
 
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-
-    // Derive unique categories from products
     const [allProducts, setAllProducts] = useState([]);
+
     const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))];
 
-    // Fetch all products once for category list
     useEffect(() => {
         api.get("/products").then(({ data }) => setAllProducts(data)).catch(() => { });
     }, []);
@@ -149,10 +114,7 @@ const Home = () => {
         fetchProducts();
     }, [searchQuery, activeCategory]);
 
-    const handleAddToCart = useCallback((product) => {
-        addItem(product);
-    }, [addItem]);
-
+    const handleAddToCart = useCallback((product) => addItem(product), [addItem]);
     const handleBuyNow = useCallback((product) => {
         navigate("/checkout", { state: { buyNowItem: { ...product, quantity: 1 } } });
     }, [navigate]);
@@ -165,75 +127,164 @@ const Home = () => {
     };
 
     const clearFilters = () => setSearchParams({});
-
-    // Format category label
     const formatCat = (cat) => cat.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase());
 
     return (
         <div className="min-h-screen bg-stone-100">
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;600;700&display=swap');
+                .hero-font { font-family: 'Playfair Display', serif; }
+                .body-font { font-family: 'DM Sans', sans-serif; }
+                @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+                @keyframes shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
+                .float { animation: float 4s ease-in-out infinite; }
+                .shimmer-text {
+                    background: linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b, #fbbf24);
+                    background-size: 200% auto;
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    animation: shimmer 3s linear infinite;
+                }
+                .scrollbar-hide::-webkit-scrollbar { display: none; }
+            `}</style>
 
-            {/* ── Hero Banner ── */}
+            {/* ══════════════════════════════════
+                FULL WIDTH HERO BANNER
+            ══════════════════════════════════ */}
             {!searchQuery && !activeCategory && (
-                <div className="bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 text-white py-10 px-4">
-                    <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div>
-                            <div className="flex items-center gap-2 mb-2">
-                                <FaGift className="text-amber-400" />
-                                <span className="text-amber-400 text-sm font-semibold tracking-wide uppercase">Premium Gift Store</span>
+                <div className="body-font relative w-full overflow-hidden bg-zinc-950" style={{ minHeight: "420px" }}>
+
+                    {/* Background pattern */}
+                    <div className="absolute inset-0 opacity-10"
+                        style={{
+                            backgroundImage: `radial-gradient(circle at 20% 50%, #f59e0b 0%, transparent 50%),
+                                             radial-gradient(circle at 80% 20%, #f59e0b 0%, transparent 40%),
+                                             radial-gradient(circle at 60% 80%, #f59e0b 0%, transparent 30%)`
+                        }} />
+
+                    {/* Decorative circles */}
+                    <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full border border-amber-500/20" />
+                    <div className="absolute -top-10 -right-10 w-60 h-60 rounded-full border border-amber-500/10" />
+                    <div className="absolute bottom-0 left-1/3 w-96 h-96 rounded-full border border-amber-500/10" />
+
+                    <div className="relative max-w-7xl mx-auto px-4 py-14 md:py-20">
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-10">
+
+                            {/* LEFT — Text */}
+                            <div className="flex-1 text-center md:text-left">
+                                <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-full px-4 py-1.5 mb-5">
+                                    <FaGift size={11} className="text-amber-400" />
+                                    <span className="text-amber-400 text-xs font-bold tracking-widest uppercase">Premium Gift Store</span>
+                                </div>
+
+                                <h1 className="hero-font text-4xl md:text-6xl font-black text-white leading-tight mb-4">
+                                    Gifts That{" "}
+                                    <span className="shimmer-text">Speak</span>
+                                    <br />From The Heart
+                                </h1>
+
+                                <p className="text-zinc-400 text-sm md:text-base mb-8 max-w-md">
+                                    Handpicked gifts for every occasion & loved ones. Customize with your personal touch.
+                                </p>
+
+                                <div className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
+                                    <button
+                                        onClick={() => document.getElementById("products-section").scrollIntoView({ behavior: "smooth" })}
+                                        className="flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-zinc-900 font-black px-8 py-3.5 rounded-2xl text-sm transition-all active:scale-95 shadow-lg shadow-amber-500/30">
+                                        Shop Now <FaArrowRight size={12} />
+                                    </button>
+                                    <button
+                                        onClick={() => setCategory("custom-tshirt")}
+                                        className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white font-bold px-8 py-3.5 rounded-2xl text-sm transition-all border border-white/20">
+                                        Customize 🎨
+                                    </button>
+                                </div>
                             </div>
-                            <h1 className="text-3xl md:text-4xl font-black mb-2 leading-tight">
-                                Gifts That <span className="text-amber-400">Speak</span> From<br />The Heart
-                            </h1>
-                            <p className="text-zinc-400 text-sm">Handpicked gifts for every occasion & loved ones</p>
+
+                            {/* RIGHT — Stats + floating cards */}
+                            <div className="flex flex-col gap-4 items-center md:items-end">
+
+                                {/* Stats row */}
+                                <div className="flex gap-3">
+                                    {[
+                                        { val: `${allProducts.length}+`, label: "Products" },
+                                        { val: `${categories.length}+`, label: "Categories" },
+                                        { val: "FREE", label: "Delivery ₹499+" },
+                                    ].map(({ val, label }) => (
+                                        <div key={label} className="bg-white/5 border border-white/10 backdrop-blur rounded-2xl px-5 py-4 text-center">
+                                            <p className="font-black text-amber-400 text-2xl">{val}</p>
+                                            <p className="text-zinc-400 text-xs mt-0.5">{label}</p>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Floating feature cards */}
+                                <div className="flex gap-3">
+                                    {[
+                                        { icon: "✏️", text: "Customizable Gifts" },
+                                        { icon: "🎁", text: "Gift Wrapping" },
+                                        { icon: "⚡", text: "Fast Delivery" },
+                                    ].map(({ icon, text }, i) => (
+                                        <div key={text}
+                                            className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-center float"
+                                            style={{ animationDelay: `${i * 0.5}s` }}>
+                                            <p className="text-lg">{icon}</p>
+                                            <p className="text-zinc-400 text-[10px] font-medium mt-0.5 whitespace-nowrap">{text}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-3 text-sm">
-                            <div className="bg-white/10 rounded-2xl px-5 py-3 text-center">
-                                <p className="font-black text-amber-400 text-2xl">{allProducts.length}+</p>
-                                <p className="text-zinc-400 text-xs">Products</p>
-                            </div>
-                            <div className="bg-white/10 rounded-2xl px-5 py-3 text-center">
-                                <p className="font-black text-amber-400 text-2xl">{categories.length}+</p>
-                                <p className="text-zinc-400 text-xs">Categories</p>
-                            </div>
-                            <div className="bg-white/10 rounded-2xl px-5 py-3 text-center">
-                                <p className="font-black text-amber-400 text-2xl">FREE</p>
-                                <p className="text-zinc-400 text-xs">Delivery ₹499+</p>
-                            </div>
-                        </div>
+                    </div>
+
+                    {/* Bottom wave */}
+                    <div className="absolute bottom-0 left-0 right-0">
+                        <svg viewBox="0 0 1440 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M0 40L60 33C120 27 240 13 360 10C480 7 600 13 720 18C840 23 960 27 1080 25C1200 23 1320 13 1380 8L1440 3V40H0Z" fill="#f1f0ef" />
+                        </svg>
                     </div>
                 </div>
             )}
 
-            <div className="max-w-7xl mx-auto px-4 py-8">
+            {/* ── Trust Bar ── */}
+            {!searchQuery && !activeCategory && (
+                <div className="body-font bg-white border-b border-stone-100">
+                    <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-center gap-8 overflow-x-auto">
+                        {[
+                            { icon: <FaTruck className="text-amber-500" size={13} />, text: "Free delivery above ₹499" },
+                            { icon: <FaShieldAlt className="text-emerald-500" size={13} />, text: "100% Secure Orders" },
+                            { icon: <span className="text-amber-500 text-sm">✏️</span>, text: "Custom Printing Available" },
+                            { icon: <FaHeadset className="text-blue-500" size={13} />, text: "WhatsApp Support" },
+                        ].map(({ icon, text }) => (
+                            <div key={text} className="flex items-center gap-2 shrink-0">
+                                {icon}
+                                <span className="text-xs font-semibold text-zinc-600">{text}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
-                {/* ── Category Filter Pills ── */}
+            {/* ── Products Section ── */}
+            <div id="products-section" className="body-font max-w-7xl mx-auto px-4 py-8">
+
+                {/* Category Filter Pills */}
                 {categories.length > 0 && (
                     <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
-                        <button
-                            onClick={() => setCategory("")}
-                            className={`shrink-0 px-4 py-2 rounded-full text-xs font-bold border transition-all duration-200 ${!activeCategory
-                                    ? "bg-zinc-900 text-white border-zinc-900"
-                                    : "bg-white text-zinc-600 border-stone-200 hover:border-zinc-400"
-                                }`}
-                        >
+                        <button onClick={() => setCategory("")}
+                            className={`shrink-0 px-4 py-2 rounded-full text-xs font-bold border transition-all duration-200 ${!activeCategory ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-stone-200 hover:border-zinc-400"}`}>
                             All
                         </button>
                         {categories.map(cat => (
-                            <button
-                                key={cat}
-                                onClick={() => setCategory(cat)}
-                                className={`shrink-0 px-4 py-2 rounded-full text-xs font-bold border transition-all duration-200 whitespace-nowrap ${activeCategory === cat
-                                        ? "bg-amber-500 text-white border-amber-500"
-                                        : "bg-white text-zinc-600 border-stone-200 hover:border-amber-400 hover:text-amber-600"
-                                    }`}
-                            >
+                            <button key={cat} onClick={() => setCategory(cat)}
+                                className={`shrink-0 px-4 py-2 rounded-full text-xs font-bold border transition-all duration-200 whitespace-nowrap ${activeCategory === cat ? "bg-amber-500 text-white border-amber-500" : "bg-white text-zinc-600 border-stone-200 hover:border-amber-400 hover:text-amber-600"}`}>
                                 {formatCat(cat)}
                             </button>
                         ))}
                     </div>
                 )}
 
-                {/* ── Page Title ── */}
+                {/* Page Title */}
                 <div className="flex items-center justify-between mb-6">
                     <div>
                         <h2 className="text-xl font-black text-zinc-900 flex items-center gap-2">
@@ -245,65 +296,53 @@ const Home = () => {
                                 <><FaFire size={16} className="text-amber-500" /> All Products</>
                             )}
                         </h2>
-                        {!loading && (
-                            <p className="text-zinc-400 text-xs mt-0.5">{products.length} product{products.length !== 1 ? "s" : ""} found</p>
-                        )}
+                        {!loading && <p className="text-zinc-400 text-xs mt-0.5">{products.length} product{products.length !== 1 ? "s" : ""} found</p>}
                     </div>
                     {(searchQuery || activeCategory) && (
-                        <button
-                            onClick={clearFilters}
-                            className="text-xs text-amber-600 font-bold hover:text-amber-700 border border-amber-200 bg-amber-50 px-3 py-1.5 rounded-lg transition-colors"
-                        >
+                        <button onClick={clearFilters}
+                            className="text-xs text-amber-600 font-bold hover:text-amber-700 border border-amber-200 bg-amber-50 px-3 py-1.5 rounded-lg transition-colors">
                             Clear Filters ✕
                         </button>
                     )}
                 </div>
 
-                {/* ── Error ── */}
+                {/* Error */}
                 {error && (
                     <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center mb-6">
                         <p className="text-red-500 font-bold mb-3">⚠️ {error}</p>
-                        <button
-                            onClick={() => window.location.reload()}
-                            className="bg-zinc-900 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-zinc-800 transition-colors"
-                        >
+                        <button onClick={() => window.location.reload()}
+                            className="bg-zinc-900 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-zinc-800 transition-colors">
                             Retry
                         </button>
                     </div>
                 )}
 
-                {/* ── Skeleton Loading ── */}
+                {/* Skeleton */}
                 {loading && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
                         {[...Array(8)].map((_, i) => <SkeletonCard key={i} />)}
                     </div>
                 )}
 
-                {/* ── Empty State ── */}
+                {/* Empty */}
                 {!loading && !error && products.length === 0 && (
                     <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-stone-300">
                         <p className="text-4xl mb-3">🎁</p>
                         <p className="text-zinc-500 font-semibold mb-1">No products found</p>
                         <p className="text-zinc-400 text-sm mb-4">Try a different search or category</p>
-                        <button
-                            onClick={clearFilters}
-                            className="text-amber-600 font-bold hover:text-amber-700 border border-amber-200 bg-amber-50 px-4 py-2 rounded-xl text-sm transition-colors"
-                        >
+                        <button onClick={clearFilters}
+                            className="text-amber-600 font-bold hover:text-amber-700 border border-amber-200 bg-amber-50 px-4 py-2 rounded-xl text-sm transition-colors">
                             Browse All Products
                         </button>
                     </div>
                 )}
 
-                {/* ── Product Grid ── */}
+                {/* Product Grid */}
                 {!loading && !error && products.length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
                         {products.map(product => (
-                            <ProductCard
-                                key={product._id}
-                                product={product}
-                                onAddToCart={handleAddToCart}
-                                onBuyNow={handleBuyNow}
-                            />
+                            <ProductCard key={product._id} product={product}
+                                onAddToCart={handleAddToCart} onBuyNow={handleBuyNow} />
                         ))}
                     </div>
                 )}

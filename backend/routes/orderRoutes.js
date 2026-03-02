@@ -5,30 +5,25 @@ import {
     getAllOrders,
     getOrderById,
     updateOrderStatus,
+    cancelOrder,
 } from "../controllers/orderController.js";
 import { protect, adminOnly } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
 /* ================= USER ================= */
-
-// CREATE ORDER
 router.post("/", protect, createOrder);
-
-// GET MY ORDERS
 router.get("/my", protect, getMyOrders);
 
-/* ================= ADMIN / OWNER ================= */
-
-// GET ALL ORDERS  ✅ MUST BE BEFORE `/:id`
+/* ================= ADMIN ================= */
 router.get("/", protect, adminOnly, getAllOrders);
-
-// UPDATE ORDER STATUS
 router.put("/:id", protect, adminOnly, updateOrderStatus);
 
-/* ================= USER / ADMIN ================= */
+// ✅ CANCEL — patch hai, GET /:id se conflict nahi hoga
+// Isliye position theek hai, but safer hai pehle rakhna
+router.patch("/:id/cancel", protect, cancelOrder);
 
-// GET SINGLE ORDER  ✅ ALWAYS LAST
-router.get("/:id", protect, getOrderById);
+/* ================= LAST ================= */
+router.get("/:id", protect, getOrderById); // ✅ ALWAYS LAST
 
 export default router;

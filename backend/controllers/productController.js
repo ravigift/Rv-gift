@@ -9,30 +9,34 @@ import { normalizeCategory } from "../utils/normalizeCategory.js";
 export const createProduct = async (req, res) => {
     try {
         const {
-            name,
-            description,
-            price,
-            category,
-            isCustomizable,
-            tags,
+            name, description, price, category,
+            isCustomizable, tags, sizes, highlights,
         } = req.body;
 
         if (!name || !price || !category) {
-            return res.status(400).json({
-                message: "Name, price and category are required",
-            });
+            return res.status(400).json({ message: "Name, price and category are required" });
         }
 
         if (!req.files || req.files.length === 0) {
-            return res.status(400).json({
-                message: "At least one image is required",
-            });
+            return res.status(400).json({ message: "At least one image is required" });
         }
 
         const images = req.files.map((file) => ({
             url: file.path,
             public_id: file.filename,
         }));
+
+        // ✅ Parse sizes — sent as JSON string from frontend
+        let parsedSizes = [];
+        if (sizes) {
+            try { parsedSizes = JSON.parse(sizes); } catch { parsedSizes = []; }
+        }
+
+        // ✅ Parse highlights — sent as JSON string from frontend
+        let parsedHighlights = {};
+        if (highlights) {
+            try { parsedHighlights = JSON.parse(highlights); } catch { parsedHighlights = {}; }
+        }
 
         const product = await Product.create({
             name: name.trim(),
@@ -41,17 +45,15 @@ export const createProduct = async (req, res) => {
             category: normalizeCategory(category),
             images,
             isCustomizable: isCustomizable === true || isCustomizable === "true",
-            tags: tags
-                ? tags.split(",").map((t) => t.trim().toLowerCase())
-                : [],
+            tags: tags ? tags.split(",").map((t) => t.trim().toLowerCase()) : [],
+            sizes: parsedSizes,
+            highlights: parsedHighlights,
         });
 
         res.status(201).json(product);
     } catch (error) {
         console.error("CREATE PRODUCT ERROR:", error);
-        res.status(500).json({
-            message: error.message || "Failed to create product",
-        });
+        res.status(500).json({ message: error.message || "Failed to create product" });
     }
 };
 
@@ -91,11 +93,9 @@ export const getAllProducts = async (req, res) => {
 export const getSingleProduct = async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
-
         if (!product) {
             return res.status(404).json({ message: "Product not found" });
         }
-
         res.json(product);
     } catch (error) {
         console.error("GET PRODUCT ERROR:", error);
@@ -110,7 +110,6 @@ export const getSingleProduct = async (req, res) => {
 export const updateProduct = async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
-
         if (!product) {
             return res.status(404).json({ message: "Product not found" });
         }
@@ -122,16 +121,23 @@ export const updateProduct = async (req, res) => {
         }
 
         if (updateData.tags) {
-            updateData.tags = updateData.tags
-                .split(",")
-                .map((t) => t.trim().toLowerCase());
+            updateData.tags = updateData.tags.split(",").map((t) => t.trim().toLowerCase());
+        }
+
+        // ✅ Parse sizes
+        if (updateData.sizes) {
+            try { updateData.sizes = JSON.parse(updateData.sizes); } catch { updateData.sizes = []; }
+        }
+
+        // ✅ Parse highlights
+        if (updateData.highlights) {
+            try { updateData.highlights = JSON.parse(updateData.highlights); } catch { updateData.highlights = {}; }
         }
 
         if (req.files && req.files.length > 0) {
             for (const img of product.images) {
                 await cloudinary.uploader.destroy(img.public_id);
             }
-
             updateData.images = req.files.map((file) => ({
                 url: file.path,
                 public_id: file.filename,
@@ -151,7 +157,10 @@ export const updateProduct = async (req, res) => {
     }
 };
 
-// controllers/product.controller.js
+/* =========================
+   GET RELATED PRODUCTS
+   GET /api/products/:id/related
+========================= */
 export const getRelatedProducts = async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
@@ -161,7 +170,7 @@ export const getRelatedProducts = async (req, res) => {
 
         const related = await Product.find({
             _id: { $ne: product._id },
-            category: product.category, // 🔒 already normalized
+            category: product.category,
         }).limit(10);
 
         res.json(related);
@@ -177,7 +186,6 @@ export const getRelatedProducts = async (req, res) => {
 export const deleteProduct = async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
-
         if (!product) {
             return res.status(404).json({ message: "Product not found" });
         }

@@ -10,17 +10,32 @@ const cartSlice = createSlice({
     reducers: {
         addToCart: (state, action) => {
             const item = action.payload;
-            const exist = state.items.find(p => p._id === item._id);
-            if (exist) {
-                exist.quantity += 1;
-            } else {
+
+            // ✅ Customization ke saath match karo
+            // Same product + same customization = quantity badhao
+            // Same product + alag customization = naya item add karo
+            const hasCustomization = item.customization?.text ||
+                item.customization?.imageUrl ||
+                item.customization?.note;
+
+            if (hasCustomization) {
+                // Customizable item — hamesha naya add karo (alag customization ho sakti hai)
                 state.items.push({ ...item, quantity: 1 });
+            } else {
+                // Normal item — same _id hai toh quantity badhao
+                const exist = state.items.find(
+                    p => p._id === item._id && !p.customization?.text && !p.customization?.imageUrl
+                );
+                if (exist) {
+                    exist.quantity += 1;
+                } else {
+                    state.items.push({ ...item, quantity: 1 });
+                }
             }
         },
 
-        // 🔥 YE MISSING THA (REDUCER)
         buyNowSingle: (state, action) => {
-            // Overwrite cart for immediate checkout
+            // ✅ Customization ke saath overwrite
             state.items = [{ ...action.payload, quantity: 1 }];
         },
 
@@ -33,7 +48,12 @@ const cartSlice = createSlice({
         },
 
         removeFromCart: (state, action) => {
-            state.items = state.items.filter(i => i._id !== action.payload);
+            // ✅ Index se remove karo (same product alag customization ke liye)
+            if (typeof action.payload === "number") {
+                state.items.splice(action.payload, 1);
+            } else {
+                state.items = state.items.filter(i => i._id !== action.payload);
+            }
         },
 
         clearCart: (state) => {
@@ -42,10 +62,9 @@ const cartSlice = createSlice({
     },
 });
 
-// 🔥 YE BHI MISSING THA (EXPORT)
 export const {
     addToCart,
-    buyNowSingle, // <--- Isse export list mein zaroor rakhein
+    buyNowSingle,
     updateQuantity,
     removeFromCart,
     clearCart,

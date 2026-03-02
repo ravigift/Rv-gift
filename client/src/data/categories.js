@@ -1,3 +1,5 @@
+// client/src/data/categories.js
+
 export const CATEGORIES = [
     // 🎁 GIFTS
     { name: "Wedding & Nikah", value: "wedding-nikah", icon: "💍" },

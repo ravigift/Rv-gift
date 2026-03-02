@@ -32,7 +32,7 @@ const Cart = () => {
 
     return (
         <div className="min-h-screen bg-stone-50 py-8 px-4">
-            <div className="max-w-5xl mx-auto">
+            <div className="max-w-6xl mx-auto">
 
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
@@ -48,10 +48,12 @@ const Cart = () => {
                     </button>
                 </div>
 
-                <div className="flex flex-col lg:flex-row gap-5">
+                {/* ✅ FIX: items-start added */}
+                <div className="flex flex-col lg:flex-row gap-5 items-start">
 
                     {/* ── Cart Items ── */}
-                    <div className="flex-1 space-y-3">
+                    {/* ✅ FIX: min-w-0 added */}
+                    <div className="flex-1 min-w-0 w-full space-y-3">
                         {cartItems.map(item => {
                             const imageUrl = item.images?.[0]?.url || item.image || null;
                             return (
@@ -74,6 +76,7 @@ const Cart = () => {
                                     </div>
 
                                     {/* Info */}
+                                    {/* ✅ FIX: min-w-0 already present - good */}
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-bold text-zinc-800 text-sm truncate">{item.name}</h3>
                                         <p className="text-emerald-600 font-black text-base mt-0.5">
@@ -117,7 +120,8 @@ const Cart = () => {
                     </div>
 
                     {/* ── Price Breakdown ── */}
-                    <div className="lg:w-80 shrink-0">
+                    {/* ✅ FIX: lg:w-80 → lg:w-96 */}
+                    <div className="w-full lg:w-96 shrink-0">
                         <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-5 sticky top-24">
                             <h2 className="font-black text-zinc-800 text-sm mb-4 flex items-center gap-2">
                                 <FaTag size={12} className="text-amber-500" /> Price Details
@@ -141,7 +145,6 @@ const Cart = () => {
                                     )}
                                 </div>
 
-                                {/* Free delivery progress */}
                                 {delivery > 0 && (
                                     <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-700 font-medium">
                                         Add ₹{FREE_DELIVERY_ABOVE - totalPrice} more for FREE delivery!
