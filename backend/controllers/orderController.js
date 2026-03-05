@@ -10,8 +10,14 @@ import { adminOrderEmailHTML } from "../utils/adminOrderEmail.js";
 /* =========================
    📧 EMAIL CONFIG
 ========================= */
+/* =========================
+   📧 EMAIL CONFIG
+========================= */
 const transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",      // ✅ service ki jagah host
+    port: 587,                    // ✅ port
+    secure: false,                // ✅ TLS
+    family: 4,                    // ✅ IPv4 force — Render fix
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
