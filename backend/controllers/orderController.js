@@ -10,54 +10,14 @@ import { adminOrderEmailHTML } from "../utils/adminOrderEmail.js";
 /* =========================
    📧 EMAIL CONFIG
 ========================= */
-// const transporter = nodemailer.createTransport({
-//     service: "gmail",
-//     auth: {
-//         user: process.env.EMAIL_USER,
-//         pass: process.env.EMAIL_PASS,
-//     },
-// });
-
-/* ── Emails ── */
-try {
-    const userMail = getOrderStatusEmailTemplate({
-        customerName: customerName.trim(),
-        orderId: savedOrder._id,
-        status: "PLACED",
-    });
-
-    const adminMailHTML = adminOrderEmailHTML({ order: savedOrder });
-
-    if (email?.trim()) {
-        await transporter.sendMail({
-            from: `"RV Gift Shop" <${process.env.EMAIL_USER}>`,
-            to: email.trim(),
-            subject: userMail.subject,
-            html: userMail.html,
-        });
-        console.log("✅ User email sent");
-    }
-
-    await transporter.sendMail({
-        from: `"Order Bot" <${process.env.EMAIL_USER}>`,
-        to: process.env.ADMIN_EMAIL,
-        subject: `🛒 New Order #${savedOrder._id.toString().slice(-6).toUpperCase()} — ₹${totalAmount}`,
-        html: adminMailHTML,
-    });
-
-    console.log("✅ Admin email sent");
-
-} catch (err) {
-    console.error("❌ EMAIL ERROR:", err.message);
-}
-
-res.status(201).json({
-    success: true,
-    orderId: savedOrder._id,
-    orderStatus: savedOrder.orderStatus,
-    adminWhatsApp: generateWhatsAppLink(savedOrder),
-    userWhatsApp: generateUserWhatsAppLink(savedOrder, "PLACED"),
+const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+    },
 });
+
 /* =========================
    🛒 CREATE ORDER
 ========================= */

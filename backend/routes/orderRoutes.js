@@ -16,7 +16,7 @@ router.post("/", protect, createOrder);
 router.get("/my", protect, getMyOrders);
 
 /* ================= ADMIN ================= */
-router.get("/", protect, adminOnly, getAllOrders);
+router.get("/", adminOnly, getAllOrders);
 router.put("/:id", protect, adminOnly, updateOrderStatus);
 
 // ✅ CANCEL — patch hai, GET /:id se conflict nahi hoga
