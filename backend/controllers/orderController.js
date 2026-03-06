@@ -320,6 +320,6 @@ export const cancelOrder = async (req, res) => {
 
     } catch (error) {
         console.error("CANCEL ORDER ERROR:", error);
-        res.status(500).json({ message: "Failed to cancel order" });
+        res.status(500).json({ message: "Failed to cancel order please try again later" });
     }
 };
