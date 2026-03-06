@@ -12,15 +12,19 @@ adminApi.interceptors.request.use(
     (config) => {
         try {
             const stored = localStorage.getItem("adminAuth");
+
             if (stored) {
-                const { token } = JSON.parse(stored);
-                if (token) {
-                    config.headers.Authorization = `Bearer ${token}`;
+                const parsed = JSON.parse(stored);
+
+                if (parsed?.token) {
+                    config.headers.Authorization = `Bearer ${parsed.token}`;
                 }
             }
-        } catch {
+        } catch (err) {
+            console.warn("Invalid adminAuth storage");
             localStorage.removeItem("adminAuth");
         }
+
         return config;
     },
     (error) => Promise.reject(error)
@@ -30,26 +34,33 @@ adminApi.interceptors.request.use(
    HANDLE RESPONSES
 ================================ */
 adminApi.interceptors.response.use(
-    (res) => res,
-    (err) => {
-        if (err.response?.status === 401) {
+    (response) => response,
+    (error) => {
+
+        // only logout if token truly invalid
+        if (error.response?.status === 401) {
+            console.warn("Admin token expired");
+
             localStorage.removeItem("adminAuth");
-            window.location.href = "/admin/login";
+
+            setTimeout(() => {
+                window.location.href = "/admin/login";
+            }, 300);
         }
 
-        if (err.response?.status === 403) {
-            window.location.href = "/admin/login";
+        if (error.response?.status === 403) {
+            console.warn("Admin access denied");
         }
 
-        if (err.code === "ECONNABORTED") {
-            err.message = "Request timed out. Please try again.";
+        if (error.code === "ECONNABORTED") {
+            error.message = "Request timeout. Please try again.";
         }
 
-        if (!err.response) {
-            err.message = "Network error. Check your connection.";
+        if (!error.response) {
+            error.message = "Network error. Check your internet.";
         }
 
-        return Promise.reject(err);
+        return Promise.reject(error);
     }
 );
 

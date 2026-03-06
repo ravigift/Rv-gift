@@ -10,18 +10,21 @@ import { adminOrderEmailHTML } from "../utils/adminOrderEmail.js";
 /* =========================
    📧 EMAIL CONFIG
 ========================= */
-/* =========================
-   📧 EMAIL CONFIG
-========================= */
 const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",      // ✅ service ki jagah host
-    port: 587,                    // ✅ port
-    secure: false,                // ✅ TLS
-    family: 4,                    // ✅ IPv4 force — Render fix
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    family: 4, // ✅ Render free tier IPv4 fix
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
     },
+});
+
+// ✅ Verify on startup
+transporter.verify((err, success) => {
+    if (err) console.error("❌ Email transporter error:", err.message);
+    else console.log("✅ Email transporter ready");
 });
 
 /* =========================
@@ -30,17 +33,10 @@ const transporter = nodemailer.createTransport({
 export const createOrder = async (req, res) => {
     try {
         const {
-            items,
-            customerName,
-            phone,
-            address,
-            email,
-            totalAmount,
-            latitude,
-            longitude,
+            items, customerName, phone, address,
+            email, totalAmount, latitude, longitude,
         } = req.body;
 
-        /* ── Validation ── */
         if (!items || !Array.isArray(items) || items.length === 0)
             return res.status(400).json({ message: "Cart is empty" });
 
@@ -50,9 +46,7 @@ export const createOrder = async (req, res) => {
         if (!totalAmount || Number(totalAmount) <= 0)
             return res.status(400).json({ message: "Invalid total amount" });
 
-        /* ── Normalize Items ── */
         const formattedItems = items.map((item) => {
-            // Image resolve
             let finalImage = "";
             if (typeof item.image === "string" && item.image) {
                 finalImage = item.image;
@@ -60,7 +54,6 @@ export const createOrder = async (req, res) => {
                 finalImage = item.images[0]?.url || item.images[0] || "";
             }
 
-            // ✅ Customization — text, image, note
             const customization = {
                 text: item.customization?.text?.trim() || "",
                 imageUrl: item.customization?.imageUrl?.trim() || "",
@@ -77,7 +70,6 @@ export const createOrder = async (req, res) => {
             };
         });
 
-        /* ── Create & Save ── */
         const order = new Order({
             user: req.user._id,
             items: formattedItems,
@@ -94,7 +86,6 @@ export const createOrder = async (req, res) => {
 
         const savedOrder = await order.save();
 
-        /* ── Fast Response ── */
         res.status(201).json({
             success: true,
             orderId: savedOrder._id,
@@ -105,6 +96,11 @@ export const createOrder = async (req, res) => {
 
         /* ── Emails (non-blocking) ── */
         try {
+            const userEmail = email?.trim();
+            console.log("📧 EMAIL_USER:", process.env.EMAIL_USER);
+            console.log("📧 ADMIN_EMAIL:", process.env.ADMIN_EMAIL);
+            console.log("📧 User email:", userEmail || "NOT PROVIDED");
+
             const userMail = getOrderStatusEmailTemplate({
                 customerName: customerName.trim(),
                 orderId: savedOrder._id,
@@ -112,29 +108,96 @@ export const createOrder = async (req, res) => {
             });
             const adminMailHTML = adminOrderEmailHTML({ order: savedOrder });
 
-            if (email?.trim()) {
+            // User email — sirf tab bhejo jab real email ho
+            if (userEmail) {
                 transporter.sendMail({
                     from: `"RV Gift Shop" <${process.env.EMAIL_USER}>`,
-                    to: email.trim(),
+                    to: userEmail,
                     subject: userMail.subject,
                     html: userMail.html,
-                }).catch(err => console.error("User email failed:", err.message));
+                })
+                    .then(() => console.log("✅ User email sent to:", userEmail))
+                    .catch(err => console.error("❌ User email failed:", err.message));
             }
 
+            // Admin email — hamesha bhejo
             transporter.sendMail({
                 from: `"Order Bot" <${process.env.EMAIL_USER}>`,
                 to: process.env.ADMIN_EMAIL,
                 subject: `🛒 New Order #${savedOrder._id.toString().slice(-6).toUpperCase()} — ₹${totalAmount}`,
                 html: adminMailHTML,
-            }).catch(err => console.error("Admin email failed:", err.message));
+            })
+                .then(() => console.log("✅ Admin email sent"))
+                .catch(err => console.error("❌ Admin email failed:", err.message));
 
         } catch (mailError) {
-            console.error("Email process error:", mailError.message);
+            console.error("❌ Email process error:", mailError.message);
         }
 
     } catch (error) {
         console.error("CREATE ORDER ERROR:", error);
         res.status(500).json({ message: "Order placement failed. Please try again." });
+    }
+};
+
+/* =========================
+   ❌ CANCEL ORDER (USER)
+========================= */
+export const cancelOrder = async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.id);
+
+        if (!order)
+            return res.status(404).json({ message: "Order not found" });
+
+        if (order.user.toString() !== req.user._id.toString())
+            return res.status(403).json({ message: "Not authorized" });
+
+        const cancellableStatuses = ["PLACED", "CONFIRMED"];
+        if (!cancellableStatuses.includes(order.orderStatus)) {
+            const msg = order.orderStatus === "CANCELLED"
+                ? "Order is already cancelled"
+                : `Cannot cancel — order is already ${order.orderStatus.toLowerCase()}`;
+            return res.status(400).json({ message: msg });
+        }
+
+        order.orderStatus = "CANCELLED";
+        order.statusTimeline = order.statusTimeline || {};
+        order.statusTimeline.cancelledAt = new Date();
+        order.cancellationReason = req.body.reason?.trim() || "Cancelled by customer";
+        await order.save();
+
+        try {
+            const userMail = getOrderStatusEmailTemplate({
+                customerName: order.customerName,
+                orderId: order._id,
+                status: "CANCELLED",
+            });
+            if (order.email) {
+                transporter.sendMail({
+                    from: `"RV Gift Shop" <${process.env.EMAIL_USER}>`,
+                    to: order.email,
+                    subject: userMail.subject,
+                    html: userMail.html,
+                })
+                    .then(() => console.log("✅ Cancel email sent to user"))
+                    .catch(err => console.error("❌ Cancel user email failed:", err.message));
+            }
+            transporter.sendMail({
+                from: `"Order Bot" <${process.env.EMAIL_USER}>`,
+                to: process.env.ADMIN_EMAIL,
+                subject: `❌ Order Cancelled #${order._id.toString().slice(-6).toUpperCase()}`,
+                html: adminOrderEmailHTML({ order }),
+            })
+                .then(() => console.log("✅ Cancel admin email sent"))
+                .catch(err => console.error("❌ Cancel admin email failed:", err.message));
+        } catch { }
+
+        res.json({ success: true, message: "Order cancelled successfully", order });
+
+    } catch (error) {
+        console.error("CANCEL ORDER ERROR:", error);
+        res.status(500).json({ message: "Failed to cancel order" });
     }
 };
 
@@ -145,7 +208,7 @@ export const getMyOrders = async (req, res) => {
     try {
         const orders = await Order.find({ user: req.user._id })
             .sort({ createdAt: -1 })
-            .lean(); // faster read
+            .lean();
         res.json(orders);
     } catch (error) {
         console.error("GET MY ORDERS ERROR:", error);
@@ -163,7 +226,6 @@ export const getOrderById = async (req, res) => {
         if (!order)
             return res.status(404).json({ message: "Order not found" });
 
-        // ✅ Only owner or admin can see others' orders
         const isOwner = order.user?.toString() === req.user._id.toString();
         const isAdmin = ["admin", "owner"].includes(req.user.role);
 
@@ -178,7 +240,7 @@ export const getOrderById = async (req, res) => {
 };
 
 /* =========================
-   🔄 UPDATE ORDER STATUS
+   🔄 UPDATE ORDER STATUS (ADMIN)
 ========================= */
 export const updateOrderStatus = async (req, res) => {
     try {
@@ -194,11 +256,11 @@ export const updateOrderStatus = async (req, res) => {
 
         const update = { orderStatus: status };
 
-        // Timeline timestamps
         if (status === "CONFIRMED") update["statusTimeline.confirmedAt"] = new Date();
         if (status === "PACKED") update["statusTimeline.packedAt"] = new Date();
         if (status === "SHIPPED") update["statusTimeline.shippedAt"] = new Date();
         if (status === "DELIVERED") update["statusTimeline.deliveredAt"] = new Date();
+        if (status === "CANCELLED") update["statusTimeline.cancelledAt"] = new Date();
 
         const order = await Order.findByIdAndUpdate(
             req.params.id,
@@ -209,7 +271,6 @@ export const updateOrderStatus = async (req, res) => {
         if (!order)
             return res.status(404).json({ message: "Order not found" });
 
-        /* ── Status Emails ── */
         try {
             const userMail = getOrderStatusEmailTemplate({
                 customerName: order.customerName,
@@ -224,7 +285,9 @@ export const updateOrderStatus = async (req, res) => {
                     to: order.email,
                     subject: userMail.subject,
                     html: userMail.html,
-                }).catch(err => console.error("User status email failed:", err.message));
+                })
+                    .then(() => console.log("✅ Status email sent to user"))
+                    .catch(err => console.error("❌ User status email failed:", err.message));
             }
 
             transporter.sendMail({
@@ -232,10 +295,12 @@ export const updateOrderStatus = async (req, res) => {
                 to: process.env.ADMIN_EMAIL,
                 subject: `📦 Order ${status} | #${order._id.toString().slice(-6).toUpperCase()}`,
                 html: adminMailHTML,
-            }).catch(err => console.error("Admin status email failed:", err.message));
+            })
+                .then(() => console.log("✅ Status admin email sent"))
+                .catch(err => console.error("❌ Admin status email failed:", err.message));
 
         } catch (mailErr) {
-            console.error("Status mail error:", mailErr.message);
+            console.error("❌ Status mail error:", mailErr.message);
         }
 
         res.json(order);
@@ -253,73 +318,10 @@ export const getAllOrders = async (req, res) => {
     try {
         const orders = await Order.find()
             .sort({ createdAt: -1 })
-            .lean(); // faster read
+            .lean();
         res.json(orders);
     } catch (error) {
         console.error("GET ALL ORDERS ERROR:", error);
         res.status(500).json({ message: "Failed to fetch all orders" });
-    }
-};
-
-
-
-/* =========================
-   ❌ CANCEL ORDER (USER)
-   PATCH /api/orders/:id/cancel
-========================= */
-export const cancelOrder = async (req, res) => {
-    try {
-        const order = await Order.findById(req.params.id);
-
-        if (!order)
-            return res.status(404).json({ message: "Order not found" });
-
-        // Only the order owner can cancel
-        if (order.user.toString() !== req.user._id.toString())
-            return res.status(403).json({ message: "Not authorized" });
-
-        // ✅ Real-world rule — only PLACED or CONFIRMED cancellable
-        const cancellableStatuses = ["PLACED", "CONFIRMED"];
-        if (!cancellableStatuses.includes(order.orderStatus)) {
-            const msg = order.orderStatus === "CANCELLED"
-                ? "Order is already cancelled"
-                : `Cannot cancel — order is already ${order.orderStatus.toLowerCase()}`;
-            return res.status(400).json({ message: msg });
-        }
-
-        order.orderStatus = "CANCELLED";
-        order.statusTimeline = order.statusTimeline || {};
-        order.statusTimeline.cancelledAt = new Date();
-        order.cancellationReason = req.body.reason?.trim() || "Cancelled by customer";
-        await order.save();
-
-        // Email (non-blocking)
-        try {
-            const userMail = getOrderStatusEmailTemplate({
-                customerName: order.customerName,
-                orderId: order._id,
-                status: "CANCELLED",
-            });
-            if (order.email) {
-                transporter.sendMail({
-                    from: `"RV Gift Shop" <${process.env.EMAIL_USER}>`,
-                    to: order.email,
-                    subject: userMail.subject,
-                    html: userMail.html,
-                }).catch(() => { });
-            }
-            transporter.sendMail({
-                from: `"Order Bot" <${process.env.EMAIL_USER}>`,
-                to: process.env.ADMIN_EMAIL,
-                subject: `❌ Order Cancelled #${order._id.toString().slice(-6).toUpperCase()}`,
-                html: adminOrderEmailHTML({ order }),
-            }).catch(() => { });
-        } catch { }
-
-        res.json({ success: true, message: "Order cancelled successfully", order });
-
-    } catch (error) {
-        console.error("CANCEL ORDER ERROR:", error);
-        res.status(500).json({ message: "Failed to cancel order please try again later" });
     }
 };
