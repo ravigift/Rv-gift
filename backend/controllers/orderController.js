@@ -15,13 +15,15 @@ const transporter = nodemailer.createTransport({
     port: 587,
     secure: false,
     family: 4,
+    connectionTimeout: 5000,  // ✅ ADD
+    greetingTimeout: 5000,    // ✅ ADD
+    socketTimeout: 10000,     // ✅ ADD
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
     },
 });
 
-// ✅ Verify on startup — ab error clearly dikhega
 transporter.verify((err, success) => {
     if (err) {
         console.error("❌ Email transporter error:", err.message);
