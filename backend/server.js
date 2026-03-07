@@ -24,18 +24,38 @@ const app = express();
 /* =========================
    🌐 CORS CONFIG
 ========================= */
-const allowedOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(",").map(o => o.trim())
-    : [
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "https://rv-gift.vercel.app",
-        "https://rv-gift-admin.vercel.app",
-    ];
+const allowedOrigins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "https://rv-gift.vercel.app",
+    "https://rv-gift-admin.vercel.app",
+];
+
+// Merge any extra origins from env (optional, no longer required)
+if (process.env.CORS_ORIGINS) {
+    process.env.CORS_ORIGINS.split(",").forEach(o => {
+        const trimmed = o.trim();
+        if (trimmed && !allowedOrigins.includes(trimmed)) {
+            allowedOrigins.push(trimmed);
+        }
+    });
+}
+
 app.use(cors({
-    origin: "*",
-    credentials: false,
+    origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, Postman, curl)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        console.warn("❌ CORS blocked:", origin);
+        callback(new Error("CORS not allowed"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
 }));
+
+// Handle preflight requests globally
+app.options("*", cors());
 
 /* =========================
    🛡️ SECURITY
@@ -140,6 +160,7 @@ const PORT = process.env.PORT || 9000;
 const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`🌍 Mode: ${process.env.NODE_ENV || "development"}`);
+    console.log(`✅ Allowed Origins:`, allowedOrigins);
 });
 
 /* =========================

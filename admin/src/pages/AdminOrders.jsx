@@ -4,7 +4,7 @@ import {
     FaSync, FaUser, FaPhone, FaMapMarkerAlt,
     FaBox, FaChevronRight, FaWhatsapp, FaBoxOpen,
     FaCheckCircle, FaTruck, FaClock, FaPencilAlt,
-    FaStickyNote, FaImage
+    FaStickyNote, FaImage, FaTimes, FaBan
 } from "react-icons/fa";
 
 /* ── Status Config ── */
@@ -15,6 +15,7 @@ const STATUS_CONFIG = {
     SHIPPED: { label: "Shipped", color: "bg-indigo-100 text-indigo-700 border-indigo-200", dot: "bg-indigo-400", icon: <FaTruck size={10} /> },
     OUT_FOR_DELIVERY: { label: "Out for Delivery", color: "bg-orange-100 text-orange-700 border-orange-200", dot: "bg-orange-400", icon: <FaTruck size={10} /> },
     DELIVERED: { label: "Delivered", color: "bg-emerald-100 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", icon: <FaCheckCircle size={10} /> },
+    CANCELLED: { label: "Cancelled", color: "bg-red-100 text-red-700 border-red-200", dot: "bg-red-500", icon: <FaBan size={10} /> },
 };
 
 const FLOW = {
@@ -139,11 +140,9 @@ const AdminOrders = () => {
         total: orders.length,
         placed: orders.filter(o => o.orderStatus === "PLACED").length,
         delivered: orders.filter(o => o.orderStatus === "DELIVERED").length,
-        revenue: orders.filter(o => o.orderStatus === "DELIVERED")
-            .reduce((s, o) => s + (o.totalAmount || 0), 0),
+        cancelled: orders.filter(o => o.orderStatus === "CANCELLED").length,
     };
 
-    // Check if any item in any order has customization
     const customOrdersCount = orders.filter(o =>
         o.items?.some(i => i.customization?.text || i.customization?.imageUrl || i.customization?.note)
     ).length;
@@ -192,7 +191,7 @@ const AdminOrders = () => {
                         { label: "Total Orders", value: stats.total, color: "text-zinc-800" },
                         { label: "New (Placed)", value: stats.placed, color: "text-yellow-600" },
                         { label: "Delivered", value: stats.delivered, color: "text-emerald-600" },
-                        { label: "Custom Orders", value: customOrdersCount, color: "text-amber-600" },
+                        { label: "Cancelled", value: stats.cancelled, color: "text-red-500" },
                     ].map(({ label, value, color }) => (
                         <div key={label} className="bg-white border border-stone-200 rounded-2xl px-4 py-3">
                             <p className="text-xs text-zinc-400 font-medium mb-0.5">{label}</p>
@@ -203,7 +202,7 @@ const AdminOrders = () => {
 
                 {/* ── Filter Pills ── */}
                 <div className="flex gap-2 overflow-x-auto pb-1 mb-5">
-                    {["ALL", ...FLOW_STEPS].map(status => {
+                    {["ALL", ...FLOW_STEPS, "CANCELLED"].map(status => {
                         const cfg = STATUS_CONFIG[status];
                         const count = status === "ALL" ? orders.length : orders.filter(o => o.orderStatus === status).length;
                         return (
@@ -230,32 +229,34 @@ const AdminOrders = () => {
                 <div className="space-y-4">
                     {filtered.map(order => {
                         const cfg = STATUS_CONFIG[order.orderStatus] || STATUS_CONFIG.PLACED;
-                        const nextStatus = FLOW[order.orderStatus];
+                        const isCancelled = order.orderStatus === "CANCELLED";
+                        const nextStatus = isCancelled ? null : FLOW[order.orderStatus];
                         const nextCfg = nextStatus ? STATUS_CONFIG[nextStatus] : null;
                         const isUpdating = updatingId === order._id;
                         const isExpanded = expandedId === order._id;
                         const stepIdx = FLOW_STEPS.indexOf(order.orderStatus);
 
-                        // Check if this order has any customization
                         const hasCustomization = order.items?.some(
                             i => i.customization?.text || i.customization?.imageUrl || i.customization?.note
                         );
 
                         return (
-                            <div key={order._id} className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+                            <div key={order._id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${isCancelled ? "border-red-200" : "border-stone-200"}`}>
 
                                 {/* ── Order Header ── */}
                                 <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 cursor-pointer hover:bg-stone-50 transition-colors"
                                     onClick={() => setExpandedId(isExpanded ? null : order._id)}>
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
-                                            <FaUser size={14} className="text-amber-500" />
+                                        <div className={`w-10 h-10 rounded-full border flex items-center justify-center shrink-0 ${isCancelled ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}>
+                                            {isCancelled
+                                                ? <FaBan size={14} className="text-red-400" />
+                                                : <FaUser size={14} className="text-amber-500" />
+                                            }
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <p className="font-bold text-zinc-800 text-sm">{order.customerName}</p>
-                                                {/* ✅ CUSTOMIZATION BADGE */}
-                                                {hasCustomization && (
+                                                {hasCustomization && !isCancelled && (
                                                     <span className="bg-amber-100 text-amber-700 border border-amber-200 text-[10px] font-black px-1.5 py-0.5 rounded-full">
                                                         ✏️ Custom
                                                     </span>
@@ -277,29 +278,39 @@ const AdminOrders = () => {
                                     </div>
                                 </div>
 
-                                {/* ── Progress Bar ── */}
-                                <div className="px-5 pb-3">
-                                    <div className="flex items-center">
-                                        {FLOW_STEPS.map((step, i) => (
-                                            <div key={step} className="flex items-center flex-1">
-                                                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${i <= stepIdx ? "border-emerald-500 bg-emerald-500" : "border-stone-200 bg-white"}`}>
-                                                    {i <= stepIdx && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                {/* ── Progress Bar (hide for cancelled) ── */}
+                                {!isCancelled && (
+                                    <div className="px-5 pb-3">
+                                        <div className="flex items-center">
+                                            {FLOW_STEPS.map((step, i) => (
+                                                <div key={step} className="flex items-center flex-1">
+                                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${i <= stepIdx ? "border-emerald-500 bg-emerald-500" : "border-stone-200 bg-white"}`}>
+                                                        {i <= stepIdx && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                                    </div>
+                                                    {i < FLOW_STEPS.length - 1 && (
+                                                        <div className={`flex-1 h-0.5 ${i < stepIdx ? "bg-emerald-400" : "bg-stone-200"}`} />
+                                                    )}
                                                 </div>
-                                                {i < FLOW_STEPS.length - 1 && (
-                                                    <div className={`flex-1 h-0.5 ${i < stepIdx ? "bg-emerald-400" : "bg-stone-200"}`} />
-                                                )}
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
+                                        <div className="flex justify-between mt-1">
+                                            {FLOW_STEPS.map((step, i) => (
+                                                <p key={step} className={`text-[9px] font-medium ${i <= stepIdx ? "text-emerald-600" : "text-zinc-300"}`}
+                                                    style={{ width: `${100 / FLOW_STEPS.length}%`, textAlign: i === 0 ? "left" : i === FLOW_STEPS.length - 1 ? "right" : "center" }}>
+                                                    {STATUS_CONFIG[step]?.label.split(" ")[0]}
+                                                </p>
+                                            ))}
+                                        </div>
                                     </div>
-                                    <div className="flex justify-between mt-1">
-                                        {FLOW_STEPS.map((step, i) => (
-                                            <p key={step} className={`text-[9px] font-medium ${i <= stepIdx ? "text-emerald-600" : "text-zinc-300"}`}
-                                                style={{ width: `${100 / FLOW_STEPS.length}%`, textAlign: i === 0 ? "left" : i === FLOW_STEPS.length - 1 ? "right" : "center" }}>
-                                                {STATUS_CONFIG[step]?.label.split(" ")[0]}
-                                            </p>
-                                        ))}
+                                )}
+
+                                {/* ── Cancelled Banner ── */}
+                                {isCancelled && (
+                                    <div className="mx-5 mb-3 px-4 py-2.5 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2">
+                                        <FaBan size={12} className="text-red-400 shrink-0" />
+                                        <p className="text-xs font-bold text-red-600">This order was cancelled by the customer</p>
                                     </div>
-                                </div>
+                                )}
 
                                 {/* ── Expanded Details ── */}
                                 {isExpanded && (
@@ -324,8 +335,13 @@ const AdminOrders = () => {
                                             </div>
 
                                             <div className="bg-stone-50 rounded-xl p-4">
-                                                <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-3">Update Status</p>
-                                                {nextStatus ? (
+                                                <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-3">Status</p>
+                                                {isCancelled ? (
+                                                    <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                                                        <FaBan size={14} className="text-red-500 shrink-0" />
+                                                        <span className="text-red-600 font-bold text-sm">Order Cancelled by Customer</span>
+                                                    </div>
+                                                ) : nextStatus ? (
                                                     <button onClick={() => updateStatus(order._id, nextStatus)} disabled={isUpdating}
                                                         className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-zinc-900 text-white hover:bg-zinc-800 transition-all active:scale-95 disabled:opacity-60">
                                                         {isUpdating ? (
@@ -339,22 +355,25 @@ const AdminOrders = () => {
                                                         <FaCheckCircle /> Order Delivered ✓
                                                     </div>
                                                 )}
-                                                <a href={`https://wa.me/91${order.phone}?text=${encodeURIComponent(`Hi ${order.customerName}! Your order #${order._id.slice(-6).toUpperCase()} is now ${cfg.label}. Thank you for shopping with RV Gifts! 🎁`)}`}
-                                                    target="_blank" rel="noreferrer"
-                                                    className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all">
-                                                    <FaWhatsapp size={14} /> WhatsApp Customer
-                                                </a>
+
+                                                {/* WhatsApp — hide for cancelled */}
+                                                {!isCancelled && (
+                                                    <a href={`https://wa.me/91${order.phone}?text=${encodeURIComponent(`Hi ${order.customerName}! Your order #${order._id.slice(-6).toUpperCase()} is now ${cfg.label}. Thank you for shopping with RV Gifts! 🎁`)}`}
+                                                        target="_blank" rel="noreferrer"
+                                                        className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all">
+                                                        <FaWhatsapp size={14} /> WhatsApp Customer
+                                                    </a>
+                                                )}
                                             </div>
                                         </div>
 
-                                        {/* ── Order Items + Customization ── */}
+                                        {/* ── Order Items ── */}
                                         <div>
                                             <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-3">Order Items</p>
                                             <div className="space-y-3">
                                                 {order.items?.map((item, idx) => (
                                                     <div key={idx} className="bg-stone-50 rounded-xl p-3">
                                                         <div className="flex items-center gap-3">
-                                                            {/* Product Image */}
                                                             <div className="w-12 h-12 rounded-lg bg-white border border-stone-200 overflow-hidden flex items-center justify-center shrink-0">
                                                                 {item.image ? (
                                                                     <img src={item.image} alt={item.name}
@@ -372,8 +391,6 @@ const AdminOrders = () => {
                                                                 ₹{(item.price * item.qty).toLocaleString("en-IN")}
                                                             </p>
                                                         </div>
-
-                                                        {/* ✅ CUSTOMIZATION DETAILS */}
                                                         <CustomizationCard customization={item.customization} />
                                                     </div>
                                                 ))}
@@ -394,7 +411,5 @@ const AdminOrders = () => {
         </div>
     );
 };
-
-
 
 export default AdminOrders;
