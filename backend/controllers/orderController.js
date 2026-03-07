@@ -15,16 +15,16 @@ const transporter = nodemailer.createTransport({
     port: 587,
     secure: false,
     family: 4,
-    connectionTimeout: 5000,  // ✅ ADD
-    greetingTimeout: 5000,    // ✅ ADD
-    socketTimeout: 10000,     // ✅ ADD
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 10000,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
     },
 });
 
-transporter.verify((err, success) => {
+transporter.verify((err) => {
     if (err) {
         console.error("❌ Email transporter error:", err.message);
         console.error("   → Check EMAIL_USER and EMAIL_PASS in .env");
@@ -53,6 +53,7 @@ const sendEmail = async ({ to, subject, html, label = "" }) => {
         console.log(`✅ [${label}] Email sent to: ${to}`);
     } catch (err) {
         console.error(`❌ [${label}] Email failed: ${err.message}`);
+        // ✅ Never throw — email failure should never crash the app
     }
 };
 
@@ -83,19 +84,17 @@ export const createOrder = async (req, res) => {
                 finalImage = item.images[0]?.url || item.images[0] || "";
             }
 
-            const customization = {
-                text: item.customization?.text?.trim() || "",
-                imageUrl: item.customization?.imageUrl?.trim() || "",
-                note: item.customization?.note?.trim() || "",
-            };
-
             return {
                 productId: item.productId || item._id,
                 name: item.name || "Product",
                 price: Number(item.price || 0),
                 qty: Number(item.qty || item.quantity || 1),
                 image: finalImage,
-                customization,
+                customization: {
+                    text: item.customization?.text?.trim() || "",
+                    imageUrl: item.customization?.imageUrl?.trim() || "",
+                    note: item.customization?.note?.trim() || "",
+                },
             };
         });
 
@@ -115,6 +114,7 @@ export const createOrder = async (req, res) => {
 
         const savedOrder = await order.save();
 
+        // ✅ Response pehle bhejo — email baad mein
         res.status(201).json({
             success: true,
             orderId: savedOrder._id,
@@ -123,7 +123,6 @@ export const createOrder = async (req, res) => {
             userWhatsApp: generateUserWhatsAppLink(savedOrder, "PLACED"),
         });
 
-        // ✅ Emails — non-blocking, helper use karo
         const userMail = getOrderStatusEmailTemplate({
             customerName: customerName.trim(),
             orderId: savedOrder._id,
@@ -172,17 +171,26 @@ export const cancelOrder = async (req, res) => {
         }
 
         order.orderStatus = "CANCELLED";
-        order.cancellationReason = req.body.reason?.trim() || "Cancelled by customer";
+        // ✅ FIX — optional chaining, req.body undefined safe
+        order.cancellationReason = req.body?.reason?.trim() || "Cancelled by customer";
 
-        // ✅ FIX — statusTimeline nested object update
+        // ✅ FIX — statusTimeline nested object Mongoose update
+        const existingTimeline = order.statusTimeline?.toObject
+            ? order.statusTimeline.toObject()
+            : { ...order.statusTimeline };
+
         order.statusTimeline = {
-            ...order.statusTimeline.toObject?.() || order.statusTimeline,
+            ...existingTimeline,
             cancelledAt: new Date(),
         };
-        order.markModified("statusTimeline"); // ✅ Mongoose ko batao ki nested object changed hai
+        order.markModified("statusTimeline");
 
         await order.save();
 
+        // ✅ Response pehle bhejo
+        res.json({ success: true, message: "Order cancelled successfully", order });
+
+        // Email baad mein — non-blocking
         const cancelMail = getOrderStatusEmailTemplate({
             customerName: order.customerName,
             orderId: order._id,
@@ -202,8 +210,6 @@ export const cancelOrder = async (req, res) => {
             html: adminOrderEmailHTML({ order }),
             label: "Admin/Cancel",
         });
-
-        res.json({ success: true, message: "Order cancelled successfully", order });
 
     } catch (error) {
         console.error("CANCEL ORDER ERROR:", error);
@@ -265,7 +271,6 @@ export const updateOrderStatus = async (req, res) => {
             return res.status(400).json({ message: "Invalid status value" });
 
         const update = { orderStatus: status };
-
         if (status === "CONFIRMED") update["statusTimeline.confirmedAt"] = new Date();
         if (status === "PACKED") update["statusTimeline.packedAt"] = new Date();
         if (status === "SHIPPED") update["statusTimeline.shippedAt"] = new Date();
@@ -281,6 +286,9 @@ export const updateOrderStatus = async (req, res) => {
         if (!order)
             return res.status(404).json({ message: "Order not found" });
 
+        res.json(order);
+
+        // Email baad mein — non-blocking
         const statusMail = getOrderStatusEmailTemplate({
             customerName: order.customerName,
             orderId: order._id,
@@ -300,8 +308,6 @@ export const updateOrderStatus = async (req, res) => {
             html: adminOrderEmailHTML({ order }),
             label: "Admin/StatusUpdate",
         });
-
-        res.json(order);
 
     } catch (error) {
         console.error("UPDATE ORDER STATUS ERROR:", error);
