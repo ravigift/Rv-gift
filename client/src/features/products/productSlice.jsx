@@ -1,31 +1,58 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import api from '../../api/axios';
+// orderSlice.js — bilkul sahi hai ✅ koi change nahi
+
+// productSlice.js — improved version:
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import api from "../../api/axios";
 
 export const fetchProducts = createAsyncThunk(
-    'products/fetchProducts',
-    async ({ search = '', category = '' }) => {
-        const params = new URLSearchParams();
-        if (search) params.append('search', search);
-        if (category) params.append('category', category);
+    "products/fetchProducts",
+    async ({ search = "", category = "" } = {}, { rejectWithValue }) => {
+        try {
+            const params = new URLSearchParams();
+            if (search) params.append("search", search);
+            if (category) params.append("category", category);
 
-        const response = await api.get(`/products?${params}`);
-        return response.data;
+            const { data } = await api.get(`/products?${params}`);
+            return data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.message || "Failed to fetch products"
+            );
+        }
     }
 );
 
 const productSlice = createSlice({
-    name: 'products',
+    name: "products",
     initialState: {
         items: [],
-        status: 'idle',
+        status: "idle", // idle | loading | success | failed
+        error: null,
     },
-    reducers: {},
+    reducers: {
+        clearProducts: (state) => {
+            state.items = [];
+            state.status = "idle";
+            state.error = null;
+        },
+    },
     extraReducers: (builder) => {
-        builder.addCase(fetchProducts.fulfilled, (state, action) => {
-            state.items = action.payload;
-            state.status = 'success';
-        });
+        builder
+            .addCase(fetchProducts.pending, (state) => {
+                state.status = "loading";
+                state.error = null;
+            })
+            .addCase(fetchProducts.fulfilled, (state, action) => {
+                state.items = action.payload;
+                state.status = "success";
+            })
+            .addCase(fetchProducts.rejected, (state, action) => {
+                state.status = "failed";
+                state.error = action.payload;
+                state.items = [];
+            });
     },
 });
 
+export const { clearProducts } = productSlice.actions;
 export default productSlice.reducer;

@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FaUser, FaEnvelope, FaLock, FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaUser, FaEnvelope, FaLock, FaEye, FaEyeSlash, FaGift } from "react-icons/fa";
 import { useAuth } from "../contexts/AuthContext";
 
 const Register = () => {
     const navigate = useNavigate();
     const { register } = useAuth();
-
     const [form, setForm] = useState({ name: "", email: "", password: "" });
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -22,7 +21,6 @@ const Register = () => {
         const { name, email, password } = form;
         if (!name || !email || !password) return setError("All fields are required");
         if (password.length < 6) return setError("Password must be at least 6 characters");
-
         try {
             setLoading(true);
             setError("");
@@ -35,63 +33,124 @@ const Register = () => {
         }
     };
 
-    const inputClass = "w-full pl-10 pr-4 py-3 border border-stone-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent outline-none bg-stone-50 focus:bg-white transition-all";
-
     return (
-        <div className="min-h-[80vh] flex items-center justify-center px-4 bg-stone-50">
-            <div className="w-full max-w-md bg-white rounded-2xl shadow-lg border border-stone-200 p-8">
-                <h1 className="text-2xl font-black text-zinc-900 text-center mb-1">Create Account</h1>
-                <p className="text-center text-sm text-zinc-400 mb-6">Join RV Gifts to start shopping</p>
+        <div className="min-h-[90vh] flex items-center justify-center px-4 bg-gradient-to-br from-stone-100 via-amber-50/30 to-stone-100 py-10">
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap');
+                .auth-font { font-family: 'DM Sans', sans-serif; }
+                @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+                .fade-up { animation: fadeUp 0.4s ease forwards; }
+                .input-field {
+                    width:100%; padding: 12px 12px 12px 40px;
+                    border: 1.5px solid #e7e5e4; border-radius: 12px;
+                    font-size: 14px; background: #fafaf9;
+                    outline: none; transition: all 0.2s;
+                    font-family: 'DM Sans', sans-serif;
+                }
+                .input-field:focus {
+                    border-color: #f59e0b;
+                    background: white;
+                    box-shadow: 0 0 0 3px rgba(245,158,11,0.12);
+                }
+                .input-field:hover:not(:focus) { border-color: #d6d3d1; }
+            `}</style>
 
-                {error && (
-                    <div className="mb-4 bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-2.5 rounded-xl">
-                        ⚠️ {error}
-                    </div>
-                )}
+            <div className="auth-font w-full max-w-md fade-up">
+                <div className="bg-white rounded-3xl shadow-xl shadow-stone-200/80 border border-stone-100 overflow-hidden">
 
-                <form onSubmit={submitHandler} className="space-y-4">
-                    <div>
-                        <label className="text-xs font-semibold text-zinc-500 mb-1.5 block">Full Name</label>
-                        <div className="relative">
-                            <FaUser className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={13} />
-                            <input name="name" type="text" placeholder="e.g. Rahul Verma"
-                                value={form.name} onChange={onChange} className={inputClass} />
+                    {/* Top accent */}
+                    <div className="h-1.5 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400" />
+
+                    <div className="p-8">
+                        {/* Logo */}
+                        <div className="flex justify-center mb-6">
+                            <div className="w-14 h-14 bg-amber-500 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-200 -rotate-3 hover:rotate-0 transition-transform duration-300">
+                                <FaGift size={24} className="text-white" />
+                            </div>
                         </div>
-                    </div>
 
-                    <div>
-                        <label className="text-xs font-semibold text-zinc-500 mb-1.5 block">Email Address</label>
-                        <div className="relative">
-                            <FaEnvelope className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={13} />
-                            <input name="email" type="email" placeholder="your@email.com"
-                                value={form.email} onChange={onChange} className={inputClass} />
-                        </div>
-                    </div>
+                        <h1 className="text-2xl font-black text-zinc-900 text-center mb-1">Create Account</h1>
+                        <p className="text-center text-sm text-zinc-400 mb-7">Join RV Gifts to start shopping</p>
 
-                    <div>
-                        <label className="text-xs font-semibold text-zinc-500 mb-1.5 block">Password</label>
-                        <div className="relative">
-                            <FaLock className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={13} />
-                            <input name="password" type={showPassword ? "text" : "password"}
-                                placeholder="Min. 6 characters" value={form.password} onChange={onChange}
-                                className="w-full pl-10 pr-12 py-3 border border-stone-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent outline-none bg-stone-50 focus:bg-white transition-all" />
-                            <button type="button" onClick={() => setShowPassword(s => !s)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors">
-                                {showPassword ? <FaEyeSlash size={14} /> : <FaEye size={14} />}
+                        {error && (
+                            <div className="mb-5 bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl flex items-center gap-2">
+                                <span className="text-base">⚠️</span> {error}
+                            </div>
+                        )}
+
+                        <form onSubmit={submitHandler} className="space-y-5">
+                            {/* Name */}
+                            <div>
+                                <label className="text-xs font-bold text-zinc-500 mb-1.5 block uppercase tracking-wide">Full Name</label>
+                                <div className="relative">
+                                    <FaUser className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={13} />
+                                    <input name="name" type="text" placeholder="e.g. Rahul Verma"
+                                        value={form.name} onChange={onChange} className="input-field" />
+                                </div>
+                            </div>
+
+                            {/* Email */}
+                            <div>
+                                <label className="text-xs font-bold text-zinc-500 mb-1.5 block uppercase tracking-wide">Email Address</label>
+                                <div className="relative">
+                                    <FaEnvelope className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={13} />
+                                    <input name="email" type="email" placeholder="your@email.com"
+                                        value={form.email} onChange={onChange} className="input-field" />
+                                </div>
+                            </div>
+
+                            {/* Password */}
+                            <div>
+                                <label className="text-xs font-bold text-zinc-500 mb-1.5 block uppercase tracking-wide">Password</label>
+                                <div className="relative">
+                                    <FaLock className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={13} />
+                                    <input name="password" type={showPassword ? "text" : "password"}
+                                        placeholder="Min. 6 characters" value={form.password} onChange={onChange}
+                                        style={{ paddingRight: "44px" }}
+                                        className="input-field" />
+                                    <button type="button" onClick={() => setShowPassword(s => !s)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-amber-500 transition-colors p-1">
+                                        {showPassword ? <FaEyeSlash size={14} /> : <FaEye size={14} />}
+                                    </button>
+                                </div>
+                                {/* Password strength hint */}
+                                {form.password.length > 0 && (
+                                    <div className="mt-1.5 flex gap-1">
+                                        {[1, 2, 3].map(i => (
+                                            <div key={i} className={`h-1 flex-1 rounded-full transition-all ${form.password.length >= i * 3
+                                                    ? form.password.length >= 9 ? "bg-emerald-400"
+                                                        : form.password.length >= 6 ? "bg-amber-400"
+                                                            : "bg-red-400"
+                                                    : "bg-stone-200"
+                                                }`} />
+                                        ))}
+                                        <span className="text-[10px] text-zinc-400 ml-1">
+                                            {form.password.length < 6 ? "Weak" : form.password.length < 9 ? "Medium" : "Strong"}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <button type="submit" disabled={loading}
+                                className="w-full bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white py-3.5 rounded-xl font-black text-sm transition-all disabled:opacity-60 shadow-lg shadow-amber-200 flex items-center justify-center gap-2">
+                                {loading ? (
+                                    <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Creating account...</>
+                                ) : "Create Account 🎉"}
                             </button>
+                        </form>
+
+                        <div className="mt-6 pt-6 border-t border-stone-100 text-center">
+                            <p className="text-sm text-zinc-400">
+                                Already have an account?{" "}
+                                <Link to="/login" className="text-amber-600 font-black hover:text-amber-700 transition-colors">
+                                    Login →
+                                </Link>
+                            </p>
                         </div>
                     </div>
+                </div>
 
-                    <button type="submit" disabled={loading}
-                        className="w-full bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-60 shadow-md shadow-amber-200">
-                        {loading ? "Creating account..." : "Create Account"}
-                    </button>
-                </form>
-
-                <p className="text-center text-sm text-zinc-400 mt-6">
-                    Already have an account?{" "}
-                    <Link to="/login" className="text-amber-600 font-bold hover:underline">Login</Link>
-                </p>
+                <p className="text-center text-xs text-zinc-400 mt-4">🔒 Your data is safe & secure</p>
             </div>
         </div>
     );

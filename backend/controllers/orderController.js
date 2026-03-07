@@ -170,9 +170,15 @@ export const cancelOrder = async (req, res) => {
         }
 
         order.orderStatus = "CANCELLED";
-        order.statusTimeline = order.statusTimeline || {};
-        order.statusTimeline.cancelledAt = new Date();
         order.cancellationReason = req.body.reason?.trim() || "Cancelled by customer";
+
+        // ✅ FIX — statusTimeline nested object update
+        order.statusTimeline = {
+            ...order.statusTimeline.toObject?.() || order.statusTimeline,
+            cancelledAt: new Date(),
+        };
+        order.markModified("statusTimeline"); // ✅ Mongoose ko batao ki nested object changed hai
+
         await order.save();
 
         const cancelMail = getOrderStatusEmailTemplate({

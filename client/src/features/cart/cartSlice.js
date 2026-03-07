@@ -42,7 +42,7 @@ const cartSlice = createSlice({
         updateQuantity: (state, action) => {
             const { id, quantity } = action.payload;
             const item = state.items.find(i => i._id === id);
-            if (item && quantity >= 1) {
+            if (item && quantity >= 1 && quantity <= 99) { // ✅ Max 99 limit
                 item.quantity = quantity;
             }
         },
