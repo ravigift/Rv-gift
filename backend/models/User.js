@@ -13,8 +13,7 @@ const userSchema = new mongoose.Schema(
             unique: true,
             lowercase: true,
             trim: true,
-            // Standard Email Regex
-            match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Please fill a valid email address']
+            match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, "Please fill a valid email address"],
         },
         location: {
             latitude: { type: Number },
@@ -26,14 +25,9 @@ const userSchema = new mongoose.Schema(
         password: {
             type: String,
             required: [true, "Password is required"],
-            minlength: [8, "Password must be at least 8 characters long"],
-            validate: {
-                validator: function (v) {
-                    // Requires at least one digit, one lowercase, one uppercase, and one special character
-                    return /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*]).{8,}$/.test(v);
-                },
-                message: "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character."
-            }
+            minlength: [6, "Password must be at least 6 characters"],
+            // ✅ Validation controller mein karo — model mein nahi
+            // Bcrypt hash yahan validate nahi hoga
         },
         role: {
             type: String,

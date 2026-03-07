@@ -6,6 +6,7 @@ const orderSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
             required: true,
+            index: true, // ✅ Fast query for getMyOrders
         },
 
         items: [
@@ -15,21 +16,19 @@ const orderSchema = new mongoose.Schema(
                 price: Number,
                 qty: Number,
                 image: String,
-
-                // ✅ CUSTOMIZATION PER ITEM
                 customization: {
-                    text: { type: String, default: "" },       // Customer ka naam/message
-                    imageUrl: { type: String, default: "" },   // Cloudinary URL
-                    note: { type: String, default: "" },       // Extra instructions
+                    text: { type: String, default: "" },
+                    imageUrl: { type: String, default: "" },
+                    note: { type: String, default: "" },
                 },
             },
         ],
 
-        customerName: String,
-        phone: String,
-        address: String,
-        email: String,
-        totalAmount: Number,
+        customerName: { type: String, trim: true },
+        phone: { type: String, trim: true },
+        address: { type: String, trim: true },
+        email: { type: String, trim: true, lowercase: true },
+        totalAmount: { type: Number, min: 0 },
 
         orderStatus: {
             type: String,
@@ -39,6 +38,7 @@ const orderSchema = new mongoose.Schema(
                 "DELIVERED", "CANCELLED",
             ],
             default: "PLACED",
+            index: true, // ✅ Fast status queries
         },
 
         statusTimeline: {
@@ -47,7 +47,18 @@ const orderSchema = new mongoose.Schema(
             packedAt: Date,
             shippedAt: Date,
             deliveredAt: Date,
+            cancelledAt: Date, // ✅ Missing tha
         },
+
+        // ✅ Missing tha
+        cancellationReason: {
+            type: String,
+            default: "",
+        },
+
+        // ✅ Location tracking
+        latitude: Number,
+        longitude: Number,
     },
     { timestamps: true }
 );
