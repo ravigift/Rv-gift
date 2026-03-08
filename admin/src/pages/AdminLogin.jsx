@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAdminAuth } from "../auth/AdminAuthContext";
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash, FaGift, FaShieldAlt } from "react-icons/fa";
 
@@ -48,8 +48,8 @@ const AdminLogin = () => {
                 @keyframes float3 { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-10px) scale(1.05)} }
                 @keyframes pulse-ring { 0%{transform:scale(0.95);opacity:0.7} 70%{transform:scale(1.1);opacity:0} 100%{transform:scale(0.95);opacity:0} }
                 @keyframes slideUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
-                @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
                 @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }
+                @keyframes spin { to{transform:rotate(360deg)} }
 
                 .login-card { animation: slideUp 0.6s cubic-bezier(0.16,1,0.3,1) forwards; }
                 .orb1 { animation: float1 6s ease-in-out infinite; }
@@ -86,6 +86,14 @@ const AdminLogin = () => {
                     background:rgba(255,255,255,0.1);
                     border-color:rgba(255,255,255,0.2);
                 }
+                .forgot-link {
+                    color: rgba(251,191,36,0.7);
+                    font-size: 12px;
+                    font-weight: 700;
+                    text-decoration: none;
+                    transition: color 0.2s;
+                }
+                .forgot-link:hover { color: #f59e0b; }
             `}</style>
 
             {/* Background orbs */}
@@ -147,9 +155,14 @@ const AdminLogin = () => {
 
                         {/* Password */}
                         <div style={{ marginBottom: 24 }}>
-                            <label style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 8 }}>
-                                Password
-                            </label>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                                <label style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                                    Password
+                                </label>
+                                <Link to="/admin/forgot-password" className="forgot-link">
+                                    Forgot Password?
+                                </Link>
+                            </div>
                             <div style={{ position: "relative" }}>
                                 <FaLock size={13} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: focused === "password" ? "#f59e0b" : "rgba(255,255,255,0.3)", transition: "color 0.2s" }} />
                                 <input
@@ -180,13 +193,9 @@ const AdminLogin = () => {
                                     Signing in...
                                 </>
                             ) : (
-                                <>
-                                    <FaShieldAlt size={14} /> Sign In to Admin Panel
-                                </>
+                                <><FaShieldAlt size={14} /> Sign In to Admin Panel</>
                             )}
                         </button>
-
-                        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
                     </form>
                 </div>
 

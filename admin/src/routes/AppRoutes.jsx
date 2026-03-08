@@ -2,6 +2,8 @@ import { Routes, Route, Navigate } from "react-router-dom";
 
 /* AUTH */
 import AdminLogin from "../pages/AdminLogin";
+import AdminForgotPassword from "../pages/AdminForgotPassword";
+import AdminResetPassword from "../pages/AdminResetPassword";
 
 /* ADMIN LAYOUT */
 import Admin from "../pages/Admin";
@@ -19,8 +21,10 @@ import AdminRoute from "./AdminRoute";
 const AppRoutes = () => {
     return (
         <Routes>
-            {/* LOGIN */}
+            {/* AUTH — PUBLIC */}
             <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin/forgot-password" element={<AdminForgotPassword />} />
+            <Route path="/admin/reset-password/:token" element={<AdminResetPassword />} />
 
             {/* PROTECTED ADMIN PANEL */}
             <Route element={<AdminRoute />}>
@@ -28,7 +32,7 @@ const AppRoutes = () => {
                     <Route index element={<AdminDashboard />} />
                     <Route path="products" element={<AdminProducts />} />
                     <Route path="products/new" element={<AdminAddProduct />} />
-                    <Route path="products/:id/edit" element={<AdminEditProduct />} /> {/* ✅ FIXED */}
+                    <Route path="products/:id/edit" element={<AdminEditProduct />} />
                     <Route path="orders" element={<AdminOrders />} />
                 </Route>
             </Route>
