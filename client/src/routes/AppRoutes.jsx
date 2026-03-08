@@ -10,12 +10,12 @@ import MyOrders from "../pages/MyOrders";
 import OrderDetails from "../pages/OrderDetails";
 import OrderSuccess from "../pages/OrderSuccess";
 import ProductDetails from "../components/ProductDetails";
+import Profile from "../pages/Profile";
+import Wishlist from "../pages/Wishlist";
 
 const ScrollToTop = () => {
     const { pathname } = useLocation();
-    useEffect(() => {
-        window.scrollTo(0, 0);
-    }, [pathname]);
+    useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
     return null;
 };
 
@@ -37,6 +37,9 @@ const AppRoutes = () => {
                     <Route path="/orders" element={<MyOrders />} />
                     <Route path="/orders/:id" element={<OrderDetails />} />
                     <Route path="/order-success/:id" element={<OrderSuccess />} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/profile/addresses" element={<Profile />} />
+                    <Route path="/wishlist" element={<Wishlist />} />
                 </Route>
 
                 {/* FALLBACK */}

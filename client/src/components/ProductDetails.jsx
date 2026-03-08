@@ -8,12 +8,12 @@ import {
     FaStar, FaRegStar, FaShoppingCart, FaBolt,
     FaTrash, FaCheckCircle, FaArrowLeft,
     FaUpload, FaTimes, FaPencilAlt, FaStickyNote,
-    FaRuler,
+    FaRuler, FaHeart, FaShare,
 } from "react-icons/fa";
 
 const StarRow = ({ value }) => (
     <div className="flex gap-0.5">
-        {[1, 2, 3, 4, 5].map((s) =>
+        {[1, 2, 3, 4, 5].map(s =>
             s <= value
                 ? <FaStar key={s} className="text-amber-400" size={13} />
                 : <FaRegStar key={s} className="text-stone-300" size={13} />
@@ -24,7 +24,7 @@ const StarRow = ({ value }) => (
 const ProductDetails = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { addItem } = useCart();
+    const { addItem, cartItems } = useCart();
     const { user } = useAuth();
 
     const [product, setProduct] = useState(null);
@@ -32,26 +32,25 @@ const ProductDetails = () => {
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-
-    // ✅ Size selection
     const [selectedSize, setSelectedSize] = useState("");
+    const [imgZoomed, setImgZoomed] = useState(false);
+    const [wished, setWished] = useState(false);
+    const [addedFlash, setAddedFlash] = useState(false);
 
-    /* ── Customization ── */
     const [customText, setCustomText] = useState("");
     const [customNote, setCustomNote] = useState("");
     const [customImagePreview, setCustomImagePreview] = useState("");
     const [customImageUrl, setCustomImageUrl] = useState("");
     const [uploadingImage, setUploadingImage] = useState(false);
 
-    /* ── Reviews ── */
     const [myRating, setMyRating] = useState(0);
     const [myComment, setMyComment] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [reviewError, setReviewError] = useState("");
     const [reviewSuccess, setReviewSuccess] = useState(false);
-
-    // ✅ Highlights open/close
     const [highlightsOpen, setHighlightsOpen] = useState(true);
+
+    const inCart = cartItems.some(i => i._id === id);
 
     const fetchReviews = async () => {
         try {
@@ -106,34 +105,18 @@ const ProductDetails = () => {
     };
 
     const removeCustomImage = () => { setCustomImagePreview(""); setCustomImageUrl(""); };
-
-    const getCustomization = () => ({
-        text: customText.trim(),
-        imageUrl: customImageUrl,
-        note: customNote.trim(),
-    });
+    const getCustomization = () => ({ text: customText.trim(), imageUrl: customImageUrl, note: customNote.trim() });
 
     const handleAddToCart = () => {
-        if (product.sizes?.length > 0 && !selectedSize) {
-            return alert("Please select a size first!");
-        }
+        if (product.sizes?.length > 0 && !selectedSize) return alert("Please select a size first!");
         addItem({ ...product, selectedSize, customization: getCustomization() });
+        setAddedFlash(true);
+        setTimeout(() => setAddedFlash(false), 1500);
     };
 
     const handleBuyNow = () => {
-        if (product.sizes?.length > 0 && !selectedSize) {
-            return alert("Please select a size first!");
-        }
-        navigate("/checkout", {
-            state: {
-                buyNowItem: {
-                    ...product,
-                    quantity: 1,
-                    selectedSize,
-                    customization: getCustomization(),
-                },
-            },
-        });
+        if (product.sizes?.length > 0 && !selectedSize) return alert("Please select a size first!");
+        navigate("/checkout", { state: { buyNowItem: { ...product, quantity: 1, selectedSize, customization: getCustomization() } } });
     };
 
     const handleSubmitReview = async (e) => {
@@ -164,103 +147,166 @@ const ProductDetails = () => {
     };
 
     if (loading) return (
-        <div className="min-h-screen flex items-center justify-center">
-            <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
+        <div className="min-h-screen flex items-center justify-center bg-stone-50">
+            <div className="text-center">
+                <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-zinc-400 text-sm font-medium">Loading product...</p>
+            </div>
         </div>
     );
 
     if (!product || error) return (
-        <div className="min-h-screen flex items-center justify-center text-red-500">
-            {error || "Product not found"}
+        <div className="min-h-screen flex flex-col items-center justify-center bg-stone-50 gap-3">
+            <p className="text-5xl">😕</p>
+            <p className="text-zinc-600 font-bold">{error || "Product not found"}</p>
+            <button onClick={() => navigate("/")} className="px-5 py-2 bg-amber-500 text-white rounded-xl font-bold text-sm hover:bg-amber-600 transition-all cursor-pointer">
+                Go Home
+            </button>
         </div>
     );
 
     const imageUrl = product.images?.[0]?.url || "";
-
-    // Highlights — handle Map or plain object
     const highlightEntries = product.highlights
-        ? (product.highlights instanceof Map
-            ? [...product.highlights.entries()]
-            : Object.entries(product.highlights))
+        ? (product.highlights instanceof Map ? [...product.highlights.entries()] : Object.entries(product.highlights))
         : [];
 
-    return (
-        <div className="min-h-screen bg-stone-100 py-6 px-4">
-            <div className="max-w-6xl mx-auto space-y-5">
+    const avgRating = product.rating || 0;
+    const ratingBars = [5, 4, 3, 2, 1].map(star => ({
+        star,
+        count: reviews.filter(r => r.rating === star).length,
+        pct: reviews.length ? Math.round((reviews.filter(r => r.rating === star).length / reviews.length) * 100) : 0,
+    }));
 
+    return (
+        <div className="min-h-screen bg-stone-100 py-6 px-4" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
+                @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+                .fade-up { animation: fadeUp 0.35s ease forwards; }
+                .img-zoom { transition: transform 0.4s ease; }
+                .img-zoom:hover { transform: scale(1.06); }
+            `}</style>
+
+            <div className="max-w-6xl mx-auto space-y-4 fade-up">
+
+                {/* Back */}
                 <button onClick={() => navigate(-1)}
-                    className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-800 font-medium transition-colors">
-                    <FaArrowLeft size={11} /> Back
+                    className="flex items-center gap-2 text-sm text-zinc-500 hover:text-amber-600 font-semibold transition-colors cursor-pointer group">
+                    <span className="w-8 h-8 rounded-xl bg-white border border-stone-200 flex items-center justify-center group-hover:border-amber-300 group-hover:bg-amber-50 transition-all">
+                        <FaArrowLeft size={11} />
+                    </span>
+                    Back
                 </button>
 
-                {/* ── Product ── */}
-                <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-6">
-                    <div className="grid md:grid-cols-2 gap-8">
+                {/* ── Main Product Card ── */}
+                <div className="bg-white rounded-3xl border border-stone-100 shadow-sm overflow-hidden">
+                    <div className="grid md:grid-cols-2 gap-0">
 
-                        {/* Image */}
-                        <div className="h-96 rounded-2xl bg-stone-50 border border-stone-200 overflow-hidden flex items-center justify-center">
-                            {imageUrl
-                                ? <img src={imageUrl} alt={product.name} className="w-full h-full object-contain p-4" />
-                                : <span className="text-5xl">🎁</span>
-                            }
-                        </div>
+                        {/* IMAGE */}
+                        <div className="relative bg-gradient-to-br from-stone-50 via-white to-amber-50/20 flex items-center justify-center overflow-hidden"
+                            style={{ minHeight: "420px" }}>
+                            {imageUrl ? (
+                                <div className="w-full h-full flex items-center justify-center p-8 overflow-hidden cursor-zoom-in"
+                                    onClick={() => setImgZoomed(true)}>
+                                    <img src={imageUrl} alt={product.name}
+                                        className="max-h-80 w-full object-contain img-zoom drop-shadow-lg" />
+                                </div>
+                            ) : (
+                                <span className="text-7xl">🎁</span>
+                            )}
 
-                        <div className="flex flex-col">
-                            <h1 className="text-2xl font-black text-zinc-900 mb-2">{product.name}</h1>
-
-                            <div className="flex items-center gap-2 mb-3">
-                                <span className={`flex items-center gap-1 text-white text-xs px-2 py-0.5 rounded font-bold ${product.rating >= 4 ? "bg-emerald-500" : "bg-amber-400"}`}>
-                                    {product.rating?.toFixed(1) || "0.0"} <FaStar size={8} />
-                                </span>
-                                <span className="text-sm text-zinc-400">{product.numReviews || 0} ratings</span>
+                            {/* Badges */}
+                            <div className="absolute top-4 left-4 flex flex-col gap-1.5">
                                 {product.isCustomizable && (
-                                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-2 py-0.5 rounded-full">
+                                    <span className="bg-emerald-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-sm">
                                         ✏️ Customizable
+                                    </span>
+                                )}
+                                {product.inStock === false && (
+                                    <span className="bg-red-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full">
+                                        Sold Out
                                     </span>
                                 )}
                             </div>
 
-                            <p className="text-3xl font-black text-emerald-600 mb-3">
-                                ₹{product.price?.toLocaleString("en-IN")}
-                            </p>
+                            {/* Wishlist */}
+                            <button onClick={() => setWished(w => !w)}
+                                className={`absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm cursor-pointer ${wished ? "bg-red-500 text-white" : "bg-white text-zinc-300 hover:text-red-400 border border-stone-200"}`}>
+                                <FaHeart size={14} />
+                            </button>
+                        </div>
+
+                        {/* INFO */}
+                        <div className="flex flex-col p-6 md:p-8 border-t md:border-t-0 md:border-l border-stone-100">
+
+                            {/* Category */}
+                            {product.category && (
+                                <span className="text-[11px] font-black text-amber-600 uppercase tracking-widest mb-2">
+                                    {product.category.replace(/-/g, " ")}
+                                </span>
+                            )}
+
+                            <h1 className="text-2xl font-black text-zinc-900 leading-tight mb-3">
+                                {product.name}
+                            </h1>
+
+                            {/* Rating row */}
+                            <div className="flex items-center gap-2 mb-4 flex-wrap">
+                                <span className={`flex items-center gap-1 text-white text-xs px-2.5 py-1 rounded-lg font-black ${avgRating >= 4 ? "bg-emerald-500" : avgRating >= 3 ? "bg-amber-400" : "bg-zinc-400"}`}>
+                                    {avgRating.toFixed(1)} <FaStar size={9} />
+                                </span>
+                                <span className="text-sm text-zinc-400 font-medium">{product.numReviews || 0} ratings</span>
+                                <span className="text-zinc-200">|</span>
+                                <span className="text-xs text-zinc-400">{reviews.length} reviews</span>
+                            </div>
+
+                            {/* Price */}
+                            <div className="flex items-baseline gap-2 mb-4 pb-4 border-b border-stone-100">
+                                <p className="text-4xl font-black text-zinc-900">
+                                    ₹{product.price?.toLocaleString("en-IN")}
+                                </p>
+                                <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
+                                    Free Delivery ₹499+
+                                </span>
+                            </div>
 
                             {product.description && (
                                 <p className="text-zinc-500 text-sm leading-relaxed mb-4">{product.description}</p>
                             )}
 
-                            {/* ✅ SIZE SELECTOR */}
+                            {/* SIZE SELECTOR */}
                             {product.sizes?.length > 0 && (
                                 <div className="mb-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <FaRuler size={11} className="text-zinc-500" />
-                                        <p className="text-sm font-bold text-zinc-700">
-                                            Select Size
-                                            {selectedSize && <span className="ml-2 text-amber-600">{selectedSize}</span>}
-                                        </p>
-                                    </div>
+                                    <p className="text-sm font-bold text-zinc-700 mb-2 flex items-center gap-1.5">
+                                        <FaRuler size={11} className="text-zinc-400" />
+                                        Select Size
+                                        {selectedSize && <span className="text-amber-600 font-black">— {selectedSize}</span>}
+                                    </p>
                                     <div className="flex flex-wrap gap-2">
                                         {product.sizes.map(size => (
                                             <button key={size} onClick={() => setSelectedSize(size)}
-                                                className={`min-w-[44px] h-10 px-3 rounded-xl text-sm font-bold border transition-all ${selectedSize === size
-                                                        ? "bg-zinc-900 text-white border-zinc-900"
-                                                        : "bg-white text-zinc-600 border-stone-200 hover:border-zinc-400"
+                                                className={`min-w-[44px] h-10 px-3 rounded-xl text-sm font-bold border transition-all cursor-pointer active:scale-95 ${selectedSize === size
+                                                        ? "bg-zinc-900 text-white border-zinc-900 shadow-sm"
+                                                        : "bg-white text-zinc-600 border-stone-200 hover:border-amber-400 hover:text-amber-600"
                                                     }`}>
                                                 {size}
                                             </button>
                                         ))}
                                     </div>
-                                    {product.sizes.length > 0 && !selectedSize && (
-                                        <p className="text-xs text-amber-600 mt-1.5 font-medium">Please select a size</p>
+                                    {!selectedSize && (
+                                        <p className="text-xs text-amber-600 mt-1.5 font-medium">⚠️ Please select a size</p>
                                     )}
                                 </div>
                             )}
 
-                            {/* ── CUSTOMIZATION FORM ── */}
+                            {/* CUSTOMIZATION */}
                             {product.isCustomizable && (
-                                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4 space-y-3">
-                                    <p className="font-black text-amber-800 text-sm">✏️ Customize Your Order</p>
+                                <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 mb-4 space-y-3">
+                                    <p className="font-black text-amber-800 text-sm flex items-center gap-1.5">
+                                        ✏️ Customize Your Order
+                                    </p>
                                     <div>
-                                        <label className="text-xs font-bold text-amber-700 mb-1 flex items-center gap-1 block">
+                                        <label className="text-xs font-bold text-amber-700 mb-1.5 flex items-center gap-1 block">
                                             <FaPencilAlt size={9} /> Name / Message to Print
                                         </label>
                                         <input type="text" value={customText} onChange={e => setCustomText(e.target.value)}
@@ -268,67 +314,82 @@ const ProductDetails = () => {
                                             className="w-full px-3 py-2.5 border border-amber-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 transition-all" />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-bold text-amber-700 mb-1 flex items-center gap-1 block">
-                                            <FaUpload size={9} /> Upload Your Photo/Design
+                                        <label className="text-xs font-bold text-amber-700 mb-1.5 flex items-center gap-1 block">
+                                            <FaUpload size={9} /> Upload Photo / Design
                                         </label>
                                         {!customImagePreview ? (
-                                            <label className="flex items-center justify-center gap-2 w-full h-20 border-2 border-dashed border-amber-300 rounded-xl cursor-pointer hover:border-amber-500 hover:bg-amber-100 transition-all">
+                                            <label className="flex items-center justify-center gap-2 w-full h-20 border-2 border-dashed border-amber-300 rounded-xl cursor-pointer hover:border-amber-500 hover:bg-white/60 transition-all">
                                                 {uploadingImage
                                                     ? <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
-                                                    : <><FaUpload className="text-amber-400" /><span className="text-sm text-amber-600 font-medium">Click to upload</span></>
+                                                    : <><FaUpload className="text-amber-400" /><span className="text-sm text-amber-600 font-semibold">Click to upload</span></>
                                                 }
                                                 <input type="file" accept="image/*" onChange={handleCustomImageChange} className="hidden" />
                                             </label>
                                         ) : (
                                             <div className="relative inline-block">
                                                 <img src={customImagePreview} alt="custom" className="h-20 w-20 object-cover rounded-xl border-2 border-amber-300" />
-                                                <button onClick={removeCustomImage}
-                                                    className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center">
+                                                <button onClick={removeCustomImage} className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center cursor-pointer">
                                                     <FaTimes size={9} />
                                                 </button>
-                                                {customImageUrl && (
-                                                    <span className="absolute bottom-1 left-1 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">✓</span>
-                                                )}
+                                                {customImageUrl && <span className="absolute bottom-1 left-1 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">✓</span>}
                                             </div>
                                         )}
                                     </div>
                                     <div>
-                                        <label className="text-xs font-bold text-amber-700 mb-1 flex items-center gap-1 block">
-                                            <FaStickyNote size={9} /> Special Instructions (Optional)
+                                        <label className="text-xs font-bold text-amber-700 mb-1.5 flex items-center gap-1 block">
+                                            <FaStickyNote size={9} /> Special Instructions
                                         </label>
                                         <textarea value={customNote} onChange={e => setCustomNote(e.target.value)}
-                                            placeholder="e.g. White background, bold font, size L"
+                                            placeholder="e.g. White background, bold font..."
                                             rows={2}
                                             className="w-full px-3 py-2.5 border border-amber-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 transition-all resize-none" />
                                     </div>
                                 </div>
                             )}
 
-                            {/* Buttons */}
+                            {/* BUTTONS */}
                             <div className="flex gap-3 mt-auto">
                                 <button onClick={handleAddToCart}
-                                    className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white py-3 rounded-xl font-bold text-sm transition-all active:scale-95">
-                                    <FaShoppingCart size={13} /> Add to Cart
+                                    disabled={product.inStock === false}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm transition-all active:scale-95 cursor-pointer shadow-sm ${inCart
+                                            ? "bg-emerald-50 text-emerald-600 border-2 border-emerald-200"
+                                            : addedFlash
+                                                ? "bg-emerald-500 text-white"
+                                                : product.inStock === false
+                                                    ? "bg-stone-100 text-stone-400 cursor-not-allowed"
+                                                    : "bg-zinc-900 text-white hover:bg-zinc-800"
+                                        }`}>
+                                    <FaShoppingCart size={13} />
+                                    {inCart ? "In Cart ✔" : addedFlash ? "Added!" : "Add to Cart"}
                                 </button>
                                 <button onClick={handleBuyNow}
-                                    className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm transition-all active:scale-95 shadow-md shadow-emerald-200">
+                                    disabled={product.inStock === false}
+                                    className="flex-1 flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white py-3.5 rounded-2xl font-black text-sm transition-all active:scale-95 cursor-pointer shadow-md shadow-amber-200 disabled:opacity-50">
                                     <FaBolt size={13} /> Buy Now
                                 </button>
+                            </div>
+
+                            {/* Trust badges */}
+                            <div className="flex gap-3 mt-4 flex-wrap">
+                                {["🔒 Secure", "🚚 Fast Delivery", "💬 WhatsApp Support"].map(t => (
+                                    <span key={t} className="text-[11px] text-zinc-400 font-medium">{t}</span>
+                                ))}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* ✅ PRODUCT HIGHLIGHTS */}
+                {/* HIGHLIGHTS */}
                 {highlightEntries.length > 0 && (
-                    <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
-                        <button
-                            onClick={() => setHighlightsOpen(o => !o)}
-                            className="w-full flex items-center justify-between px-6 py-4 hover:bg-stone-50 transition-colors">
-                            <h2 className="font-black text-zinc-900 text-base">Product highlights</h2>
-                            <span className="text-zinc-400 text-lg">{highlightsOpen ? "∧" : "∨"}</span>
+                    <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                        <button onClick={() => setHighlightsOpen(o => !o)}
+                            className="w-full flex items-center justify-between px-6 py-4 hover:bg-stone-50 transition-colors cursor-pointer">
+                            <h2 className="font-black text-zinc-900 text-base flex items-center gap-2">
+                                <span className="w-1 h-4 bg-amber-500 rounded-full" />
+                                Product Highlights
+                            </h2>
+                            <span className="text-zinc-400 text-lg transition-transform duration-200" style={{ transform: highlightsOpen ? "rotate(180deg)" : "rotate(0deg)" }}>∨</span>
                         </button>
-
                         {highlightsOpen && (
                             <div className="px-6 pb-5">
                                 <div className="grid grid-cols-2 gap-0 border-t border-stone-100">
@@ -344,52 +405,85 @@ const ProductDetails = () => {
                     </div>
                 )}
 
-                {/* ── Reviews ── */}
-                <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-6">
-                    <h2 className="font-black text-zinc-900 text-lg mb-5">Ratings & Reviews</h2>
+                {/* REVIEWS */}
+                <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6">
+                    <h2 className="font-black text-zinc-900 text-lg mb-5 flex items-center gap-2">
+                        <span className="w-1 h-5 bg-amber-500 rounded-full" />
+                        Ratings & Reviews
+                    </h2>
 
+                    {/* Rating Summary */}
+                    {reviews.length > 0 && (
+                        <div className="flex gap-6 mb-6 p-4 bg-stone-50 rounded-2xl border border-stone-100">
+                            <div className="text-center shrink-0">
+                                <p className="text-5xl font-black text-zinc-900">{avgRating.toFixed(1)}</p>
+                                <StarRow value={Math.round(avgRating)} />
+                                <p className="text-xs text-zinc-400 mt-1">{reviews.length} reviews</p>
+                            </div>
+                            <div className="flex-1 space-y-1.5">
+                                {ratingBars.map(({ star, count, pct }) => (
+                                    <div key={star} className="flex items-center gap-2">
+                                        <span className="text-xs text-zinc-500 w-4 shrink-0">{star}</span>
+                                        <FaStar size={9} className="text-amber-400 shrink-0" />
+                                        <div className="flex-1 h-1.5 bg-stone-200 rounded-full overflow-hidden">
+                                            <div className="h-full bg-amber-400 rounded-full transition-all duration-500"
+                                                style={{ width: `${pct}%` }} />
+                                        </div>
+                                        <span className="text-xs text-zinc-400 w-5 shrink-0">{count}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Write Review */}
                     {user ? (
-                        <form onSubmit={handleSubmitReview} className="mb-6 bg-stone-50 rounded-2xl p-4 border border-stone-200">
-                            <p className="text-sm font-bold text-zinc-700 mb-3">Write a Review</p>
+                        <form onSubmit={handleSubmitReview} className="mb-6 bg-stone-50 rounded-2xl p-4 border border-stone-100">
+                            <p className="text-sm font-black text-zinc-700 mb-3">Write a Review</p>
                             <div className="flex gap-1 mb-3">
-                                {[1, 2, 3, 4, 5].map((s) => (
-                                    <button key={s} type="button" onClick={() => setMyRating(s)} className="text-2xl">
+                                {[1, 2, 3, 4, 5].map(s => (
+                                    <button key={s} type="button" onClick={() => setMyRating(s)}
+                                        className="text-2xl cursor-pointer hover:scale-110 transition-transform active:scale-95">
                                         {s <= myRating ? <FaStar className="text-amber-400" /> : <FaRegStar className="text-stone-300" />}
                                     </button>
                                 ))}
                             </div>
                             <textarea value={myComment} onChange={e => setMyComment(e.target.value)}
-                                rows={3} placeholder="Share your experience..."
-                                className="w-full border border-stone-200 rounded-xl p-3 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none" />
-                            {reviewError && <p className="text-red-500 text-xs mb-2">{reviewError}</p>}
+                                rows={3} placeholder="Share your experience with this product..."
+                                className="w-full border border-stone-200 rounded-xl p-3 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none transition-all" />
+                            {reviewError && <p className="text-red-500 text-xs mb-2 bg-red-50 px-3 py-1.5 rounded-lg">{reviewError}</p>}
                             {reviewSuccess && (
-                                <p className="text-emerald-600 text-xs mb-2 flex items-center gap-1">
-                                    <FaCheckCircle /> Review submitted!
+                                <p className="text-emerald-600 text-xs mb-2 flex items-center gap-1 font-bold">
+                                    <FaCheckCircle /> Review submitted successfully!
                                 </p>
                             )}
                             <button type="submit" disabled={submitting}
-                                className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-sm transition-all active:scale-95 disabled:opacity-60">
+                                className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-sm transition-all active:scale-95 disabled:opacity-60 cursor-pointer shadow-sm shadow-amber-200">
                                 {submitting ? "Submitting..." : "Submit Review"}
                             </button>
                         </form>
                     ) : (
                         <button onClick={() => navigate("/login")}
-                            className="mb-6 px-5 py-2.5 bg-amber-500 text-white rounded-xl font-bold text-sm hover:bg-amber-600 transition-all">
-                            Login to Write Review
+                            className="mb-6 px-5 py-2.5 bg-amber-500 text-white rounded-xl font-bold text-sm hover:bg-amber-600 transition-all cursor-pointer active:scale-95 shadow-sm shadow-amber-200">
+                            Login to Write a Review
                         </button>
                     )}
 
                     {reviews.length === 0 ? (
-                        <p className="text-zinc-400 text-sm text-center py-6">No reviews yet — be the first!</p>
+                        <div className="text-center py-8 bg-stone-50 rounded-2xl border border-dashed border-stone-200">
+                            <p className="text-3xl mb-2">⭐</p>
+                            <p className="text-zinc-500 font-bold text-sm">No reviews yet</p>
+                            <p className="text-zinc-400 text-xs mt-1">Be the first to review this product!</p>
+                        </div>
                     ) : (
                         <div className="space-y-3">
-                            {reviews.map((r) => {
+                            {reviews.map(r => {
                                 const isOwn = user && (r.user === user._id || r.user?._id === user._id);
                                 return (
-                                    <div key={r._id} className="bg-stone-50 rounded-2xl border border-stone-200 p-4">
+                                    <div key={r._id} className="bg-stone-50 rounded-2xl border border-stone-100 p-4 hover:border-amber-100 transition-colors">
                                         <div className="flex justify-between items-start">
                                             <div className="flex gap-3">
-                                                <div className="w-9 h-9 rounded-full bg-amber-500 text-white flex items-center justify-center text-sm font-black shrink-0">
+                                                <div className="w-9 h-9 rounded-full bg-amber-500 text-white flex items-center justify-center text-sm font-black shrink-0 shadow-sm">
                                                     {r.name?.[0]?.toUpperCase() || "U"}
                                                 </div>
                                                 <div>
@@ -399,12 +493,12 @@ const ProductDetails = () => {
                                             </div>
                                             {isOwn && (
                                                 <button onClick={() => handleDeleteReview(r._id)}
-                                                    className="text-red-400 hover:text-red-600 transition-colors">
-                                                    <FaTrash size={13} />
+                                                    className="text-stone-300 hover:text-red-500 transition-colors cursor-pointer p-1 rounded-lg hover:bg-red-50">
+                                                    <FaTrash size={12} />
                                                 </button>
                                             )}
                                         </div>
-                                        {r.comment && <p className="text-sm text-zinc-600 mt-2 leading-relaxed">{r.comment}</p>}
+                                        {r.comment && <p className="text-sm text-zinc-600 mt-2.5 leading-relaxed">{r.comment}</p>}
                                     </div>
                                 );
                             })}
@@ -412,13 +506,29 @@ const ProductDetails = () => {
                     )}
                 </div>
 
+                {/* Related */}
                 {relatedProducts.length > 0 && (
-                    <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-6">
-                        <h2 className="font-black text-zinc-900 text-lg mb-4">Similar Products</h2>
+                    <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6">
+                        <h2 className="font-black text-zinc-900 text-lg mb-4 flex items-center gap-2">
+                            <span className="w-1 h-5 bg-amber-500 rounded-full" />
+                            Similar Products
+                        </h2>
                         <RelatedProductsSlider products={relatedProducts} />
                     </div>
                 )}
             </div>
+
+            {/* Image Zoom Modal */}
+            {imgZoomed && (
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-zoom-out"
+                    onClick={() => setImgZoomed(false)}>
+                    <img src={imageUrl} alt={product.name}
+                        className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl" />
+                    <button className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-all cursor-pointer">
+                        <FaTimes size={16} />
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

@@ -57,13 +57,14 @@ const Cart = () => {
                             const imageUrl = item.images?.[0]?.url || item.image || null;
                             return (
                                 <div key={`${item._id}-${index}`}
-                                    className="bg-white rounded-2xl border border-stone-100 hover:border-stone-200 hover:shadow-md shadow-sm p-4 flex items-center gap-4 transition-all duration-200">
+                                    className="bg-white rounded-2xl border border-stone-100 hover:border-amber-100 hover:shadow-lg shadow-sm p-4 flex items-center gap-4 transition-all duration-200 group/item">
 
                                     {/* Image */}
-                                    <div className="w-20 h-20 rounded-xl bg-stone-50 border border-stone-100 overflow-hidden flex items-center justify-center shrink-0">
+                                    <div className="w-20 h-20 rounded-2xl overflow-hidden flex items-center justify-center shrink-0"
+                                        style={{ background: "linear-gradient(135deg, #fafaf9, #fef9f0)" }}>
                                         {imageUrl ? (
                                             <img src={imageUrl} alt={item.name}
-                                                className="w-full h-full object-contain p-1 hover:scale-110 transition-transform duration-300"
+                                                className="w-full h-full object-contain p-1.5 group-hover/item:scale-110 transition-transform duration-300"
                                                 onError={e => { e.target.style.display = "none"; }} />
                                         ) : (
                                             <FaShoppingBag size={24} className="text-stone-300" />
@@ -72,39 +73,42 @@ const Cart = () => {
 
                                     {/* Info */}
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="font-bold text-zinc-800 text-sm truncate">{item.name}</h3>
-                                        <p className="text-zinc-500 font-black text-base mt-0.5">
-                                            ₹{item.price.toLocaleString("en-IN")}
+                                        <h3 className="font-bold text-zinc-800 text-sm truncate group-hover/item:text-amber-600 transition-colors">
+                                            {item.name}
+                                        </h3>
+                                        <p className="text-zinc-400 text-xs mt-0.5 font-medium">
+                                            ₹{item.price.toLocaleString("en-IN")} × {item.quantity}
                                         </p>
                                         {item.customization?.text && (
-                                            <p className="text-xs text-emerald-600 font-medium mt-0.5 truncate">
+                                            <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
                                                 ✏️ {item.customization.text}
-                                            </p>
+                                            </span>
                                         )}
                                     </div>
 
                                     {/* Qty Controls */}
-                                    <div className="flex items-center gap-2 bg-stone-100 rounded-xl px-3 py-2 shrink-0">
+                                    <div className="flex items-center gap-1.5 rounded-2xl p-1 shrink-0"
+                                        style={{ background: "#f5f4f2" }}>
                                         <button onClick={() => decQty(item._id)}
                                             disabled={item.quantity <= 1}
-                                            className="w-6 h-6 flex items-center justify-center font-black text-zinc-600 hover:text-red-500 disabled:opacity-30 transition-colors text-lg leading-none">
+                                            className="w-7 h-7 flex items-center justify-center font-black rounded-xl text-zinc-600 hover:bg-white hover:text-red-500 disabled:opacity-30 transition-all text-base leading-none">
                                             −
                                         </button>
-                                        <span className="font-black text-zinc-800 w-5 text-center text-sm">{item.quantity}</span>
+                                        <span className="font-black text-zinc-800 w-6 text-center text-sm">{item.quantity}</span>
                                         <button onClick={() => incQty(item._id)}
-                                            className="w-6 h-6 flex items-center justify-center font-black text-zinc-600 hover:text-emerald-600 transition-colors text-lg leading-none">
+                                            className="w-7 h-7 flex items-center justify-center font-black rounded-xl text-zinc-600 hover:bg-white hover:text-emerald-600 transition-all text-base leading-none">
                                             +
                                         </button>
                                     </div>
 
                                     {/* Total + Remove */}
-                                    <div className="text-right shrink-0">
-                                        <p className="font-black text-zinc-900 text-base">
+                                    <div className="text-right shrink-0 ml-1">
+                                        <p className="font-black text-zinc-900 text-base leading-none">
                                             ₹{(item.price * item.quantity).toLocaleString("en-IN")}
                                         </p>
                                         <button onClick={() => removeItem(item._id)}
-                                            className="text-red-400 text-xs font-bold hover:text-red-600 mt-1 transition-colors flex items-center gap-1 ml-auto">
-                                            <FaTrash size={9} /> Remove
+                                            className="text-stone-300 hover:text-red-500 mt-2 transition-colors flex items-center gap-1 ml-auto">
+                                            <FaTrash size={11} />
                                         </button>
                                     </div>
                                 </div>
@@ -137,7 +141,6 @@ const Cart = () => {
                                     )}
                                 </div>
 
-                                {/* Free delivery progress */}
                                 {delivery > 0 && amountNeededForFree > 0 && (
                                     <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
                                         <p className="text-xs text-amber-700 font-medium mb-1.5">

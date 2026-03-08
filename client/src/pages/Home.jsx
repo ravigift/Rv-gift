@@ -94,10 +94,10 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                             onClick={e => { e.stopPropagation(); if (!inCart) onAddToCart(product); }}
                             disabled={inCart || product.inStock === false}
                             className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${inCart
-                                    ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                                    : product.inStock === false
-                                        ? "bg-stone-100 text-stone-400 cursor-not-allowed"
-                                        : "bg-zinc-900 text-white hover:bg-zinc-700 shadow-sm"
+                                ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                                : product.inStock === false
+                                    ? "bg-stone-100 text-stone-400 cursor-not-allowed"
+                                    : "bg-zinc-900 text-white hover:bg-zinc-700 shadow-sm"
                                 }`}>
                             {inCart ? <>✔ In Cart</> : <><FaShoppingCart size={10} /> Add</>}
                         </button>
@@ -189,49 +189,65 @@ const Home = () => {
             `}</style>
 
             {/* HERO */}
+            {/* HERO - replace karo poora hero div */}
             {!searchQuery && !activeCategory && (
-                <div className="body-font relative w-full overflow-hidden bg-zinc-950" style={{ minHeight: "440px" }}>
-                    <div className="absolute inset-0 opacity-10"
-                        style={{ backgroundImage: `radial-gradient(circle at 20% 50%, #f59e0b 0%, transparent 50%), radial-gradient(circle at 80% 20%, #f59e0b 0%, transparent 40%), radial-gradient(circle at 60% 80%, #f59e0b 0%, transparent 30%)` }} />
-                    <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full border border-amber-500/20" />
-                    <div className="absolute -top-10 -right-10 w-60 h-60 rounded-full border border-amber-500/10" />
-                    <div className="absolute bottom-0 left-1/3 w-96 h-96 rounded-full border border-amber-500/10" />
+                <div className="body-font relative w-full overflow-hidden" style={{ minHeight: "460px", background: "linear-gradient(135deg, #0f1923 0%, #1a1a2e 50%, #16213e 100%)" }}>
+                    {/* Decorative circles */}
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full opacity-10"
+                        style={{ background: "radial-gradient(circle, #f59e0b 0%, transparent 70%)", transform: "translate(30%, -30%)" }} />
+                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full opacity-5"
+                        style={{ background: "radial-gradient(circle, #f59e0b 0%, transparent 70%)", transform: "translate(-30%, 30%)" }} />
+
+                    {/* Grid texture */}
+                    <div className="absolute inset-0 opacity-[0.03]"
+                        style={{ backgroundImage: "linear-gradient(#f59e0b 1px, transparent 1px), linear-gradient(90deg, #f59e0b 1px, transparent 1px)", backgroundSize: "50px 50px" }} />
 
                     <div className="relative max-w-7xl mx-auto px-4 py-16 md:py-24">
                         <div className="flex flex-col md:flex-row items-center justify-between gap-12">
                             <div className="flex-1 text-center md:text-left fade-up">
-                                <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-full px-4 py-1.5 mb-5">
-                                    <FaGift size={11} className="text-amber-400" />
-                                    <span className="text-amber-400 text-xs font-bold tracking-widest uppercase">Premium Gift Store</span>
+                                <div className="inline-flex items-center gap-2 mb-5 px-4 py-1.5 rounded-full border"
+                                    style={{ background: "rgba(245,158,11,0.08)", borderColor: "rgba(245,158,11,0.25)" }}>
+                                    <span className="text-amber-400 text-[10px] font-black tracking-[0.15em] uppercase">✦ Premium Gift Store</span>
                                 </div>
-                                <h1 className="hero-font text-4xl md:text-6xl font-black text-white leading-tight mb-4">
-                                    Gifts That{" "}<span className="shimmer-text">Speak</span><br />From The Heart
+
+                                <h1 className="hero-font text-4xl md:text-6xl font-black text-white leading-[1.1] mb-5">
+                                    Gifts That{" "}
+                                    <span className="shimmer-text">Speak</span>
+                                    <br />From The Heart
                                 </h1>
+
                                 <p className="text-zinc-400 text-sm md:text-base mb-8 max-w-md leading-relaxed">
-                                    Handpicked gifts for every occasion & loved ones. Customize with your personal touch.
+                                    Handpicked gifts for every occasion. Personalize with your own touch — because every gift tells a story.
                                 </p>
+
                                 <div className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
-                                    <button onClick={() => document.getElementById("products-section").scrollIntoView({ behavior: "smooth" })}
-                                        className="flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-zinc-900 font-black px-8 py-3.5 rounded-2xl text-sm transition-all active:scale-95 shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50">
-                                        Shop Now <FaArrowRight size={12} />
+                                    <button
+                                        onClick={() => document.getElementById("products-section").scrollIntoView({ behavior: "smooth" })}
+                                        className="group/btn flex items-center justify-center gap-2 font-black px-8 py-3.5 rounded-2xl text-sm transition-all active:scale-95"
+                                        style={{ background: "linear-gradient(135deg, #f59e0b, #fbbf24)", color: "#1a1a1a", boxShadow: "0 8px 32px rgba(245,158,11,0.35)" }}>
+                                        Shop Now
+                                        <FaArrowRight size={11} className="group-hover/btn:translate-x-0.5 transition-transform" />
                                     </button>
                                     <button onClick={() => setCategory("custom-tshirt")}
-                                        className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white font-bold px-8 py-3.5 rounded-2xl text-sm transition-all border border-white/20 hover:border-white/40">
+                                        className="flex items-center justify-center gap-2 font-bold px-8 py-3.5 rounded-2xl text-sm text-white transition-all border"
+                                        style={{ background: "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.15)" }}>
                                         Customize 🎨
                                     </button>
                                 </div>
                             </div>
 
-                            <div className="flex flex-col gap-4 items-center md:items-end">
+                            {/* Stats */}
+                            <div className="flex flex-col gap-3 items-center md:items-end">
                                 <div className="flex gap-3">
                                     {[
                                         { val: `${allProducts.length}+`, label: "Products" },
                                         { val: `${categories.length}+`, label: "Categories" },
                                         { val: "FREE", label: "Delivery ₹499+" },
                                     ].map(({ val, label }) => (
-                                        <div key={label} className="bg-white/5 hover:bg-white/10 border border-white/10 backdrop-blur rounded-2xl px-5 py-4 text-center transition-colors">
-                                            <p className="font-black text-amber-400 text-2xl">{val}</p>
-                                            <p className="text-zinc-400 text-xs mt-0.5">{label}</p>
+                                        <div key={label} className="rounded-2xl px-5 py-4 text-center transition-colors cursor-default"
+                                            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                                            <p className="font-black text-amber-400 text-2xl leading-none">{val}</p>
+                                            <p className="text-zinc-500 text-[11px] mt-1 font-medium">{label}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -242,10 +258,10 @@ const Home = () => {
                                         { icon: "⚡", text: "Fast Delivery" },
                                     ].map(({ icon, text }, i) => (
                                         <div key={text}
-                                            className="bg-white/5 hover:bg-white/10 border border-white/10 hover:border-amber-500/30 rounded-xl px-3 py-2 text-center float cursor-default transition-all"
-                                            style={{ animationDelay: `${i * 0.5}s` }}>
-                                            <p className="text-lg">{icon}</p>
-                                            <p className="text-zinc-400 text-[10px] font-medium mt-0.5 whitespace-nowrap">{text}</p>
+                                            className="rounded-xl px-3 py-2.5 text-center float cursor-default"
+                                            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", animationDelay: `${i * 0.4}s` }}>
+                                            <p className="text-xl">{icon}</p>
+                                            <p className="text-zinc-500 text-[10px] font-semibold mt-0.5 whitespace-nowrap">{text}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -253,6 +269,7 @@ const Home = () => {
                         </div>
                     </div>
 
+                    {/* Wave */}
                     <div className="absolute bottom-0 left-0 right-0">
                         <svg viewBox="0 0 1440 40" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M0 40L60 33C120 27 240 13 360 10C480 7 600 13 720 18C840 23 960 27 1080 25C1200 23 1320 13 1380 8L1440 3V40H0Z" fill="#f1f0ef" />

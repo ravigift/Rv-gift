@@ -158,8 +158,8 @@ const OrderDetails = () => {
                                 <div key={step} className="flex items-center flex-1">
                                     <div className="flex flex-col items-center">
                                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all duration-300 ${i <= stepIdx
-                                                ? "bg-amber-500 shadow-md shadow-amber-200"
-                                                : "bg-stone-100"
+                                            ? "bg-amber-500 shadow-md shadow-amber-200"
+                                            : "bg-stone-100"
                                             }`}>
                                             {i <= stepIdx
                                                 ? <span>{STEP_ICONS[i]}</span>
