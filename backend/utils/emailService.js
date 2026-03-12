@@ -19,7 +19,7 @@ export const sendEmail = async ({ to, subject, html, label = "", attachments = [
 
     try {
         const payload = {
-            from: "RV Gift Shop <onboarding@resend.dev>",
+            from: "RV Gift Shop <orders@rvgiftshop.com>",
             to,
             subject,
             html,
