@@ -15,7 +15,7 @@ export const createProduct = async (req, res) => {
     try {
         const {
             name, description, price, category,
-            isCustomizable, tags, sizes, highlights,
+            isCustomizable, tags, sizes, highlights, stock,
         } = req.body;
 
         if (!name?.trim() || !price || !category)
@@ -42,6 +42,8 @@ export const createProduct = async (req, res) => {
             try { parsedHighlights = JSON.parse(highlights); } catch { parsedHighlights = {}; }
         }
 
+        const stockQty = Math.max(0, Number(stock) || 0);
+
         const product = await Product.create({
             name: name.trim(),
             description: description?.trim() || "",
@@ -52,6 +54,8 @@ export const createProduct = async (req, res) => {
             tags: tags ? tags.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean) : [],
             sizes: parsedSizes,
             highlights: parsedHighlights,
+            stock: stockQty,
+            inStock: stockQty > 0,
         });
 
         res.status(201).json(product);
@@ -74,7 +78,6 @@ export const getAllProducts = async (req, res) => {
         }
 
         if (search && search.trim().length >= 2) {
-            // ✅ Escape regex — ReDoS attack prevent
             const safeSearch = escapeRegex(search.trim());
             query.$or = [
                 { name: { $regex: safeSearch, $options: "i" } },
@@ -85,7 +88,7 @@ export const getAllProducts = async (req, res) => {
 
         const products = await Product.find(query)
             .sort({ createdAt: -1 })
-            .lean(); // ✅ faster read
+            .lean();
         res.json(products);
     } catch (error) {
         console.error("GET PRODUCTS ERROR:", error);
@@ -139,8 +142,13 @@ export const updateProduct = async (req, res) => {
         if (updateData.isCustomizable !== undefined)
             updateData.isCustomizable = updateData.isCustomizable === true || updateData.isCustomizable === "true";
 
+        // ✅ Stock update — auto set inStock
+        if (updateData.stock !== undefined) {
+            updateData.stock = Math.max(0, Number(updateData.stock) || 0);
+            updateData.inStock = updateData.stock > 0;
+        }
+
         if (req.files && req.files.length > 0) {
-            // ✅ Delete old images from Cloudinary
             for (const img of product.images) {
                 try {
                     await cloudinary.uploader.destroy(img.public_id);
@@ -199,7 +207,6 @@ export const deleteProduct = async (req, res) => {
         if (!product)
             return res.status(404).json({ message: "Product not found" });
 
-        // ✅ Delete images from Cloudinary
         for (const img of product.images) {
             try {
                 await cloudinary.uploader.destroy(img.public_id);

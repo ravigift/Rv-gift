@@ -94,4 +94,4 @@ export const useCartContext = () => {
         throw new Error("useCart must be used inside CartProvider");
     }
     return ctx;
-};
+}; 

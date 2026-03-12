@@ -1,11 +1,35 @@
 import mongoose from "mongoose";
 
+/* ═══════════════════════════
+   ADDRESS SUB-SCHEMA
+═══════════════════════════ */
+const addressSchema = new mongoose.Schema(
+    {
+        label: { type: String, trim: true, maxlength: 30, default: "Home" },
+        name: { type: String, required: true, trim: true, maxlength: 100 },
+        phone: { type: String, required: true, trim: true, match: [/^[6-9]\d{9}$/, "Invalid phone number"] },
+        house: { type: String, required: true, trim: true, maxlength: 200 },
+        area: { type: String, required: true, trim: true, maxlength: 200 },
+        landmark: { type: String, trim: true, maxlength: 100, default: "" },
+        city: { type: String, required: true, trim: true, maxlength: 100 },
+        state: { type: String, required: true, trim: true, maxlength: 100 },
+        pincode: { type: String, required: true, trim: true, match: [/^\d{6}$/, "Invalid pincode"] },
+        isDefault: { type: Boolean, default: false },
+    },
+    { timestamps: true }
+);
+
+/* ═══════════════════════════
+   USER SCHEMA
+═══════════════════════════ */
 const userSchema = new mongoose.Schema(
     {
+        /* ── Basic Info ── */
         name: {
             type: String,
             required: [true, "Name is required"],
             trim: true,
+            maxlength: [100, "Name cannot exceed 100 characters"],
         },
         email: {
             type: String,
@@ -13,14 +37,7 @@ const userSchema = new mongoose.Schema(
             unique: true,
             lowercase: true,
             trim: true,
-            match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, "Please fill a valid email address"],
-        },
-        location: {
-            latitude: { type: Number },
-            longitude: { type: Number },
-            city: { type: String },
-            state: { type: String },
-            updatedAt: { type: Date },
+            match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, "Please enter a valid email"],
         },
         password: {
             type: String,
@@ -33,11 +50,32 @@ const userSchema = new mongoose.Schema(
             default: "user",
         },
 
-        // ── Password Reset ──
-        passwordResetToken: { type: String },
-        passwordResetExpires: { type: Date },
+        /* ── GPS Location (from browser on login/register) ── */
+        location: {
+            latitude: { type: Number, default: null },
+            longitude: { type: Number, default: null },
+            city: { type: String, trim: true, default: null },
+            state: { type: String, trim: true, default: null },
+            updatedAt: { type: Date, default: null },
+        },
+
+        /* ── Saved Delivery Addresses (max 5) ── */
+        addresses: {
+            type: [addressSchema],
+            validate: {
+                validator: (arr) => arr.length <= 5,
+                message: "Maximum 5 addresses allowed",
+            },
+            default: [],
+        },
+
+        /* ── Password Reset ── */
+        passwordResetToken: { type: String, default: undefined },
+        passwordResetExpires: { type: Date, default: undefined },
     },
-    { timestamps: true }
+    {
+        timestamps: true,  // createdAt, updatedAt auto
+    }
 );
 
 export default mongoose.model("User", userSchema);

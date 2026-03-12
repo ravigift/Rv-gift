@@ -7,23 +7,19 @@ const productSchema = new mongoose.Schema(
             required: true,
             trim: true,
         },
-
         description: {
             type: String,
             trim: true,
         },
-
         price: {
             type: Number,
             required: true,
         },
-
         category: {
             type: String,
             required: true,
             index: true,
         },
-
         images: {
             type: [
                 {
@@ -33,54 +29,31 @@ const productSchema = new mongoose.Schema(
             ],
             validate: v => v.length > 0,
         },
+        tags: { type: [String], default: [] },
+        sizes: { type: [String], default: [] },
+        highlights: { type: Map, of: String, default: {} },
+        rating: { type: Number, default: 0, min: 0, max: 5 },
+        numReviews: { type: Number, default: 0 },
+        isCustomizable: { type: Boolean, default: false },
+        stock: { type: Number, default: 0, min: 0 },
+        inStock: { type: Boolean, default: true },
 
-        tags: {
-            type: [String],
-            default: [],
-        },
-
-        // ✅ SIZES — e.g. ["S", "M", "L", "XL", "XXL"]
-        sizes: {
-            type: [String],
-            default: [],
-        },
-
-        // ✅ PRODUCT HIGHLIGHTS — e.g. { fabric: "Cotton", sleeve: "Full", color: "Purple" }
-        highlights: {
-            type: Map,
-            of: String,
-            default: {},
-        },
-
-        rating: {
+        // ── Shipping ──
+        weight: {
             type: Number,
-            default: 0,
-            min: 0,
-            max: 5,
+            default: 500,      // grams — default 500g
+            min: [1, "Weight must be at least 1g"],
+            max: [30000, "Weight cannot exceed 30kg"],
         },
-
-        numReviews: {
-            type: Number,
-            default: 0,
-        },
-
-        isCustomizable: {
-            type: Boolean,
-            default: false,
-        },
-
-        inStock: {
-            type: Boolean,
-            default: true,
+        dimensions: {
+            length: { type: Number, default: 10 }, // cm
+            breadth: { type: Number, default: 10 },
+            height: { type: Number, default: 10 },
         },
     },
     { timestamps: true }
 );
 
-productSchema.index({
-    name: "text",
-    description: "text",
-    tags: "text",
-});
+productSchema.index({ name: "text", description: "text", tags: "text" });
 
 export default mongoose.model("Product", productSchema);

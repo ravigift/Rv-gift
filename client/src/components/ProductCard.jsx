@@ -18,10 +18,13 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
 
     const rating = product.rating || 0;
     const numReviews = product.numReviews || 0;
+    const stockNum = Number(product.stock ?? 0);
+    const isOutOfStock = product.inStock === false || stockNum === 0;
+    const isLowStock = !isOutOfStock && stockNum > 0 && stockNum <= 5;
 
     const handleAddToCart = (e) => {
         e.stopPropagation();
-        if (inCart || product.inStock === false) return;
+        if (inCart || isOutOfStock) return;
         if (onAddToCart) onAddToCart(product);
         else addItem(product);
         setAddedFlash(true);
@@ -30,6 +33,7 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
 
     const handleBuyNow = (e) => {
         e.stopPropagation();
+        if (isOutOfStock) return;
         if (onBuyNow) onBuyNow(product);
         else navigate("/checkout", { state: { buyNowItem: { ...product, quantity: 1 } } });
     };
@@ -50,20 +54,19 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                         alt={product.name}
                         onLoad={() => setImgLoaded(true)}
                         onError={e => { e.target.src = "https://via.placeholder.com/400x400?text=No+Image"; setImgLoaded(true); }}
-                        className={`w-full h-full object-contain p-4 group-hover:scale-108 transition-transform duration-500 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
-                        style={{ transform: "scale(1)", transition: "transform 0.5s ease" }}
+                        className={`w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500 ${imgLoaded ? "opacity-100" : "opacity-0"} ${isOutOfStock ? "opacity-50 grayscale" : ""}`}
                     />
                     <div className="absolute inset-0 bg-zinc-900/0 group-hover:bg-zinc-900/4 transition-all duration-300" />
                 </div>
 
                 {/* Top badges */}
                 <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
-                    {product.isCustomizable && (
+                    {product.isCustomizable && !isOutOfStock && (
                         <span className="bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm tracking-wide">
                             ✏️ CUSTOM
                         </span>
                     )}
-                    {product.inStock === false && (
+                    {isOutOfStock && (
                         <span className="bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full tracking-wide">
                             SOLD OUT
                         </span>
@@ -73,8 +76,7 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                 {/* Wishlist */}
                 <button
                     onClick={e => { e.stopPropagation(); setWished(w => !w); }}
-                    className={`absolute top-2 right-2 z-10 w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm ${wished ? "bg-red-500 text-white scale-110" : "bg-white/90 text-zinc-300 hover:text-red-400"
-                        }`}
+                    className={`absolute top-2 right-2 z-10 w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm ${wished ? "bg-red-500 text-white scale-110" : "bg-white/90 text-zinc-300 hover:text-red-400"}`}
                 >
                     <FaHeart size={11} />
                 </button>
@@ -90,8 +92,7 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                 <div className="flex items-center gap-1.5 mb-2">
                     {numReviews > 0 ? (
                         <>
-                            <span className={`flex items-center gap-0.5 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md ${rating >= 4 ? "bg-emerald-500" : rating >= 3 ? "bg-amber-400" : "bg-red-400"
-                                }`}>
+                            <span className={`flex items-center gap-0.5 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md ${rating >= 4 ? "bg-emerald-500" : rating >= 3 ? "bg-amber-400" : "bg-red-400"}`}>
                                 {rating.toFixed(1)} <FaStar size={7} />
                             </span>
                             <span className="text-[10px] text-zinc-400 font-medium">({numReviews})</span>
@@ -104,13 +105,32 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                     )}
                 </div>
 
-                <p className="text-zinc-400 text-[11px] line-clamp-2 leading-relaxed mb-3 flex-1">
+                <p className="text-zinc-400 text-[11px] line-clamp-2 leading-relaxed mb-2 flex-1">
                     {product.description}
                 </p>
 
+                {/* ✅ STOCK INDICATOR */}
+                <div className="mb-2">
+                    {isOutOfStock ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-500">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+                            Out of Stock
+                        </span>
+                    ) : isLowStock ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                            ⚡ Only {stockNum} left!
+                        </span>
+                    ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                            In Stock
+                        </span>
+                    )}
+                </div>
+
                 {/* Price */}
                 <div className="flex items-baseline gap-1.5 mb-3">
-                    <p className="text-zinc-900 text-lg font-black leading-none">
+                    <p className={`text-lg font-black leading-none ${isOutOfStock ? "text-zinc-400" : "text-zinc-900"}`}>
                         ₹{product.price.toLocaleString("en-IN")}
                     </p>
                 </div>
@@ -119,14 +139,14 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                 <div className="flex gap-1.5">
                     <button
                         onClick={handleAddToCart}
-                        disabled={inCart || product.inStock === false}
+                        disabled={inCart || isOutOfStock}
                         className={`flex-1 flex items-center justify-center gap-1 py-2.5 rounded-xl text-[11px] font-black transition-all active:scale-95 ${inCart
-                                ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                                : addedFlash
-                                    ? "bg-emerald-500 text-white"
-                                    : product.inStock === false
-                                        ? "bg-stone-100 text-stone-400 cursor-not-allowed"
-                                        : "bg-zinc-900 text-white hover:bg-zinc-800"
+                            ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                            : addedFlash
+                                ? "bg-emerald-500 text-white"
+                                : isOutOfStock
+                                    ? "bg-stone-100 text-stone-400 cursor-not-allowed"
+                                    : "bg-zinc-900 text-white hover:bg-zinc-800"
                             }`}
                     >
                         <FaShoppingCart size={10} />
@@ -134,8 +154,8 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                     </button>
                     <button
                         onClick={handleBuyNow}
-                        disabled={product.inStock === false}
-                        className="flex-1 flex items-center justify-center gap-1 py-2.5 rounded-xl text-[11px] font-black bg-amber-500 text-white hover:bg-amber-600 active:scale-95 shadow-sm shadow-amber-200 transition-all disabled:opacity-40"
+                        disabled={isOutOfStock}
+                        className="flex-1 flex items-center justify-center gap-1 py-2.5 rounded-xl text-[11px] font-black bg-amber-500 text-white hover:bg-amber-600 active:scale-95 shadow-sm shadow-amber-200 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                         <FaBolt size={9} /> Buy Now
                     </button>

@@ -1,9 +1,15 @@
 import { useAuth } from "../contexts/AuthContext";
-import { Link } from "react-router-dom";
-import { FaUser, FaEnvelope, FaBox, FaArrowRight } from "react-icons/fa";
+import { Link, useNavigate } from "react-router-dom";
+import { FaUser, FaEnvelope, FaBox, FaArrowRight, FaMapMarkerAlt, FaSignOutAlt } from "react-icons/fa";
 
 const Profile = () => {
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        logout();
+        navigate("/");
+    };
 
     return (
         <div className="min-h-screen bg-stone-50 py-10 px-4" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -50,23 +56,41 @@ const Profile = () => {
                     <h2 className="font-black text-zinc-800 text-sm mb-4 flex items-center gap-2">
                         <span className="w-1 h-4 bg-amber-500 rounded-full" /> Quick Links
                     </h2>
-                    <Link to="/orders"
-                        className="flex items-center justify-between p-3 rounded-xl hover:bg-amber-50 hover:border-amber-200 border border-transparent transition-all group">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center group-hover:bg-amber-100 transition-colors">
-                                <FaBox size={12} className="text-amber-500" />
+                    <div className="space-y-1">
+                        <Link to="/orders"
+                            className="flex items-center justify-between p-3 rounded-xl hover:bg-amber-50 hover:border-amber-200 border border-transparent transition-all group">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center group-hover:bg-amber-100 transition-colors">
+                                    <FaBox size={12} className="text-amber-500" />
+                                </div>
+                                <span className="font-bold text-zinc-700 text-sm group-hover:text-amber-700 transition-colors">My Orders</span>
                             </div>
-                            <span className="font-bold text-zinc-700 text-sm group-hover:text-amber-700 transition-colors">My Orders</span>
-                        </div>
-                        <FaArrowRight size={11} className="text-zinc-300 group-hover:text-amber-400 transition-colors" />
-                    </Link>
+                            <FaArrowRight size={11} className="text-zinc-300 group-hover:text-amber-400 transition-colors" />
+                        </Link>
+                        <Link to="/addresses"
+                            className="flex items-center justify-between p-3 rounded-xl hover:bg-amber-50 hover:border-amber-200 border border-transparent transition-all group">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center group-hover:bg-amber-100 transition-colors">
+                                    <FaMapMarkerAlt size={12} className="text-amber-500" />
+                                </div>
+                                <span className="font-bold text-zinc-700 text-sm group-hover:text-amber-700 transition-colors">Saved Addresses</span>
+                            </div>
+                            <FaArrowRight size={11} className="text-zinc-300 group-hover:text-amber-400 transition-colors" />
+                        </Link>
+                    </div>
                 </div>
+
+                {/* Logout */}
+                <button onClick={handleLogout}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 bg-red-50 border border-red-200 text-red-600 rounded-2xl font-bold text-sm hover:bg-red-100 transition-all active:scale-[0.98] cursor-pointer mb-4">
+                    <FaSignOutAlt size={13} /> Logout
+                </button>
 
                 {/* Coming Soon */}
                 <div className="bg-white rounded-2xl border border-dashed border-stone-200 p-6 text-center">
                     <p className="text-2xl mb-2">🚧</p>
                     <p className="font-bold text-zinc-600 text-sm">More features coming soon</p>
-                    <p className="text-zinc-400 text-xs mt-1">Edit profile, saved addresses & more</p>
+                    <p className="text-zinc-400 text-xs mt-1">Edit profile & more</p>
                 </div>
             </div>
         </div>

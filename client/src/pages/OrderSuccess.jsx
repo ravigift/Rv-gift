@@ -2,9 +2,14 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../api/axios";
-import { FaShoppingBag, FaClipboardList, FaWhatsapp, FaArrowRight, FaCheckCircle, FaMapMarkerAlt, FaPhone, FaUser } from "react-icons/fa";
+import {
+    FaShoppingBag, FaClipboardList, FaWhatsapp,
+    FaCheckCircle, FaMapMarkerAlt, FaPhone, FaUser,
+} from "react-icons/fa";
 
 const OrderSuccess = () => {
+    // BUG FIX: Checkout now navigates to /order-success/${orderId}
+    // So useParams :id is correct — no longer relies on location.state.orderId
     const { id } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -13,7 +18,8 @@ const OrderSuccess = () => {
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const userWhatsAppFromState = location.state?.userWhatsApp || null;
+
+    const paymentMethod = location.state?.paymentMethod || null;
 
     useEffect(() => {
         if (!id) { navigate("/orders"); return; }
@@ -26,9 +32,7 @@ const OrderSuccess = () => {
             } catch {
                 setError("Order not found");
                 setTimeout(() => navigate("/orders"), 2000);
-            } finally {
-                setLoading(false);
-            }
+            } finally { setLoading(false); }
         };
         fetchOrder();
     }, [id, user, navigate]);
@@ -49,12 +53,12 @@ const OrderSuccess = () => {
         </div>
     );
 
+    const isCOD = order.payment?.method === "COD" || paymentMethod === "COD";
     const cleanPhone = order.phone.replace(/[^0-9]/g, "");
     const finalPhone = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
-    const userWhatsApp = userWhatsAppFromState ||
-        `https://wa.me/${finalPhone}?text=${encodeURIComponent(
-            `✅ ORDER CONFIRMED\n\nHi ${order.customerName},\n\nOrder ID: #${order._id.slice(-8).toUpperCase()}\nTotal: ₹${order.totalAmount}\nPayment: Cash on Delivery\n\nThank you for shopping with RV Gift Shop 💝`
-        )}`;
+    const userWhatsApp = `https://wa.me/${finalPhone}?text=${encodeURIComponent(
+        `✅ ORDER CONFIRMED\n\nHi ${order.customerName},\n\nOrder ID: #${order._id.slice(-8).toUpperCase()}\nTotal: ₹${order.totalAmount}\nPayment: ${isCOD ? "Cash on Delivery" : "Online Paid"}\n\nThank you for shopping with RV Gift Shop 💝`
+    )}`;
 
     return (
         <div className="min-h-screen py-8 px-4" style={{ background: "#f1f3f6", fontFamily: "'DM Sans', sans-serif" }}>
@@ -62,7 +66,7 @@ const OrderSuccess = () => {
 
             <div className="max-w-3xl mx-auto space-y-3">
 
-                {/* Success banner — Flipkart green */}
+                {/* Success banner */}
                 <div className="bg-white rounded-sm border border-stone-200 overflow-hidden">
                     <div className="h-1.5 bg-amber-500 w-full" />
                     <div className="px-6 py-5 flex items-center gap-4">
@@ -78,19 +82,17 @@ const OrderSuccess = () => {
                     </div>
                 </div>
 
-                {/* Order Info — Flipkart style grid */}
+                {/* Order Info */}
                 <div className="bg-white rounded-sm border border-stone-200">
                     <div className="px-5 py-3 border-b border-stone-100 flex items-center justify-between">
                         <h2 className="font-black text-zinc-800 text-sm">Order Summary</h2>
-                        <span className="text-xs font-mono font-bold text-zinc-500">
-                            #{order._id.slice(-8).toUpperCase()}
-                        </span>
+                        <span className="text-xs font-mono font-bold text-zinc-500">#{order._id.slice(-8).toUpperCase()}</span>
                     </div>
                     <div className="grid grid-cols-3 divide-x divide-stone-100">
                         {[
                             { label: "Order ID", value: `#${order._id.slice(-8).toUpperCase()}` },
                             { label: "Total Amount", value: `₹${Number(order.totalAmount).toLocaleString("en-IN")}`, highlight: true },
-                            { label: "Payment", value: "Cash on Delivery" },
+                            { label: "Payment", value: isCOD ? "Cash on Delivery" : "Online Paid ✓" },
                         ].map(({ label, value, highlight }) => (
                             <div key={label} className="px-4 py-3 text-center">
                                 <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">{label}</p>
@@ -112,10 +114,8 @@ const OrderSuccess = () => {
                                 <div key={idx} className="px-5 py-4 flex gap-4 items-center">
                                     <div className="w-16 h-16 rounded border border-stone-100 bg-stone-50 overflow-hidden flex items-center justify-center shrink-0">
                                         {img
-                                            ? <img src={img} alt={item.name} className="w-full h-full object-contain p-1"
-                                                onError={e => { e.target.style.display = "none"; }} />
-                                            : <span className="text-2xl">🎁</span>
-                                        }
+                                            ? <img src={img} alt={item.name} className="w-full h-full object-contain p-1" onError={e => { e.target.style.display = "none"; }} />
+                                            : <span className="text-2xl">🎁</span>}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="font-bold text-zinc-800 text-sm line-clamp-1">{item.name}</p>

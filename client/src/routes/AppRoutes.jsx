@@ -14,6 +14,7 @@ import Profile from "../pages/Profile";
 import Wishlist from "../pages/Wishlist";
 import ForgotPassword from "../pages/Forgotpassword";
 import ResetPassword from "../pages/Resetpassword";
+import VerifyInvoice from "../pages/Verifyinvoice";
 
 const ScrollToTop = () => {
     const { pathname } = useLocation();
@@ -33,6 +34,7 @@ const AppRoutes = () => {
                 <Route path="/register" element={<Register />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password/:token" element={<ResetPassword />} />
+                <Route path="/verify/:invoiceNumber" element={<VerifyInvoice />} />
 
                 {/* PROTECTED */}
                 <Route element={<ProtectedRoute />}>

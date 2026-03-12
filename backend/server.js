@@ -11,168 +11,107 @@ import productRoutes from "./routes/productRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
+import addressRoutes from "./routes/addressRoutes.js";
+import walkInRoutes from "./routes/walkInRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes .js";
+import shiprocketRoutes from "./routes/shiprocketRoutes.js";
 
 dotenv.config();
 
-/* =========================
-   🔌 DB CONNECT
-========================= */
 connectDB();
 
 const app = express();
-app.set("trust proxy", 1);
-/* =========================
-   🌐 CORS CONFIG
-========================= */
+
+/* ── CORS ── */
 const allowedOrigins = [
     "http://localhost:5173",
     "http://localhost:5174",
+    "http://localhost:5175",
     "https://rv-gift.vercel.app",
     "https://rv-gift-admin.vercel.app",
 ];
-
-// Merge any extra origins from env (optional, no longer required)
 if (process.env.CORS_ORIGINS) {
     process.env.CORS_ORIGINS.split(",").forEach(o => {
-        const trimmed = o.trim();
-        if (trimmed && !allowedOrigins.includes(trimmed)) {
-            allowedOrigins.push(trimmed);
-        }
+        const t = o.trim();
+        if (t && !allowedOrigins.includes(t)) allowedOrigins.push(t);
     });
 }
-
 app.use(cors({
-    origin: (origin, callback) => {
-        // Allow requests with no origin (mobile apps, Postman, curl)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin)) return callback(null, true);
-        console.warn("❌ CORS blocked:", origin);
-        callback(new Error("CORS not allowed"));
+    origin: (origin, cb) => {
+        if (!origin) return cb(null, true);
+        if (allowedOrigins.includes(origin)) return cb(null, true);
+        console.warn("CORS blocked:", origin);
+        cb(new Error("CORS not allowed"));
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
-// Handle preflight requests globally
-// app.options("/(.*)", cors());
-
-/* =========================
-   🛡️ SECURITY
-========================= */
+/* ── SECURITY ── */
 app.use(helmet());
 
-/* =========================
-   ⏱️ RATE LIMITING
-========================= */
-const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 min
-    max: 10,
-    message: { message: "Too many attempts. Try after 15 minutes." },
-    standardHeaders: true,
-    legacyHeaders: false,
-});
+/* ── RATE LIMITING ── */
+app.use("/api/auth/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { message: "Too many attempts. Try after 15 minutes." } }));
+app.use("/api/auth/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { message: "Too many attempts. Try after 15 minutes." } }));
+app.use("/api", rateLimit({ windowMs: 60 * 1000, max: 100, message: { message: "Too many requests. Slow down." } }));
 
-const apiLimiter = rateLimit({
-    windowMs: 60 * 1000, // 1 min
-    max: 100,
-    message: { message: "Too many requests. Slow down." },
-    standardHeaders: true,
-    legacyHeaders: false,
-});
-
-app.use("/api/auth/login", authLimiter);
-app.use("/api/auth/register", authLimiter);
-app.use("/api", apiLimiter);
-
-/* =========================
-   🧩 BODY PARSERS
-========================= */
+/* ── BODY PARSERS ──
+   IMPORTANT: Webhook needs raw body — must be BEFORE express.json() */
+app.use("/api/payment/webhook", express.raw({ type: "application/json" }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-/* =========================
-   📜 LOGGER
-========================= */
-app.use((req, res, next) => {
+/* ── REQUEST LOGGER ── */
+app.use((req, _res, next) => {
     console.log(`${req.method} ${req.originalUrl}`);
     next();
 });
 
-/* =========================
-   🩺 HEALTH CHECK
-========================= */
-app.get("/", (req, res) => {
-    res.status(200).json({
-        success: true,
-        message: "RV Gift Shop API running 🚀",
-        environment: process.env.NODE_ENV || "development",
-        timestamp: new Date().toISOString(),
-    });
-});
+/* ── HEALTH CHECK ── */
+app.get("/", (_req, res) => res.json({
+    success: true,
+    message: "RV Gift Shop API running",
+    env: process.env.NODE_ENV || "development",
+    time: new Date().toISOString(),
+}));
 
-/* =========================
-   🔗 API ROUTES
-========================= */
+/* ── ROUTES ── */
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/uploads", uploadRoutes);
+app.use("/api/addresses", addressRoutes);
+app.use("/api/walkin", walkInRoutes);
+app.use("/api/payment", paymentRoutes);
+app.use("/api/shipping", shiprocketRoutes);
 
-/* =========================
-   🚫 404 HANDLER
-========================= */
-app.use((req, res) => {
-    res.status(404).json({
-        success: false,
-        message: `Route not found: ${req.method} ${req.originalUrl}`,
-    });
-});
+/* ── 404 ── */
+app.use((req, res) => res.status(404).json({ success: false, message: `Not found: ${req.method} ${req.originalUrl}` }));
 
-/* =========================
-   🌐 GLOBAL ERROR HANDLER
-========================= */
-app.use((err, req, res, next) => {
-    console.error("🔥 SERVER ERROR:", err.message);
-
-    if (err.message === "CORS not allowed") {
+/* ── GLOBAL ERROR HANDLER ── */
+app.use((err, _req, res, _next) => {
+    console.error("SERVER ERROR:", err.message);
+    if (err.message === "CORS not allowed")
         return res.status(403).json({ success: false, message: err.message });
-    }
-
-    if (err instanceof SyntaxError) {
-        return res.status(400).json({ success: false, message: "Invalid JSON format" });
-    }
-
+    if (err instanceof SyntaxError)
+        return res.status(400).json({ success: false, message: "Invalid JSON" });
     res.status(err.status || 500).json({
         success: false,
-        message: process.env.NODE_ENV === "production"
-            ? "Internal Server Error"
-            : err.message,
+        message: process.env.NODE_ENV === "production" ? "Internal Server Error" : err.message,
     });
 });
 
-/* =========================
-   🚀 SERVER START
-========================= */
+/* ── START ── */
 const PORT = process.env.PORT || 9000;
-
 const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`🌍 Mode: ${process.env.NODE_ENV || "development"}`);
-    console.log(`✅ Allowed Origins:`, allowedOrigins);
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Mode: ${process.env.NODE_ENV || "development"}`);
+    console.log(`Allowed Origins:`, allowedOrigins);
 });
 
-/* =========================
-   🧹 GRACEFUL SHUTDOWN
-========================= */
-process.on("SIGTERM", () => {
-    console.log("🛑 SIGTERM received. Shutting down...");
-    server.close(() => process.exit(0));
-});
-
-process.on("SIGUSR2", () => {
-    server.close(() => process.exit(0));
-});
+process.on("SIGTERM", () => server.close(() => process.exit(0)));
+process.on("SIGUSR2", () => server.close(() => process.exit(0)));
 
 export default app;
