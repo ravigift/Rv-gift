@@ -15,7 +15,7 @@ import { generateWhatsAppLink, generateUserWhatsAppLink } from "../utils/whatsap
 import { getOrderStatusEmailTemplate } from "../utils/orderStatusEmail.js";
 import { adminOrderEmailHTML } from "../utils/adminOrderEmail.js";
 import { generateInvoiceBuffer } from "../utils/invoiceEmailHelper.js";
-import { createShiprocketOrder } from "../utils/shiprocketService.js";
+import { createShiprocketOrder } from "../utils/Shiprocketservice.js";
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
