@@ -14,6 +14,7 @@ import AdminProducts from "../pages/AdminProducts";
 import AdminAddProduct from "../pages/AdminAddProduct";
 import AdminEditProduct from "../pages/AdminEditProduct";
 import AdminOrders from "../pages/AdminOrders";
+import AdminPOS from "../pages/AdminPOS";
 
 /* PROTECTED */
 import AdminRoute from "./AdminRoute";
@@ -34,6 +35,7 @@ const AppRoutes = () => {
                     <Route path="products/new" element={<AdminAddProduct />} />
                     <Route path="products/:id/edit" element={<AdminEditProduct />} />
                     <Route path="orders" element={<AdminOrders />} />
+                    <Route path="pos" element={<AdminPOS />} />
                 </Route>
             </Route>
 

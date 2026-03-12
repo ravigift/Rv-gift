@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/adminApi";
-import { FaArrowLeft, FaUpload, FaTimes, FaPlus, FaTag, FaRupeeSign, FaList } from "react-icons/fa";
+import { FaArrowLeft, FaUpload, FaTimes, FaPlus, FaTag, FaRupeeSign, FaList, FaBoxes } from "react-icons/fa";
 import { CATEGORIES } from "../data/categories";
 
 const inputClass = "w-full px-4 py-3 border border-stone-200 rounded-xl text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all bg-stone-50 focus:bg-white";
@@ -14,7 +14,7 @@ const AdminAddProduct = () => {
 
     const [form, setForm] = useState({
         name: "", description: "", price: "", category: "",
-        isCustomizable: false, tags: "",
+        isCustomizable: false, tags: "", stock: "",
     });
 
     const [images, setImages] = useState([]);
@@ -73,6 +73,7 @@ const AdminAddProduct = () => {
         if (!form.price || Number(form.price) <= 0) return setError("Enter a valid price");
         if (!form.category) return setError("Please select a category");
         if (images.length === 0) return setError("At least one image is required");
+        if (form.stock === "" || Number(form.stock) < 0) return setError("Enter valid stock quantity (0 or more)");
 
         try {
             setLoading(true);
@@ -84,6 +85,7 @@ const AdminAddProduct = () => {
             formData.append("price", Number(form.price));
             formData.append("category", form.category);
             formData.append("isCustomizable", form.isCustomizable ? "true" : "false");
+            formData.append("stock", Number(form.stock));
             if (form.tags.trim()) formData.append("tags", form.tags.trim());
             images.forEach(img => formData.append("images", img));
 
@@ -118,7 +120,6 @@ const AdminAddProduct = () => {
                 }
             `}</style>
 
-            {/* ── TOAST ── */}
             {toast && (
                 <div style={{
                     position: "fixed", top: 24, right: 24, zIndex: 9999,
@@ -140,7 +141,6 @@ const AdminAddProduct = () => {
 
             <div className="max-w-3xl mx-auto px-4 py-8">
 
-                {/* Header */}
                 <div className="flex items-center gap-3 mb-6">
                     <button onClick={() => navigate("/admin/products")}
                         className="w-9 h-9 rounded-full bg-white border border-stone-200 flex items-center justify-center text-zinc-500 hover:text-zinc-800 transition-all cursor-pointer">
@@ -172,7 +172,7 @@ const AdminAddProduct = () => {
                                 className={`${inputClass} resize-none`} />
                         </div>
 
-                        {/* Price + Category */}
+                        {/* Price + Category + Stock */}
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1.5 block">Price (₹) *</label>
@@ -195,6 +195,24 @@ const AdminAddProduct = () => {
                                     </select>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Stock */}
+                        <div>
+                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1.5 block">
+                                Stock Quantity *
+                            </label>
+                            <div className="relative">
+                                <FaBoxes size={12} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                                <input type="number" name="stock" value={form.stock} onChange={handleChange}
+                                    placeholder="e.g. 50" min="0"
+                                    className={`${inputClass} pl-9`} />
+                            </div>
+                            {form.stock !== "" && (
+                                <p className={`text-xs mt-1.5 font-semibold ${Number(form.stock) > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                    {Number(form.stock) > 0 ? `✅ In Stock — ${form.stock} units` : "❌ Out of Stock"}
+                                </p>
+                            )}
                         </div>
 
                         {/* Tags */}
@@ -312,14 +330,12 @@ const AdminAddProduct = () => {
                             </button>
                         </div>
 
-                        {/* Error */}
                         {error && (
                             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2">
                                 ⚠️ {error}
                             </div>
                         )}
 
-                        {/* Buttons */}
                         <div className="flex gap-3 pt-2">
                             <button type="button" onClick={() => navigate("/admin/products")}
                                 className="flex-1 py-3 rounded-xl border border-stone-200 text-zinc-600 font-semibold text-sm hover:bg-stone-50 transition-all cursor-pointer">

@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/adminApi";
 import {
     FaArrowLeft, FaUpload, FaTimes, FaPlus,
-    FaTag, FaRupeeSign, FaList
+    FaTag, FaRupeeSign, FaList, FaBoxes
 } from "react-icons/fa";
 import { CATEGORIES } from "../data/categories";
 
@@ -18,7 +18,7 @@ const AdminEditProduct = () => {
 
     const [form, setForm] = useState({
         name: "", description: "", price: "",
-        category: "", isCustomizable: false, tags: "",
+        category: "", isCustomizable: false, tags: "", stock: "",
     });
 
     const [images, setImages] = useState([]);
@@ -28,7 +28,6 @@ const AdminEditProduct = () => {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const [toast, setToast] = useState(null);
-
     const [selectedSizes, setSelectedSizes] = useState([]);
     const [highlights, setHighlights] = useState([{ key: "", value: "" }]);
 
@@ -50,12 +49,11 @@ const AdminEditProduct = () => {
                     category: data.category || "",
                     isCustomizable: Boolean(data.isCustomizable),
                     tags: data.tags?.join(", ") || "",
+                    stock: data.stock?.toString() ?? "0",
                 });
                 setCurrentImages(data.images || []);
 
-                if (data.sizes?.length > 0) {
-                    setSelectedSizes(data.sizes);
-                }
+                if (data.sizes?.length > 0) setSelectedSizes(data.sizes);
 
                 if (data.highlights && Object.keys(data.highlights).length > 0) {
                     const entries = data.highlights instanceof Map
@@ -114,6 +112,7 @@ const AdminEditProduct = () => {
         if (!form.name.trim()) return setError("Product name is required");
         if (!form.price || Number(form.price) <= 0) return setError("Enter a valid price");
         if (!form.category) return setError("Please select a category");
+        if (form.stock === "" || Number(form.stock) < 0) return setError("Enter a valid stock quantity (0 or more)");
 
         try {
             setSaving(true);
@@ -125,6 +124,7 @@ const AdminEditProduct = () => {
             formData.append("price", Number(form.price));
             formData.append("category", form.category);
             formData.append("isCustomizable", form.isCustomizable ? "true" : "false");
+            formData.append("stock", Number(form.stock));
             if (form.tags.trim()) formData.append("tags", form.tags.trim());
             images.forEach(img => formData.append("images", img));
             formData.append("sizes", JSON.stringify(selectedSizes));
@@ -145,6 +145,16 @@ const AdminEditProduct = () => {
         }
     };
 
+    /* ── Stock status indicator ── */
+    const stockNum = Number(form.stock);
+    const stockStatus = form.stock === ""
+        ? null
+        : stockNum === 0
+            ? { label: "Out of Stock — product will be hidden from store", color: "text-red-500 bg-red-50 border-red-200" }
+            : stockNum <= 5
+                ? { label: `Low Stock — only ${stockNum} left`, color: "text-amber-600 bg-amber-50 border-amber-200" }
+                : { label: `In Stock — ${stockNum} units available`, color: "text-emerald-600 bg-emerald-50 border-emerald-200" };
+
     if (loading) return (
         <div className="min-h-screen bg-stone-50 flex items-center justify-center">
             <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
@@ -161,7 +171,7 @@ const AdminEditProduct = () => {
                 }
             `}</style>
 
-            {/* ── TOAST ── */}
+            {/* TOAST */}
             {toast && (
                 <div style={{
                     position: "fixed", top: 24, right: 24, zIndex: 9999,
@@ -173,8 +183,7 @@ const AdminEditProduct = () => {
                     color: "#fff", borderRadius: 14, fontWeight: 700, fontSize: 14,
                     boxShadow: "0 8px 30px rgba(0,0,0,0.2)",
                     animation: "slideInRight 0.3s cubic-bezier(0.16,1,0.3,1)",
-                    fontFamily: "'DM Sans', sans-serif",
-                    minWidth: 240,
+                    fontFamily: "'DM Sans', sans-serif", minWidth: 240,
                 }}>
                     <span style={{ fontSize: 20 }}>{toast.type === "success" ? "✅" : "❌"}</span>
                     {toast.msg}
@@ -238,6 +247,31 @@ const AdminEditProduct = () => {
                                     </select>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* ✅ STOCK QUANTITY */}
+                        <div>
+                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1.5 block">
+                                Stock Quantity *
+                            </label>
+                            <div className="relative">
+                                <FaBoxes size={12} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                                <input
+                                    type="number"
+                                    name="stock"
+                                    value={form.stock}
+                                    onChange={handleChange}
+                                    placeholder="e.g. 10"
+                                    min="0"
+                                    className={`${inputClass} pl-9`}
+                                />
+                            </div>
+                            {stockStatus && (
+                                <div className={`mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-bold ${stockStatus.color}`}>
+                                    <FaBoxes size={9} />
+                                    {stockStatus.label}
+                                </div>
+                            )}
                         </div>
 
                         {/* Tags */}

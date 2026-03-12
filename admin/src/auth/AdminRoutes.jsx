@@ -4,7 +4,6 @@ import { useAdminAuth } from "./AdminAuthContext";
 const AdminRoute = () => {
     const { admin, loading } = useAdminAuth();
 
-    // ✅ CRITICAL: loading ke dauran kuch mat karo
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-stone-50">
@@ -16,7 +15,6 @@ const AdminRoute = () => {
         );
     }
 
-    // ✅ Loading khatam — ab check karo
     if (!admin) {
         return <Navigate to="/admin/login" replace />;
     }

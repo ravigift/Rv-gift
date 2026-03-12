@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import api from "../api/adminApi";
 import {
     FaPlus, FaSync, FaEdit, FaTrash, FaSearch,
-    FaBoxOpen, FaCheckCircle, FaTimesCircle,
+    FaBoxOpen, FaBoxes,
 } from "react-icons/fa";
 
 const AdminProducts = () => {
@@ -16,56 +16,67 @@ const AdminProducts = () => {
     const [deletingId, setDeletingId] = useState(null);
     const [confirmId, setConfirmId] = useState(null);
     const [toast, setToast] = useState(null);
+    const [editingStockId, setEditingStockId] = useState(null);
+    const [stockInput, setStockInput] = useState("");
+    const [savingStockId, setSavingStockId] = useState(null);
 
     const showToast = (type, msg) => {
         setToast({ type, msg });
         setTimeout(() => setToast(null), 3000);
     };
 
-    // ── Fetch ──
     const fetchProducts = useCallback(async () => {
         try {
-            setLoading(true);
-            setError(null);
+            setLoading(true); setError(null);
             const { data } = await api.get("/products");
             const list = Array.isArray(data) ? data : [];
-            setProducts(list);
-            setFiltered(list);
-        } catch (err) {
-            console.error("FETCH PRODUCTS ERROR:", err);
-            setError("Failed to load products");
-        } finally {
-            setLoading(false);
-        }
+            setProducts(list); setFiltered(list);
+        } catch { setError("Failed to load products"); }
+        finally { setLoading(false); }
     }, []);
 
     useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
-    // ── Search filter ──
     useEffect(() => {
         if (!search.trim()) return setFiltered(products);
         const q = search.toLowerCase();
         setFiltered(products.filter(p =>
-            p.name?.toLowerCase().includes(q) ||
-            p.category?.toLowerCase().includes(q)
+            p.name?.toLowerCase().includes(q) || p.category?.toLowerCase().includes(q)
         ));
     }, [search, products]);
 
-    // ── Delete ──
     const deleteHandler = async (id) => {
         try {
             setDeletingId(id);
             await api.delete(`/products/${id}`);
-            setProducts(prev => prev.filter(p => p._id !== id));
-            setFiltered(prev => prev.filter(p => p._id !== id));
-            showToast("success", "Product deleted successfully!");
-        } catch (err) {
-            console.error("DELETE ERROR:", err);
-            showToast("error", "Failed to delete product");
-        } finally {
-            setDeletingId(null);
-            setConfirmId(null);
-        }
+            setProducts(p => p.filter(x => x._id !== id));
+            setFiltered(p => p.filter(x => x._id !== id));
+            showToast("success", "Product deleted!");
+        } catch { showToast("error", "Failed to delete"); }
+        finally { setDeletingId(null); setConfirmId(null); }
+    };
+
+    const handleStockSave = async (product) => {
+        const newStock = parseInt(stockInput, 10);
+        if (isNaN(newStock) || newStock < 0) { showToast("error", "Invalid stock"); return; }
+        try {
+            setSavingStockId(product._id);
+            const fd = new FormData();
+            fd.append("name", product.name); fd.append("price", product.price);
+            fd.append("category", product.category); fd.append("stock", newStock);
+            fd.append("isCustomizable", product.isCustomizable ? "true" : "false");
+            fd.append("sizes", JSON.stringify(product.sizes || []));
+            fd.append("highlights", JSON.stringify(
+                product.highlights instanceof Map ? Object.fromEntries(product.highlights) : (product.highlights || {})
+            ));
+            await api.put(`/products/${product._id}`, fd);
+            const updated = { ...product, stock: newStock, inStock: newStock > 0 };
+            setProducts(p => p.map(x => x._id === product._id ? updated : x));
+            setFiltered(p => p.map(x => x._id === product._id ? updated : x));
+            setEditingStockId(null);
+            showToast("success", `Stock updated to ${newStock}`);
+        } catch { showToast("error", "Failed to update stock"); }
+        finally { setSavingStockId(null); }
     };
 
     const refreshProducts = async () => {
@@ -77,239 +88,349 @@ const AdminProducts = () => {
     const formatCat = (cat) =>
         cat?.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase()) || "—";
 
-    // ── Loading ──
+    const stockBadge = (product) => {
+        const n = Number(product.stock ?? 0);
+        if (!product.inStock) return { label: "Out of Stock", cls: "text-red-500 bg-red-50 border-red-200" };
+        if (n <= 5) return { label: `${n} left`, cls: "text-amber-600 bg-amber-50 border-amber-200" };
+        return { label: `${n} left`, cls: "text-emerald-600 bg-emerald-50 border-emerald-200" };
+    };
+
     if (loading) return (
-        <div className="min-h-screen bg-stone-50 flex items-center justify-center">
-            <div className="text-center">
-                <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                <p className="text-zinc-500 font-medium text-sm">Loading products...</p>
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F8FAFC" }}>
+            <div style={{ textAlign: "center" }}>
+                <div style={{ width: 40, height: 40, border: "3px solid #F59E0B", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
+                <p style={{ color: "#94A3B8", fontSize: 13, fontWeight: 600 }}>Loading products...</p>
             </div>
+            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         </div>
     );
 
-    // ── Error ──
     if (error) return (
-        <div className="min-h-screen bg-stone-50 flex items-center justify-center">
-            <div className="text-center bg-white rounded-2xl p-10 border border-stone-200 shadow-sm">
-                <p className="text-4xl mb-3">⚠️</p>
-                <p className="text-zinc-700 font-bold mb-4">{error}</p>
-                <button onClick={fetchProducts}
-                    className="px-6 py-2.5 bg-zinc-900 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 transition-colors">
-                    Retry
-                </button>
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F8FAFC" }}>
+            <div style={{ textAlign: "center", background: "#fff", borderRadius: 16, padding: 40, border: "1px solid #E2E8F0" }}>
+                <p style={{ fontSize: 32, marginBottom: 8 }}>⚠️</p>
+                <p style={{ color: "#374151", fontWeight: 700, marginBottom: 16 }}>{error}</p>
+                <button onClick={fetchProducts} style={{
+                    padding: "8px 20px", background: "#1E293B", color: "#fff",
+                    borderRadius: 10, fontWeight: 700, fontSize: 13, border: "none", cursor: "pointer"
+                }}>Retry</button>
             </div>
         </div>
     );
 
     return (
-        <div className="min-h-screen bg-stone-50" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+        <div style={{ minHeight: "100vh", background: "#F8FAFC", fontFamily: "'DM Sans',sans-serif" }}>
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
-                @keyframes slideInRight {
-                    from { opacity: 0; transform: translateX(60px); }
-                    to   { opacity: 1; transform: translateX(0); }
-                }
+                @keyframes spin{to{transform:rotate(360deg)}}
+                @keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
             `}</style>
 
-            {/* ── TOAST ── */}
+            {/* Toast */}
             {toast && (
                 <div style={{
-                    position: "fixed", top: 24, right: 24, zIndex: 9999,
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "13px 20px",
-                    background: toast.type === "success"
-                        ? "linear-gradient(135deg,#10b981,#059669)"
-                        : "linear-gradient(135deg,#ef4444,#dc2626)",
-                    color: "#fff", borderRadius: 14, fontWeight: 700, fontSize: 14,
-                    boxShadow: "0 8px 30px rgba(0,0,0,0.2)",
-                    animation: "slideInRight 0.3s cubic-bezier(0.16,1,0.3,1)",
-                    fontFamily: "'DM Sans', sans-serif",
-                    minWidth: 240,
+                    position: "fixed", top: 12, left: "50%", transform: "translateX(-50%)",
+                    zIndex: 9999, display: "flex", alignItems: "center", gap: 8,
+                    padding: "10px 18px", whiteSpace: "nowrap",
+                    background: toast.type === "success" ? "#10B981" : "#EF4444",
+                    color: "#fff", borderRadius: 10, fontWeight: 700, fontSize: 13,
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.15)", animation: "fadeIn 0.2s ease"
                 }}>
-                    <span style={{ fontSize: 20 }}>
-                        {toast.type === "success" ? "✅" : "❌"}
-                    </span>
-                    {toast.msg}
+                    {toast.type === "success" ? "✓" : "✕"} {toast.msg}
                 </div>
             )}
 
-            <div className="max-w-7xl mx-auto px-4 py-8">
+            <div style={{ maxWidth: 900, margin: "0 auto", padding: "20px 12px 40px" }}>
 
-                {/* ── Header ── */}
-                <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+                {/* Header */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
                     <div>
-                        <h1 className="text-2xl font-black text-zinc-900">Product Management</h1>
-                        <p className="text-zinc-400 text-sm mt-0.5">
+                        <h1 style={{ fontWeight: 800, fontSize: 20, color: "#0F172A", margin: 0 }}>Products</h1>
+                        <p style={{ fontSize: 12, color: "#94A3B8", margin: "3px 0 0", fontWeight: 500 }}>
                             {products.length} total · {filtered.length} showing
                         </p>
                     </div>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={refreshProducts}
-                            disabled={refreshing}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-stone-200 text-zinc-600 rounded-xl text-sm font-semibold hover:bg-stone-50 hover:border-stone-300 transition-all disabled:opacity-50 cursor-pointer"
-                        >
-                            <FaSync size={12} className={refreshing ? "animate-spin" : ""} />
-                            {refreshing ? "Refreshing..." : "Refresh"}
+                    <div style={{ display: "flex", gap: 8 }}>
+                        <button onClick={refreshProducts} disabled={refreshing} style={{
+                            display: "flex", alignItems: "center", gap: 6,
+                            padding: "8px 12px", background: "#fff",
+                            border: "1px solid #E2E8F0", borderRadius: 9,
+                            fontSize: 12, fontWeight: 600, color: "#64748B",
+                            cursor: "pointer", opacity: refreshing ? 0.6 : 1
+                        }}>
+                            <FaSync size={11} style={{ animation: refreshing ? "spin 0.8s linear infinite" : "none" }} />
+                            Refresh
                         </button>
-                        <Link
-                            to="/admin/products/new"
-                            className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 active:scale-95 transition-all shadow-md shadow-amber-200"
-                        >
-                            <FaPlus size={12} /> Add Product
+                        <Link to="/admin/products/new" style={{
+                            display: "flex", alignItems: "center", gap: 6,
+                            padding: "8px 14px", background: "#F59E0B", color: "#fff",
+                            borderRadius: 9, fontSize: 12, fontWeight: 700,
+                            textDecoration: "none", boxShadow: "0 2px 8px rgba(245,158,11,0.3)"
+                        }}>
+                            <FaPlus size={11} /> Add Product
                         </Link>
                     </div>
                 </div>
 
-                {/* ── Stats Row ── */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                {/* Stats */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
                     {[
-                        { label: "Total Products", value: products.length, color: "text-zinc-800", bg: "bg-white border-stone-200" },
-                        { label: "Customizable", value: products.filter(p => p.isCustomizable).length, color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-100" },
-                        { label: "Categories", value: [...new Set(products.map(p => p.category))].filter(Boolean).length, color: "text-amber-600", bg: "bg-amber-50 border-amber-100" },
-                        { label: "Avg Price", value: `₹${products.length ? Math.round(products.reduce((s, p) => s + p.price, 0) / products.length).toLocaleString("en-IN") : 0}`, color: "text-blue-600", bg: "bg-blue-50 border-blue-100" },
-                    ].map(({ label, value, color, bg }) => (
-                        <div key={label} className={`${bg} border rounded-2xl px-4 py-3`}>
-                            <p className="text-xs text-zinc-400 font-medium mb-0.5">{label}</p>
-                            <p className={`text-xl font-black ${color}`}>{value}</p>
+                        { label: "Total", value: products.length, color: "#0F172A", bg: "#fff", border: "#E2E8F0" },
+                        { label: "In Stock", value: products.filter(p => p.inStock).length, color: "#10B981", bg: "#ECFDF5", border: "#A7F3D0" },
+                        { label: "Out of Stock", value: products.filter(p => !p.inStock).length, color: "#EF4444", bg: "#FEF2F2", border: "#FECACA" },
+                        { label: "Avg Price", value: `₹${products.length ? Math.round(products.reduce((s, p) => s + p.price, 0) / products.length).toLocaleString("en-IN") : 0}`, color: "#3B82F6", bg: "#EFF6FF", border: "#BFDBFE" },
+                    ].map(({ label, value, color, bg, border }) => (
+                        <div key={label} style={{
+                            background: bg, border: `1px solid ${border}`,
+                            borderRadius: 12, padding: "10px 12px"
+                        }}>
+                            <p style={{ fontSize: 10, color: "#94A3B8", fontWeight: 600, marginBottom: 4 }}>{label}</p>
+                            <p style={{ fontSize: 18, fontWeight: 800, color, margin: 0 }}>{value}</p>
                         </div>
                     ))}
                 </div>
 
-                {/* ── Search Bar ── */}
-                <div className="relative mb-4">
-                    <FaSearch size={13} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                {/* Search */}
+                <div style={{ position: "relative", marginBottom: 14 }}>
+                    <FaSearch size={12} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94A3B8" }} />
                     <input
-                        type="text"
-                        value={search}
+                        type="text" value={search}
                         onChange={e => setSearch(e.target.value)}
                         placeholder="Search by name or category..."
-                        className="w-full pl-10 pr-10 py-3 bg-white border border-stone-200 rounded-xl text-sm text-zinc-700 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
+                        style={{
+                            width: "100%", paddingLeft: 34, paddingRight: 32,
+                            paddingTop: 10, paddingBottom: 10,
+                            background: "#fff", border: "1px solid #E2E8F0",
+                            borderRadius: 10, fontSize: 13, color: "#374151",
+                            outline: "none", fontFamily: "inherit", boxSizing: "border-box"
+                        }}
                     />
                     {search && (
-                        <button onClick={() => setSearch("")}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 cursor-pointer">
-                            ✕
-                        </button>
+                        <button onClick={() => setSearch("")} style={{
+                            position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                            background: "none", border: "none", color: "#94A3B8", cursor: "pointer", fontSize: 14
+                        }}>✕</button>
                     )}
                 </div>
 
-                {/* ── Empty State ── */}
+                {/* Empty */}
                 {filtered.length === 0 ? (
-                    <div className="bg-white rounded-2xl border border-dashed border-stone-300 p-16 text-center">
-                        <FaBoxOpen size={40} className="text-stone-300 mx-auto mb-4" />
-                        <p className="text-zinc-500 font-semibold mb-1">
+                    <div style={{
+                        background: "#fff", border: "1px dashed #CBD5E1",
+                        borderRadius: 16, padding: "48px 20px", textAlign: "center"
+                    }}>
+                        <FaBoxOpen size={32} style={{ color: "#CBD5E1", margin: "0 auto 12px" }} />
+                        <p style={{ fontWeight: 700, color: "#475569", marginBottom: 4 }}>
                             {search ? `No results for "${search}"` : "No products yet"}
                         </p>
-                        <p className="text-zinc-400 text-sm mb-4">
-                            {search ? "Try a different search term" : "Add your first product to get started"}
+                        <p style={{ fontSize: 12, color: "#94A3B8" }}>
+                            {search ? "Try a different term" : "Add your first product"}
                         </p>
-                        {!search && (
-                            <Link to="/admin/products/new"
-                                className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition-all">
-                                <FaPlus size={11} /> Add First Product
-                            </Link>
-                        )}
                     </div>
                 ) : (
-                    <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+                    <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #E2E8F0", overflow: "hidden" }}>
 
-                        {/* Table Header */}
-                        <div className="grid grid-cols-12 gap-3 px-5 py-3 bg-stone-50 border-b border-stone-100 text-xs font-bold text-zinc-400 uppercase tracking-wider">
-                            <div className="col-span-1">#</div>
-                            <div className="col-span-1">Image</div>
-                            <div className="col-span-4">Product</div>
-                            <div className="col-span-2 hidden md:block">Category</div>
-                            <div className="col-span-2">Price</div>
-                            <div className="col-span-1 hidden md:block">Custom</div>
-                            <div className="col-span-1 text-right">Actions</div>
+                        {/* ── DESKTOP TABLE ── */}
+                        <div className="hidden md:block">
+                            {/* thead */}
+                            <div style={{
+                                display: "grid", gap: 8,
+                                gridTemplateColumns: "28px 40px 1fr 100px 70px 120px 80px",
+                                padding: "10px 16px", background: "#F8FAFC",
+                                borderBottom: "1px solid #F1F5F9",
+                                fontSize: 10, fontWeight: 700, color: "#94A3B8",
+                                textTransform: "uppercase", letterSpacing: "0.06em"
+                            }}>
+                                <div>#</div><div>Img</div><div>Product</div>
+                                <div>Category</div><div>Price</div><div>Stock</div>
+                                <div style={{ textAlign: "right" }}>Actions</div>
+                            </div>
+                            <div>
+                                {filtered.map((product, idx) => {
+                                    const img = product.images?.[0]?.url || product.image || null;
+                                    const sb = stockBadge(product);
+                                    const isES = editingStockId === product._id;
+                                    const isIC = confirmId === product._id;
+                                    return (
+                                        <div key={product._id} style={{
+                                            display: "grid", gap: 8,
+                                            gridTemplateColumns: "28px 40px 1fr 100px 70px 120px 80px",
+                                            padding: "10px 16px", alignItems: "center",
+                                            borderBottom: "1px solid #F8FAFC",
+                                            opacity: deletingId === product._id ? 0.5 : 1,
+                                            transition: "background 0.1s"
+                                        }}
+                                            onMouseEnter={e => e.currentTarget.style.background = "#FAFAFA"}
+                                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                                        >
+                                            <div style={{ fontSize: 11, color: "#CBD5E1", fontWeight: 600 }}>{idx + 1}</div>
+                                            <div style={{ width: 36, height: 36, borderRadius: 8, background: "#F1F5F9", border: "1px solid #E2E8F0", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                {img ? <img src={img} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "contain", padding: 3 }} />
+                                                    : <FaBoxOpen size={13} style={{ color: "#CBD5E1" }} />}
+                                            </div>
+                                            <div style={{ minWidth: 0 }}>
+                                                <p style={{ fontWeight: 700, fontSize: 13, color: "#0F172A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.name}</p>
+                                                <p style={{ fontSize: 11, color: "#94A3B8", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.description || "—"}</p>
+                                            </div>
+                                            <div>
+                                                <span style={{ background: "#FFFBEB", border: "1px solid #FDE68A", color: "#92400E", fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 20 }}>
+                                                    {formatCat(product.category)}
+                                                </span>
+                                            </div>
+                                            <div style={{ fontWeight: 800, fontSize: 13, color: "#10B981" }}>
+                                                ₹{Number(product.price || 0).toLocaleString("en-IN")}
+                                            </div>
+                                            <div>
+                                                {isES ? (
+                                                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                                                        <input type="number" min="0" value={stockInput}
+                                                            onChange={e => setStockInput(e.target.value)}
+                                                            onKeyDown={e => { if (e.key === "Enter") handleStockSave(product); if (e.key === "Escape") setEditingStockId(null); }}
+                                                            autoFocus
+                                                            style={{ width: 52, padding: "3px 6px", border: "1px solid #F59E0B", borderRadius: 7, fontSize: 12, fontWeight: 700, outline: "none", fontFamily: "inherit" }} />
+                                                        <button onClick={() => handleStockSave(product)} disabled={savingStockId === product._id}
+                                                            style={{ padding: "3px 8px", background: "#10B981", color: "#fff", borderRadius: 6, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer" }}>
+                                                            {savingStockId === product._id ? "..." : "✓"}
+                                                        </button>
+                                                        <button onClick={() => setEditingStockId(null)}
+                                                            style={{ padding: "3px 6px", background: "#F1F5F9", color: "#64748B", borderRadius: 6, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer" }}>✕</button>
+                                                    </div>
+                                                ) : (
+                                                    <button onClick={() => { setEditingStockId(product._id); setStockInput(String(product.stock ?? 0)); }}
+                                                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 8px", border: `1px solid`, borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", background: "transparent" }}
+                                                        className={sb.cls}>
+                                                        <FaBoxes size={9} /> {sb.label} <span style={{ fontSize: 9, opacity: 0.5 }}>✎</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+                                                <Link to={`/admin/products/${product._id}/edit`} style={{
+                                                    width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
+                                                    background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, color: "#3B82F6", textDecoration: "none"
+                                                }}>
+                                                    <FaEdit size={11} />
+                                                </Link>
+                                                {isIC ? (
+                                                    <div style={{ display: "flex", gap: 4 }}>
+                                                        <button onClick={() => deleteHandler(product._id)}
+                                                            style={{ padding: "4px 8px", background: "#EF4444", color: "#fff", borderRadius: 7, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer" }}>
+                                                            Yes
+                                                        </button>
+                                                        <button onClick={() => setConfirmId(null)}
+                                                            style={{ padding: "4px 8px", background: "#F1F5F9", color: "#64748B", borderRadius: 7, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer" }}>No</button>
+                                                    </div>
+                                                ) : (
+                                                    <button onClick={() => setConfirmId(product._id)} style={{
+                                                        width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
+                                                        background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#EF4444", cursor: "pointer"
+                                                    }}>
+                                                        <FaTrash size={11} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
 
-                        {/* Table Rows */}
-                        <div className="divide-y divide-stone-100">
+                        {/* ── MOBILE CARDS ── */}
+                        <div className="md:hidden">
                             {filtered.map((product, idx) => {
-                                const imageUrl = product.images?.[0]?.url || product.image || null;
-                                const isDeleting = deletingId === product._id;
-                                const isConfirming = confirmId === product._id;
-
+                                const img = product.images?.[0]?.url || product.image || null;
+                                const sb = stockBadge(product);
+                                const isES = editingStockId === product._id;
+                                const isIC = confirmId === product._id;
                                 return (
-                                    <div key={product._id}
-                                        className={`grid grid-cols-12 gap-3 px-5 py-4 items-center hover:bg-stone-50 transition-colors duration-150 ${isDeleting ? "opacity-50" : ""}`}>
-
-                                        {/* Index */}
-                                        <div className="col-span-1 text-xs text-zinc-400 font-medium">{idx + 1}</div>
-
-                                        {/* Image */}
-                                        <div className="col-span-1">
-                                            <div className="w-10 h-10 rounded-lg bg-stone-100 border border-stone-200 overflow-hidden flex items-center justify-center shrink-0">
-                                                {imageUrl
-                                                    ? <img src={imageUrl} alt={product.name} className="w-full h-full object-contain p-1" />
-                                                    : <FaBoxOpen size={14} className="text-stone-400" />
-                                                }
+                                    <div key={product._id} style={{
+                                        padding: "12px 14px",
+                                        borderBottom: "1px solid #F1F5F9",
+                                        opacity: deletingId === product._id ? 0.5 : 1
+                                    }}>
+                                        {/* Top row: image + info + price */}
+                                        <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                                            <div style={{
+                                                width: 48, height: 48, borderRadius: 10,
+                                                background: "#F1F5F9", border: "1px solid #E2E8F0",
+                                                overflow: "hidden", flexShrink: 0,
+                                                display: "flex", alignItems: "center", justifyContent: "center"
+                                            }}>
+                                                {img
+                                                    ? <img src={img} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "contain", padding: 4 }} />
+                                                    : <FaBoxOpen size={16} style={{ color: "#CBD5E1" }} />}
+                                            </div>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6 }}>
+                                                    <p style={{ fontWeight: 700, fontSize: 14, color: "#0F172A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                        {product.name}
+                                                    </p>
+                                                    <p style={{ fontWeight: 800, fontSize: 13, color: "#10B981", flexShrink: 0, margin: 0 }}>
+                                                        ₹{Number(product.price || 0).toLocaleString("en-IN")}
+                                                    </p>
+                                                </div>
+                                                {/* Category + Stock in one row */}
+                                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                                                    <span style={{ background: "#FFFBEB", border: "1px solid #FDE68A", color: "#92400E", fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 20 }}>
+                                                        {formatCat(product.category)}
+                                                    </span>
+                                                    {isES ? (
+                                                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                                                            <input type="number" min="0" value={stockInput}
+                                                                onChange={e => setStockInput(e.target.value)}
+                                                                onKeyDown={e => { if (e.key === "Enter") handleStockSave(product); if (e.key === "Escape") setEditingStockId(null); }}
+                                                                autoFocus
+                                                                style={{ width: 48, padding: "2px 6px", border: "1px solid #F59E0B", borderRadius: 6, fontSize: 12, fontWeight: 700, outline: "none", fontFamily: "inherit" }} />
+                                                            <button onClick={() => handleStockSave(product)} disabled={savingStockId === product._id}
+                                                                style={{ padding: "2px 8px", background: "#10B981", color: "#fff", borderRadius: 6, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer" }}>
+                                                                {savingStockId === product._id ? "..." : "✓"}
+                                                            </button>
+                                                            <button onClick={() => setEditingStockId(null)}
+                                                                style={{ padding: "2px 6px", background: "#F1F5F9", color: "#64748B", borderRadius: 6, fontSize: 11, border: "none", cursor: "pointer" }}>✕</button>
+                                                        </div>
+                                                    ) : (
+                                                        <button onClick={() => { setEditingStockId(product._id); setStockInput(String(product.stock ?? 0)); }}
+                                                            style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: "pointer", border: "1px solid" }}
+                                                            className={sb.cls}>
+                                                            <FaBoxes size={8} /> {sb.label} <span style={{ fontSize: 9, opacity: 0.5 }}>✎</span>
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
 
-                                        {/* Name */}
-                                        <div className="col-span-4">
-                                            <p className="font-semibold text-zinc-800 text-sm line-clamp-1">{product.name}</p>
-                                            <p className="text-xs text-zinc-400 line-clamp-1 mt-0.5">{product.description || "No description"}</p>
-                                        </div>
-
-                                        {/* Category */}
-                                        <div className="col-span-2 hidden md:block">
-                                            <span className="inline-block bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-semibold px-2 py-0.5 rounded-full">
-                                                {formatCat(product.category)}
-                                            </span>
-                                        </div>
-
-                                        {/* Price */}
-                                        <div className="col-span-2">
-                                            <p className="font-black text-emerald-600 text-sm">
-                                                ₹{Number(product.price || 0).toLocaleString("en-IN")}
-                                            </p>
-                                        </div>
-
-                                        {/* Customizable */}
-                                        <div className="col-span-1 hidden md:block">
-                                            {product.isCustomizable
-                                                ? <FaCheckCircle className="text-emerald-500" size={15} />
-                                                : <FaTimesCircle className="text-stone-300" size={15} />
-                                            }
-                                        </div>
-
-                                        {/* Actions */}
-                                        <div className="col-span-1 flex items-center justify-end gap-1.5">
-                                            <Link
-                                                to={`/admin/products/${product._id}/edit`}
-                                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-50 border border-blue-200 text-blue-500 hover:bg-blue-500 hover:text-white transition-all duration-150"
-                                                title="Edit"
-                                            >
-                                                <FaEdit size={12} />
+                                        {/* Action buttons — compact */}
+                                        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                                            <Link to={`/admin/products/${product._id}/edit`} style={{
+                                                flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+                                                gap: 6, padding: "7px 0", borderRadius: 9,
+                                                background: "#EFF6FF", border: "1px solid #BFDBFE",
+                                                color: "#3B82F6", fontSize: 12, fontWeight: 700, textDecoration: "none"
+                                            }}>
+                                                <FaEdit size={11} /> Edit
                                             </Link>
-
-                                            {isConfirming ? (
-                                                <div className="flex items-center gap-1">
-                                                    <button
-                                                        onClick={() => deleteHandler(product._id)}
-                                                        disabled={isDeleting}
-                                                        className="px-2 py-1 bg-red-500 text-white rounded-lg text-[11px] font-bold hover:bg-red-600 transition-colors disabled:opacity-50 cursor-pointer"
-                                                    >
-                                                        {isDeleting ? "..." : "Yes"}
+                                            {isIC ? (
+                                                <>
+                                                    <button onClick={() => deleteHandler(product._id)} style={{
+                                                        flex: 1, padding: "7px 0", background: "#EF4444",
+                                                        color: "#fff", borderRadius: 9, fontSize: 12,
+                                                        fontWeight: 700, border: "none", cursor: "pointer"
+                                                    }}>
+                                                        {deletingId === product._id ? "..." : "Confirm"}
                                                     </button>
-                                                    <button
-                                                        onClick={() => setConfirmId(null)}
-                                                        className="px-2 py-1 bg-stone-100 text-zinc-600 rounded-lg text-[11px] font-bold hover:bg-stone-200 transition-colors cursor-pointer"
-                                                    >
-                                                        No
-                                                    </button>
-                                                </div>
+                                                    <button onClick={() => setConfirmId(null)} style={{
+                                                        flex: 1, padding: "7px 0", background: "#F1F5F9",
+                                                        color: "#64748B", borderRadius: 9, fontSize: 12,
+                                                        fontWeight: 700, border: "none", cursor: "pointer"
+                                                    }}>Cancel</button>
+                                                </>
                                             ) : (
-                                                <button
-                                                    onClick={() => setConfirmId(product._id)}
-                                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 border border-red-200 text-red-400 hover:bg-red-500 hover:text-white transition-all duration-150 cursor-pointer"
-                                                    title="Delete"
-                                                >
-                                                    <FaTrash size={11} />
+                                                <button onClick={() => setConfirmId(product._id)} style={{
+                                                    flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+                                                    gap: 6, padding: "7px 0", borderRadius: 9,
+                                                    background: "#FEF2F2", border: "1px solid #FECACA",
+                                                    color: "#EF4444", fontSize: 12, fontWeight: 700, cursor: "pointer"
+                                                }}>
+                                                    <FaTrash size={11} /> Delete
                                                 </button>
                                             )}
                                         </div>
@@ -319,13 +440,17 @@ const AdminProducts = () => {
                         </div>
 
                         {/* Footer */}
-                        <div className="px-5 py-3 bg-stone-50 border-t border-stone-100 flex items-center justify-between">
-                            <p className="text-xs text-zinc-400">
-                                Showing <span className="font-semibold text-zinc-600">{filtered.length}</span> of{" "}
-                                <span className="font-semibold text-zinc-600">{products.length}</span> products
+                        <div style={{
+                            display: "flex", alignItems: "center", justifyContent: "space-between",
+                            padding: "10px 14px", background: "#F8FAFC", borderTop: "1px solid #F1F5F9"
+                        }}>
+                            <p style={{ fontSize: 12, color: "#94A3B8", margin: 0 }}>
+                                Showing <b style={{ color: "#475569" }}>{filtered.length}</b> of <b style={{ color: "#475569" }}>{products.length}</b>
                             </p>
-                            <Link to="/admin/products/new"
-                                className="flex items-center gap-1.5 text-xs text-amber-600 font-bold hover:text-amber-700 transition-colors">
+                            <Link to="/admin/products/new" style={{
+                                display: "flex", alignItems: "center", gap: 5,
+                                fontSize: 12, color: "#F59E0B", fontWeight: 700, textDecoration: "none"
+                            }}>
                                 <FaPlus size={10} /> Add New
                             </Link>
                         </div>
