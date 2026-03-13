@@ -6,6 +6,7 @@ import rateLimit from "express-rate-limit";
 import connectDB from "./config/db.js";
 
 // Routes
+
 import authRoutes from "./routes/authRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
@@ -14,7 +15,9 @@ import uploadRoutes from "./routes/uploadRoutes.js";
 import addressRoutes from "./routes/addressRoutes.js";
 import walkInRoutes from "./routes/walkInRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes .js";        // FIX 1: space removed
-import shiprocketRoutes from "./routes/shiprocketRoutes.js";  // FIX 2: lowercase
+import shiprocketRoutes from "./routes/shiprocketRoutes.js";
+import invoiceRoutes from "./routes/Invoiceroutes.js";
+
 
 dotenv.config();
 connectDB();
@@ -115,6 +118,7 @@ app.use("/api/addresses", addressRoutes);
 app.use("/api/walkin", walkInRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/shipping", shiprocketRoutes);
+app.use("/api/invoice", invoiceRoutes);
 
 /* ─────────────────────────────
    404 HANDLER
