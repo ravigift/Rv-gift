@@ -196,7 +196,10 @@ const Register = () => {
                             <>
                                 <h1 className="text-2xl font-black text-zinc-900 text-center mb-1">Verify Email</h1>
                                 <p className="text-center text-sm text-zinc-400 mb-2">OTP sent to</p>
-                                <p className="text-center text-sm font-bold text-amber-600 mb-7">{form.email}</p>
+                                <p className="text-center text-sm font-bold text-amber-600 mb-3">{form.email}</p>
+                                <p className="text-center text-xs text-zinc-400 mb-5 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                                    📬 OTP spam / junk folder mein bhi ho sakta hai — zaroor check karein
+                                </p>
 
                                 {error && (
                                     <div className="mb-5 bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl flex items-center gap-2">

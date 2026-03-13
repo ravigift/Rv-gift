@@ -303,7 +303,7 @@ export const forgotPassword = async (req, res) => {
             </div>
         `;
 
-        await sendEmail({ to: user.email, subject: "🔑 Reset Your Password — RV Gift Shop", html, label: "Auth/ForgotPassword" });
+        await sendEmail({ to: user.email, subject: "Reset Your Password - RV Gift Shop", html, label: "Auth/ForgotPassword" });
         res.json({ success: true, message: "If this email exists, a reset link has been sent" });
 
     } catch (error) {
@@ -375,5 +375,5 @@ async function sendOtpEmail(email, name, otp) {
         </div>
     `;
 
-    await sendEmail({ to: email, subject: "🔐 Verify Your Email — RV Gift Shop", html, label: "Auth/OTP" });
+    await sendEmail({ to: email, subject: "Verify Your Email - RV Gift Shop", html, label: "Auth/OTP" });
 }
