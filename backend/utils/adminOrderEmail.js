@@ -6,7 +6,7 @@ export const adminOrderEmailHTML = ({ order }) => {
       <tr>
         <td style="padding:8px;border-bottom:1px solid #eee">${item.name}</td>
         <td style="padding:8px;border-bottom:1px solid #eee">${item.qty}</td>
-        <td style="padding:8px;border-bottom:1px solid #eee">₹${item.price}</td>
+        <td style="padding:8px;border-bottom:1px solid #eee">Rs.${item.price}</td>
       </tr>
     `
     )
@@ -16,7 +16,7 @@ export const adminOrderEmailHTML = ({ order }) => {
   <div style="font-family:Arial;background:#f5f7fa;padding:30px">
     <div style="max-width:650px;margin:auto;background:white;padding:30px;border-radius:10px">
 
-      <h2 style="margin-bottom:10px">🛒 New Order Received</h2>
+      <h2 style="margin-bottom:10px;color:#111827">New Order Received</h2>
       <p>A new order has been placed on <b>RV Gift Shop</b>.</p>
       <hr/>
 
@@ -29,25 +29,25 @@ export const adminOrderEmailHTML = ({ order }) => {
       <h3>Order Items</h3>
       <table width="100%" style="border-collapse:collapse">
         <thead>
-          <tr>
-            <th align="left">Product</th>
-            <th align="left">Qty</th>
-            <th align="left">Price</th>
+          <tr style="background:#f9fafb">
+            <th align="left" style="padding:8px">Product</th>
+            <th align="left" style="padding:8px">Qty</th>
+            <th align="left" style="padding:8px">Price</th>
           </tr>
         </thead>
         <tbody>${itemsHTML}</tbody>
       </table>
       <hr/>
 
-      <p><b>Total Amount:</b> ₹${Number(order.totalAmount).toLocaleString("en-IN")}</p>
+      <p><b>Total Amount:</b> Rs.${Number(order.totalAmount).toLocaleString("en-IN")}</p>
 
       <a href="https://admin.rvgift.com/orders/${order._id}" target="_blank" rel="noopener"
         style="display:inline-block;margin-top:20px;padding:14px 22px;background:#111827;color:white;text-decoration:none;border-radius:6px;font-weight:bold">
-        🔐 Open Admin Dashboard
+        Open Admin Dashboard
       </a>
 
       <p style="margin-top:30px;font-size:13px;color:#6b7280">
-        RV Gift Shop • Admin Notification
+        RV Gift Shop &bull; Admin Notification
       </p>
     </div>
   </div>

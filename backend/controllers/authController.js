@@ -20,10 +20,13 @@ const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString()
 ================================ */
 export const register = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, email, phone, password } = req.body;
 
-        if (!name?.trim() || !email?.trim() || !password?.trim())
+        if (!name?.trim() || !email?.trim() || !phone?.trim() || !password?.trim())
             return res.status(400).json({ message: "All fields required" });
+
+        if (!/^[6-9]\d{9}$/.test(phone.trim()))
+            return res.status(400).json({ message: "Please enter a valid 10-digit Indian mobile number" });
 
         if (password.length < 6)
             return res.status(400).json({ message: "Password must be at least 6 characters" });
@@ -34,7 +37,7 @@ export const register = async (req, res) => {
         if (exists && !exists.isEmailVerified) {
             const otp = generateOtp();
             exists.emailOtp = otp;
-            exists.emailOtpExpires = Date.now() + 10 * 60 * 1000; // 10 min
+            exists.emailOtpExpires = Date.now() + 10 * 60 * 1000;
             await exists.save({ validateBeforeSave: false });
             await sendOtpEmail(exists.email, exists.name, otp);
             return res.status(200).json({
@@ -53,6 +56,7 @@ export const register = async (req, res) => {
         const user = await User.create({
             name: name.trim(),
             email: email.toLowerCase().trim(),
+            phone: phone.trim(),
             password: hashedPassword,
             role: "user",
             isEmailVerified: false,
@@ -99,7 +103,6 @@ export const verifyOtp = async (req, res) => {
         if (user.emailOtpExpires < Date.now())
             return res.status(400).json({ message: "OTP expired. Please register again." });
 
-        // Mark verified
         user.isEmailVerified = true;
         user.emailOtp = undefined;
         user.emailOtpExpires = undefined;
@@ -110,6 +113,7 @@ export const verifyOtp = async (req, res) => {
             _id: user._id,
             name: user.name,
             email: user.email,
+            phone: user.phone,
             role: user.role,
             token: generateToken(user._id, user.role),
         });
@@ -172,9 +176,7 @@ export const login = async (req, res) => {
         if (!isMatch)
             return res.status(401).json({ message: "Invalid credentials" });
 
-        // Block unverified users
         if (!user.isEmailVerified) {
-            // Resend OTP
             const otp = generateOtp();
             user.emailOtp = otp;
             user.emailOtpExpires = Date.now() + 10 * 60 * 1000;
@@ -195,6 +197,7 @@ export const login = async (req, res) => {
             _id: user._id,
             name: user.name,
             email: user.email,
+            phone: user.phone,
             role: user.role,
             token: generateToken(user._id, user.role),
         });

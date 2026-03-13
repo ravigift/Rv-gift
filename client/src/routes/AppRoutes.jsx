@@ -11,7 +11,7 @@ import OrderDetails from "../pages/OrderDetails";
 import OrderSuccess from "../pages/OrderSuccess";
 import ProductDetails from "../components/ProductDetails";
 import Profile from "../pages/Profile";
-import Wishlist from "../pages/Wishlist";
+
 import ForgotPassword from "../pages/Forgotpassword";
 import ResetPassword from "../pages/Resetpassword";
 import VerifyInvoice from "../pages/Verifyinvoice";
@@ -54,7 +54,7 @@ const AppRoutes = () => {
                     <Route path="/order-success/:id" element={<OrderSuccess />} />
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/profile/addresses" element={<Profile />} />
-                    <Route path="/wishlist" element={<Wishlist />} />
+
                 </Route>
 
                 {/* FALLBACK */}

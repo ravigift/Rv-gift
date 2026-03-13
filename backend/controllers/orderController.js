@@ -1,10 +1,10 @@
 /**
  * orderController.js — Production Grade
- * ✅ Auto Shiprocket on PACKED
  * ✅ Refund via Razorpay API
  * ✅ Payment logs on every event
  * ✅ Fraud detection
  * ❌ No return system
+ * ⏸️ Shiprocket — commented, enable when needed
  */
 
 import Razorpay from "razorpay";
@@ -14,7 +14,7 @@ import { sendEmail } from "../utils/emailService.js";
 import { getOrderStatusEmailTemplate } from "../utils/orderStatusEmail.js";
 import { adminOrderEmailHTML } from "../utils/adminOrderEmail.js";
 import { generateInvoiceBuffer } from "../utils/invoiceEmailHelper.js";
-import { createShiprocketOrder } from "../utils/Shiprocketservice.js";
+// import { createShiprocketOrder } from "../utils/Shiprocketservice.js"; // ⏸️ baad me karenge
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
@@ -180,7 +180,6 @@ export const createOrder = async (req, res) => {
 
 /* ════════════════════════════════════════
    CANCEL ORDER (USER)
-   Only allowed if status is PLACED or CONFIRMED (not yet packed)
 ════════════════════════════════════════ */
 export const cancelOrder = async (req, res) => {
     try {
@@ -199,7 +198,6 @@ export const cancelOrder = async (req, res) => {
         order.statusTimeline = { ...existing, cancelledAt: new Date() };
         order.markModified("statusTimeline");
 
-        // Auto refund-request if paid online
         if (order.payment.method === "RAZORPAY" && order.payment.status === "PAID") {
             order.refund = {
                 requested: true, requestedAt: new Date(),
@@ -211,7 +209,6 @@ export const cancelOrder = async (req, res) => {
 
         await order.save();
 
-        // Restore stock
         for (const item of order.items) {
             try {
                 const p = await Product.findById(item.productId);
@@ -262,7 +259,6 @@ export const getOrderById = async (req, res) => {
 
 /* ════════════════════════════════════════
    UPDATE ORDER STATUS (ADMIN)
-   🚀 AUTO SHIPROCKET WHEN PACKED
 ════════════════════════════════════════ */
 export const updateOrderStatus = async (req, res) => {
     try {
@@ -294,9 +290,9 @@ export const updateOrderStatus = async (req, res) => {
 
         res.json(order);
 
-        /* ── AUTO SHIPROCKET ON PACKED ── */
+        /* ── AUTO SHIPROCKET ON PACKED — ⏸️ commented, enable when Shiprocket is active ──
         if (status === "PACKED" && !order.shipping?.shipmentId) {
-            ; (async () => {
+            (async () => {
                 try {
                     const wt = await calcTotalWeight(order.items);
                     const srResult = await createShiprocketOrder({ order, totalWeight: wt });
@@ -333,6 +329,7 @@ export const updateOrderStatus = async (req, res) => {
                 } catch (err) { console.error("[Shiprocket AUTO]", err.message); }
             })();
         }
+        */
 
         /* ── USER EMAIL ── */
         if (order.email && !order.email.includes("@rvgifts.com")) {
@@ -368,7 +365,7 @@ export const getAllOrders = async (req, res) => {
 };
 
 /* ════════════════════════════════════════
-   REQUEST REFUND (USER) — fallback for cancelled paid orders
+   REQUEST REFUND (USER)
 ════════════════════════════════════════ */
 export const requestRefund = async (req, res) => {
     try {
@@ -403,7 +400,7 @@ export const requestRefund = async (req, res) => {
 };
 
 /* ════════════════════════════════════════
-   PROCESS REFUND (ADMIN) — approve/reject via Razorpay
+   PROCESS REFUND (ADMIN)
 ════════════════════════════════════════ */
 export const processRefund = async (req, res) => {
     try {
@@ -427,7 +424,6 @@ export const processRefund = async (req, res) => {
             return res.json({ success: true, message: "Refund rejected" });
         }
 
-        // APPROVE → Razorpay API
         const refundAmount = order.refund.amount || order.totalAmount;
         const paymentId = order.payment.razorpayPaymentId;
         if (!paymentId) return res.status(400).json({ message: "No Razorpay payment ID" });
@@ -509,23 +505,22 @@ export const getRefundQueue = async (req, res) => {
 };
 
 /* ════════════════════════════════════════
-   SHIPROCKET WEBHOOK
+   SHIPROCKET WEBHOOK — ⏸️ commented, enable when Shiprocket is active
 ════════════════════════════════════════ */
-export const shiprocketWebhook = async (req, res) => {
-    try {
-        const { awb, current_status: status } = req.body;
-        const order = await Order.findOne({ "shipping.awbCode": awb });
-        if (!order) return res.sendStatus(200);
-
-        order.shipping.status = status;
-        if (status === "DELIVERED") {
-            order.orderStatus = "DELIVERED";
-            order.statusTimeline.deliveredAt = new Date();
-        }
-        await order.save();
-        res.sendStatus(200);
-    } catch (err) {
-        console.error("Shiprocket webhook error", err);
-        res.sendStatus(500);
-    }
-};
+// export const shiprocketWebhook = async (req, res) => {
+//     try {
+//         const { awb, current_status: status } = req.body;
+//         const order = await Order.findOne({ "shipping.awbCode": awb });
+//         if (!order) return res.sendStatus(200);
+//         order.shipping.status = status;
+//         if (status === "DELIVERED") {
+//             order.orderStatus = "DELIVERED";
+//             order.statusTimeline.deliveredAt = new Date();
+//         }
+//         await order.save();
+//         res.sendStatus(200);
+//     } catch (err) {
+//         console.error("Shiprocket webhook error", err);
+//         res.sendStatus(500);
+//     }
+// };

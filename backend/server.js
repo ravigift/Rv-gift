@@ -15,7 +15,7 @@ import uploadRoutes from "./routes/uploadRoutes.js";
 import addressRoutes from "./routes/addressRoutes.js";
 import walkInRoutes from "./routes/walkInRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes .js";        // FIX 1: space removed
-import shiprocketRoutes from "./routes/shiprocketRoutes.js";
+// import shiprocketRoutes from "./routes/shiprocketRoutes.js";  // future use, currently not used
 import invoiceRoutes from "./routes/Invoiceroutes.js";
 
 
@@ -117,7 +117,7 @@ app.use("/api/uploads", uploadRoutes);
 app.use("/api/addresses", addressRoutes);
 app.use("/api/walkin", walkInRoutes);
 app.use("/api/payment", paymentRoutes);
-app.use("/api/shipping", shiprocketRoutes);
+// app.use("/api/shipping", shiprocketRoutes);
 app.use("/api/invoice", invoiceRoutes);
 
 /* ─────────────────────────────

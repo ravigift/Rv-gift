@@ -15,7 +15,8 @@ import {
     retryRefund,
     getRefundQueue,
     getFlaggedOrders,
-    shiprocketWebhook,
+    // TODO (3 months): Re-enable when Shiprocket webhook integration is active
+    // shiprocketWebhook,
 } from "../controllers/orderController.js";
 import { protect, adminOnly } from "../middlewares/authMiddleware.js";
 import { downloadInvoice } from "../controllers/invoiceController.js";
@@ -52,7 +53,15 @@ router.get("/:id/invoice", protect, downloadInvoice);
 /* ── GET SINGLE ORDER — MUST be last ── */
 router.get("/:id", protect, getOrderById);
 
-/* ── SHIPROCKET WEBHOOK (no auth) ── */
-// router.post("/shipping/webhook", shiprocketWebhook);
+/*
+ * ─────────────────────────────────────────────────────────────
+ * TODO (3 months): Re-enable Shiprocket webhook when integration
+ * is active. This route receives real-time shipment status
+ * updates (AWB assigned, shipped, delivered, etc.) from
+ * Shiprocket and syncs them to the order document.
+ * No auth middleware — Shiprocket calls this externally.
+ * ─────────────────────────────────────────────────────────────
+ * router.post("/shipping/webhook", shiprocketWebhook);
+ */
 
 export default router;

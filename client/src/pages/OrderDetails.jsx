@@ -5,7 +5,7 @@ import {
     FaArrowLeft, FaBoxOpen, FaMapMarkerAlt,
     FaPhone, FaUser, FaShoppingBag,
     FaTimesCircle, FaGift, FaUndo, FaInfoCircle,
-    FaSpinner, FaFileInvoice,
+    FaSpinner, FaFileInvoice, FaTruck,
 } from "react-icons/fa";
 
 /* ─────────────────────────────────────────────
@@ -29,7 +29,7 @@ const REFUND_STATUS = {
     REQUESTED: {
         label: "Refund Requested",
         color: "bg-yellow-50 text-yellow-700 border-yellow-200",
-        desc: "Your refund request is under review. Admin will process it within 1–2 business days.",
+        desc: "Your refund request is under review. Admin will process it within 1-2 business days.",
     },
     PROCESSING: {
         label: "Refund Processing",
@@ -37,9 +37,9 @@ const REFUND_STATUS = {
         desc: "Refund is being processed via Razorpay. Please wait.",
     },
     PROCESSED: {
-        label: "Refund Processed ✓",
+        label: "Refund Processed",
         color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-        desc: "Refund has been initiated. Amount will reflect in 5–7 business days.",
+        desc: "Refund has been initiated. Amount will reflect in 5-7 business days.",
     },
     FAILED: {
         label: "Refund Failed",
@@ -55,7 +55,9 @@ const REFUND_STATUS = {
 
 const FLOW_STEPS = ["PLACED", "CONFIRMED", "PACKED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"];
 const CANCELLABLE = ["PLACED", "CONFIRMED"];
-const STEP_ICONS = ["🛒", "✅", "📦", "🚚", "🏃", "🎉"];
+
+// Step dot indicators — no emojis, just colored dots with step number
+const STEP_DOTS = FLOW_STEPS.map((_, i) => i + 1);
 
 const getItemImage = (item) => item.images?.[0]?.url || item.image || null;
 
@@ -68,18 +70,15 @@ const OrderDetails = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
-    // Cancel state
     const [cancelling, setCancelling] = useState(false);
     const [confirmCancel, setConfirmCancel] = useState(false);
     const [cancelError, setCancelError] = useState("");
 
-    // Refund state (for cancelled paid orders)
     const [showRefundForm, setShowRefundForm] = useState(false);
     const [refundReason, setRefundReason] = useState("");
     const [requestingRefund, setRequestingRefund] = useState(false);
     const [refundError, setRefundError] = useState("");
 
-    // Invoice download
     const [downloadingInvoice, setDownloadingInvoice] = useState(false);
 
     const fetchOrder = async () => {
@@ -151,7 +150,8 @@ const OrderDetails = () => {
             </div>
             <h2 className="text-xl font-black text-zinc-800 mb-1">Order Not Found</h2>
             <p className="text-zinc-400 text-sm mb-6">{error}</p>
-            <Link to="/orders" className="flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white rounded-xl font-bold text-sm hover:bg-zinc-800 transition-all">
+            <Link to="/orders"
+                className="flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white rounded-xl font-bold text-sm hover:bg-zinc-800 transition-all">
                 <FaArrowLeft size={11} /> Back to Orders
             </Link>
         </div>
@@ -262,7 +262,7 @@ const OrderDetails = () => {
                                 <p className="text-xs mt-1 font-mono opacity-70">Refund ID: {order.refund.razorpayRefundId}</p>
                             )}
                             {refundStatus === "PROCESSED" && order.refund?.amount && (
-                                <p className="text-xs mt-0.5 font-bold">₹{Number(order.refund.amount).toLocaleString("en-IN")} refunded</p>
+                                <p className="text-xs mt-0.5 font-bold">Rs.{Number(order.refund.amount).toLocaleString("en-IN")} refunded</p>
                             )}
                         </div>
                     </div>
@@ -276,11 +276,12 @@ const OrderDetails = () => {
                             Shipment Tracking
                         </h3>
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="text-sm text-zinc-600">
-                                🚚 Courier:
-                                <span className="font-bold ml-1">{order.shipping.courierName || "Courier"}</span>
+                            <div className="flex items-center gap-2 text-sm text-zinc-600">
+                                <FaTruck size={13} className="text-amber-500" />
+                                <span>Courier:</span>
+                                <span className="font-bold text-zinc-800">{order.shipping.courierName || "Courier"}</span>
                                 {order.shipping.awbCode && (
-                                    <span className="ml-3 text-zinc-400 font-mono text-xs">AWB: {order.shipping.awbCode}</span>
+                                    <span className="text-zinc-400 font-mono text-xs">AWB: {order.shipping.awbCode}</span>
                                 )}
                             </div>
                             <a href={order.shipping.trackingUrl} target="_blank" rel="noreferrer"
@@ -302,8 +303,11 @@ const OrderDetails = () => {
                             {FLOW_STEPS.map((step, i) => (
                                 <div key={step} className="flex items-center flex-1">
                                     <div className="flex flex-col items-center">
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all duration-300 ${i <= stepIdx ? "bg-amber-500 shadow-md shadow-amber-200" : "bg-stone-100"}`}>
-                                            <span>{STEP_ICONS[i]}</span>
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${i <= stepIdx ? "bg-amber-500 text-white shadow-md shadow-amber-200" : "bg-stone-100 text-zinc-400"}`}>
+                                            {i < stepIdx
+                                                ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                                : STEP_DOTS[i]
+                                            }
                                         </div>
                                     </div>
                                     {i < FLOW_STEPS.length - 1 && (
@@ -349,8 +353,8 @@ const OrderDetails = () => {
                                         <p className="font-bold text-zinc-800 text-sm truncate">{item.name}</p>
                                         <p className="text-xs text-zinc-400 mt-0.5">
                                             Qty: <span className="font-semibold text-zinc-600">{item.qty}</span>
-                                            {" × "}
-                                            <span className="font-semibold text-zinc-600">₹{item.price.toLocaleString("en-IN")}</span>
+                                            {" x "}
+                                            <span className="font-semibold text-zinc-600">Rs.{item.price.toLocaleString("en-IN")}</span>
                                         </p>
                                         {item.selectedSize && (
                                             <span className="inline-block mt-1 text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
@@ -359,12 +363,12 @@ const OrderDetails = () => {
                                         )}
                                         {item.customization?.text && (
                                             <p className="text-[10px] text-amber-600 font-semibold mt-0.5">
-                                                ✏️ "{item.customization.text}"
+                                                "{item.customization.text}"
                                             </p>
                                         )}
                                     </div>
                                     <p className="font-black text-zinc-900 text-sm shrink-0">
-                                        ₹{(item.qty * item.price).toLocaleString("en-IN")}
+                                        Rs.{(item.qty * item.price).toLocaleString("en-IN")}
                                     </p>
                                 </div>
                             );
@@ -383,32 +387,32 @@ const OrderDetails = () => {
                             <div className="flex justify-between text-zinc-500">
                                 <span>Items Total</span>
                                 <span className="font-semibold text-zinc-700">
-                                    ₹{order.items.reduce((s, i) => s + i.price * i.qty, 0).toLocaleString("en-IN")}
+                                    Rs.{order.items.reduce((s, i) => s + i.price * i.qty, 0).toLocaleString("en-IN")}
                                 </span>
                             </div>
                             {Number(order.platformFee) > 0 && (
                                 <div className="flex justify-between text-zinc-500">
                                     <span>Platform Fee</span>
-                                    <span className="font-semibold text-zinc-700">₹{Number(order.platformFee).toLocaleString("en-IN")}</span>
+                                    <span className="font-semibold text-zinc-700">Rs.{Number(order.platformFee).toLocaleString("en-IN")}</span>
                                 </div>
                             )}
                             <div className="flex justify-between text-zinc-500">
                                 <span>Delivery</span>
                                 {Number(order.deliveryCharge) > 0
-                                    ? <span className="font-semibold text-zinc-700">₹{Number(order.deliveryCharge).toLocaleString("en-IN")}</span>
-                                    : <span className="font-bold text-emerald-600">FREE ✓</span>
+                                    ? <span className="font-semibold text-zinc-700">Rs.{Number(order.deliveryCharge).toLocaleString("en-IN")}</span>
+                                    : <span className="font-bold text-emerald-600">FREE</span>
                                 }
                             </div>
                             <div className="flex justify-between pt-3 border-t border-stone-100">
                                 <span className="font-black text-zinc-900">Total</span>
                                 <span className="font-black text-zinc-900 text-lg">
-                                    ₹{Number(order.totalAmount).toLocaleString("en-IN")}
+                                    Rs.{Number(order.totalAmount).toLocaleString("en-IN")}
                                 </span>
                             </div>
                             <div className="flex justify-between pt-1">
                                 <span className="text-zinc-400">Payment</span>
                                 <span className="font-bold text-zinc-700">
-                                    {isRazorpay ? "💳 Online Paid" : "💵 Cash on Delivery"}
+                                    {isRazorpay ? "Online Paid" : "Cash on Delivery"}
                                 </span>
                             </div>
                         </div>
@@ -441,15 +445,15 @@ const OrderDetails = () => {
                     <div className="card p-5 border-red-100">
                         <h2 className="font-black text-zinc-800 text-sm mb-1">Cancel Order</h2>
                         <p className="text-xs text-zinc-400 mb-4">
-                            You can cancel this order since it hasn't been packed yet.
+                            You can cancel this order since it has not been packed yet.
                             {isRazorpay && isPaid && (
                                 <span className="block mt-1 text-amber-600 font-medium">
-                                    💡 Since you paid online, a refund will be automatically requested after cancellation.
+                                    Since you paid online, a refund will be automatically requested after cancellation.
                                 </span>
                             )}
                         </p>
                         {cancelError && (
-                            <p className="text-red-500 text-xs mb-3 font-medium bg-red-50 px-3 py-2 rounded-lg">⚠️ {cancelError}</p>
+                            <p className="text-red-500 text-xs mb-3 font-medium bg-red-50 px-3 py-2 rounded-lg">{cancelError}</p>
                         )}
                         {confirmCancel ? (
                             <div className="flex gap-2">
@@ -482,12 +486,12 @@ const OrderDetails = () => {
                         <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3 mb-4">
                             <FaInfoCircle size={12} className="text-amber-500 mt-0.5 shrink-0" />
                             <p className="text-xs text-amber-700 leading-relaxed">
-                                Your payment of <strong>₹{Number(order.totalAmount).toLocaleString("en-IN")}</strong> will be
-                                refunded to your original payment method within <strong>5–7 business days</strong> after admin approval.
+                                Your payment of <strong>Rs.{Number(order.totalAmount).toLocaleString("en-IN")}</strong> will be
+                                refunded to your original payment method within <strong>5-7 business days</strong> after admin approval.
                             </p>
                         </div>
                         {refundError && (
-                            <p className="text-red-500 text-xs mb-3 font-medium bg-red-50 px-3 py-2 rounded-lg">⚠️ {refundError}</p>
+                            <p className="text-red-500 text-xs mb-3 font-medium bg-red-50 px-3 py-2 rounded-lg">{refundError}</p>
                         )}
                         {showRefundForm ? (
                             <div className="space-y-3">

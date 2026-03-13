@@ -1,6 +1,6 @@
 import { useAuth } from "../contexts/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
-import { FaUser, FaEnvelope, FaBox, FaArrowRight, FaMapMarkerAlt, FaSignOutAlt } from "react-icons/fa";
+import { FaUser, FaEnvelope, FaBox, FaArrowRight, FaMapMarkerAlt, FaSignOutAlt, FaTools } from "react-icons/fa";
 
 const Profile = () => {
     const { user, logout } = useAuth();
@@ -67,7 +67,7 @@ const Profile = () => {
                             </div>
                             <FaArrowRight size={11} className="text-zinc-300 group-hover:text-amber-400 transition-colors" />
                         </Link>
-                        <Link to="/addresses"
+                        <Link to="/profile/addresses"
                             className="flex items-center justify-between p-3 rounded-xl hover:bg-amber-50 hover:border-amber-200 border border-transparent transition-all group">
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center group-hover:bg-amber-100 transition-colors">
@@ -88,10 +88,13 @@ const Profile = () => {
 
                 {/* Coming Soon */}
                 <div className="bg-white rounded-2xl border border-dashed border-stone-200 p-6 text-center">
-                    <p className="text-2xl mb-2">🚧</p>
+                    <div className="w-10 h-10 bg-stone-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <FaTools size={14} className="text-stone-400" />
+                    </div>
                     <p className="font-bold text-zinc-600 text-sm">More features coming soon</p>
                     <p className="text-zinc-400 text-xs mt-1">Edit profile & more</p>
                 </div>
+
             </div>
         </div>
     );

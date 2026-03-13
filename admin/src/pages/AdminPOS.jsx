@@ -5,7 +5,7 @@ import {
     FaUser, FaPhone, FaShoppingCart,
     FaCheckCircle, FaHistory, FaTimes, FaCalendarAlt,
     FaCashRegister, FaMobileAlt, FaCreditCard, FaBoxOpen,
-    FaReceipt, FaRupeeSign, FaEnvelope, FaPaperPlane,
+    FaReceipt, FaRupeeSign, FaEnvelope, FaPaperPlane, FaLock,
 } from "react-icons/fa";
 
 const GST_RATES = [0, 5, 12, 18, 28];
@@ -67,19 +67,13 @@ const EmailModal = ({ bill, onClose, onSent }) => {
         <div style={{
             position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
             zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center",
-        }}
-            onClick={onClose}
-        >
-            <div
-                onClick={e => e.stopPropagation()}
-                style={{
-                    background: "#fff", borderRadius: 20, padding: 28,
-                    width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
-                    animation: "popIn .3s cubic-bezier(.16,1,.3,1)",
-                    fontFamily: "'DM Sans',sans-serif",
-                }}
-            >
-                {/* Header */}
+        }} onClick={onClose}>
+            <div onClick={e => e.stopPropagation()} style={{
+                background: "#fff", borderRadius: 20, padding: 28,
+                width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+                animation: "popIn .3s cubic-bezier(.16,1,.3,1)",
+                fontFamily: "'DM Sans',sans-serif",
+            }}>
                 <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
@@ -87,6 +81,89 @@ const EmailModal = ({ bill, onClose, onSent }) => {
                         </div>
                         <div>
                             <p className="font-black text-zinc-900 text-base">Email Invoice</p>
+                            <p className="text-xs text-zinc-400">{bill.billNumber}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose}
+                        className="w-8 h-8 rounded-lg bg-stone-100 flex items-center justify-center text-zinc-500 hover:bg-stone-200 transition cursor-pointer">
+                        <FaTimes size={12} />
+                    </button>
+                </div>
+
+                <div className="bg-stone-50 rounded-xl p-3 mb-4 text-sm">
+                    <div className="flex justify-between mb-1">
+                        <span className="text-zinc-500">Customer</span>
+                        <span className="font-bold text-zinc-800">{bill.customerName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-zinc-500">Amount</span>
+                        <span className="font-black text-emerald-600">{fmt(bill.grandTotal)}</span>
+                    </div>
+                </div>
+
+                <label className="block text-xs font-bold text-zinc-500 mb-1.5">Send to Email Address</label>
+                <div className="relative mb-3">
+                    <FaEnvelope size={12} className="absolute left-3 top-3.5 text-zinc-400" />
+                    <input
+                        type="email" value={email}
+                        onChange={e => { setEmail(e.target.value); setError(""); }}
+                        placeholder="customer@example.com"
+                        onKeyDown={e => e.key === "Enter" && handleSend()}
+                        autoFocus
+                        className="w-full pl-9 pr-4 py-2.5 border border-stone-200 rounded-xl text-sm font-medium text-zinc-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
+                    />
+                </div>
+
+                {error && <p className="text-xs text-red-500 font-semibold mb-3">⚠ {error}</p>}
+
+                <div className="flex gap-2">
+                    <button onClick={onClose}
+                        className="flex-1 py-2.5 rounded-xl border border-stone-200 text-sm font-bold text-zinc-600 hover:bg-stone-50 transition cursor-pointer">
+                        Cancel
+                    </button>
+                    <button onClick={handleSend} disabled={sending}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-black hover:bg-amber-600 active:scale-95 transition-all disabled:opacity-60 cursor-pointer shadow-md shadow-amber-200">
+                        {sending ? (
+                            <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sending...</>
+                        ) : (
+                            <><FaPaperPlane size={12} /> Send Invoice</>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ── Delete Confirm Modal ───────────────────────────────────────
+const DeleteModal = ({ bill, onClose, onConfirm, deleting }) => {
+    const [pin, setPin] = useState("");
+    const [error, setError] = useState("");
+
+    const handleDelete = () => {
+        if (!pin.trim()) return setError("PIN is required");
+        onConfirm(bill._id, pin, setError);
+    };
+
+    return (
+        <div style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center",
+        }} onClick={onClose}>
+            <div onClick={e => e.stopPropagation()} style={{
+                background: "#fff", borderRadius: 20, padding: 28,
+                width: 380, boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+                animation: "popIn .3s cubic-bezier(.16,1,.3,1)",
+                fontFamily: "'DM Sans',sans-serif",
+            }}>
+                {/* Header */}
+                <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+                            <FaTrash size={15} className="text-red-500" />
+                        </div>
+                        <div>
+                            <p className="font-black text-zinc-900 text-base">Delete Bill</p>
                             <p className="text-xs text-zinc-400">{bill.billNumber}</p>
                         </div>
                     </div>
@@ -104,42 +181,44 @@ const EmailModal = ({ bill, onClose, onSent }) => {
                     </div>
                     <div className="flex justify-between">
                         <span className="text-zinc-500">Amount</span>
-                        <span className="font-black text-emerald-600">{fmt(bill.grandTotal)}</span>
+                        <span className="font-black text-red-500">{fmt(bill.grandTotal)}</span>
                     </div>
                 </div>
 
-                {/* Email input */}
-                <label className="block text-xs font-bold text-zinc-500 mb-1.5">
-                    Send to Email Address
-                </label>
+                <p className="text-xs text-zinc-500 mb-3">
+                    ⚠️ This action cannot be undone. Enter your admin PIN to confirm deletion.
+                </p>
+
+                {/* PIN input */}
+                <label className="block text-xs font-bold text-zinc-500 mb-1.5">Admin PIN</label>
                 <div className="relative mb-3">
-                    <FaEnvelope size={12} className="absolute left-3 top-3.5 text-zinc-400" />
+                    <FaLock size={11} className="absolute left-3 top-3.5 text-zinc-400" />
                     <input
-                        type="email"
-                        value={email}
-                        onChange={e => { setEmail(e.target.value); setError(""); }}
-                        placeholder="customer@example.com"
-                        onKeyDown={e => e.key === "Enter" && handleSend()}
+                        type="password"
+                        value={pin}
+                        onChange={e => { setPin(e.target.value); setError(""); }}
+                        placeholder="Enter PIN"
+                        maxLength={6}
+                        inputMode="numeric"
+                        onKeyDown={e => e.key === "Enter" && handleDelete()}
                         autoFocus
-                        className="w-full pl-9 pr-4 py-2.5 border border-stone-200 rounded-xl text-sm font-medium text-zinc-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
+                        className="w-full pl-9 pr-4 py-2.5 border border-stone-200 rounded-xl text-sm font-medium text-zinc-800 focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition-all tracking-widest"
                     />
                 </div>
 
-                {error && (
-                    <p className="text-xs text-red-500 font-semibold mb-3">⚠ {error}</p>
-                )}
+                {error && <p className="text-xs text-red-500 font-semibold mb-3">⚠ {error}</p>}
 
                 <div className="flex gap-2">
                     <button onClick={onClose}
                         className="flex-1 py-2.5 rounded-xl border border-stone-200 text-sm font-bold text-zinc-600 hover:bg-stone-50 transition cursor-pointer">
                         Cancel
                     </button>
-                    <button onClick={handleSend} disabled={sending}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-black hover:bg-amber-600 active:scale-95 transition-all disabled:opacity-60 cursor-pointer shadow-md shadow-amber-200">
-                        {sending ? (
-                            <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sending...</>
+                    <button onClick={handleDelete} disabled={deleting}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-500 text-white text-sm font-black hover:bg-red-600 active:scale-95 transition-all disabled:opacity-60 cursor-pointer shadow-md shadow-red-200">
+                        {deleting ? (
+                            <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Deleting...</>
                         ) : (
-                            <><FaPaperPlane size={12} /> Send Invoice</>
+                            <><FaTrash size={12} /> Delete Bill</>
                         )}
                     </button>
                 </div>
@@ -169,8 +248,8 @@ const AdminPOS = () => {
     const [stats, setStats] = useState(null);
     const [downloadingId, setDownloadingId] = useState(null);
     const [deletingId, setDeletingId] = useState(null);
-    const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-    const [emailBill, setEmailBill] = useState(null); // modal target
+    const [deleteBill, setDeleteBill] = useState(null); // modal target (was confirmDeleteId)
+    const [emailBill, setEmailBill] = useState(null);
 
     const subtotal = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
     const totalGST = items.reduce((s, i) => {
@@ -255,16 +334,19 @@ const AdminPOS = () => {
         finally { setDownloadingId(null); }
     };
 
-    const handleDelete = async (id) => {
+    const handleDelete = async (id, pin, setError) => {
         setDeletingId(id);
         try {
-            await api.delete(`/walkin/${id}`);
+            await api.delete(`/walkin/${id}`, { data: { pin } });
             setBills(prev => prev.filter(b => b._id !== id));
-            setConfirmDeleteId(null);
+            setDeleteBill(null);
             fetchStats();
             showToast("success", "Bill deleted");
-        } catch { showToast("error", "Failed to delete bill"); }
-        finally { setDeletingId(null); }
+        } catch (err) {
+            setError(err.response?.data?.message || "Invalid PIN");
+        } finally {
+            setDeletingId(null);
+        }
     };
 
     // ─────────────────────────────────────────────
@@ -277,14 +359,8 @@ const AdminPOS = () => {
             <style>{styles}</style>
 
             {emailBill && (
-                <EmailModal
-                    bill={emailBill}
-                    onClose={() => setEmailBill(null)}
-                    onSent={(to) => {
-                        setEmailBill(null);
-                        showToast("success", `Invoice sent to ${to} ✉️`);
-                    }}
-                />
+                <EmailModal bill={emailBill} onClose={() => setEmailBill(null)}
+                    onSent={(to) => { setEmailBill(null); showToast("success", `Invoice sent to ${to} ✉️`); }} />
             )}
 
             <div className="bg-white rounded-3xl border border-stone-200 shadow-2xl max-w-md w-full overflow-hidden"
@@ -322,7 +398,6 @@ const AdminPOS = () => {
                         </div>
                     </div>
 
-                    {/* 3 action buttons */}
                     <div className="grid grid-cols-3 gap-2 mb-3">
                         <button
                             onClick={() => handleDownload(successBill._id, successBill.billNumber)}
@@ -358,13 +433,17 @@ const AdminPOS = () => {
             <Toast toast={toast} />
 
             {emailBill && (
-                <EmailModal
-                    bill={emailBill}
-                    onClose={() => setEmailBill(null)}
-                    onSent={(to) => {
-                        setEmailBill(null);
-                        showToast("success", `Invoice sent to ${to} ✉️`);
-                    }}
+                <EmailModal bill={emailBill} onClose={() => setEmailBill(null)}
+                    onSent={(to) => { setEmailBill(null); showToast("success", `Invoice sent to ${to} ✉️`); }} />
+            )}
+
+            {/* ── Delete Modal (replaces inline PIN) ── */}
+            {deleteBill && (
+                <DeleteModal
+                    bill={deleteBill}
+                    onClose={() => setDeleteBill(null)}
+                    onConfirm={handleDelete}
+                    deleting={deletingId === deleteBill._id}
                 />
             )}
 
@@ -388,8 +467,8 @@ const AdminPOS = () => {
                         ].map(t => (
                             <button key={t.id} onClick={() => setTab(t.id)}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${tab === t.id
-                                        ? "bg-zinc-900 text-white shadow-md"
-                                        : "bg-white border border-stone-200 text-zinc-600 hover:bg-stone-50"
+                                    ? "bg-zinc-900 text-white shadow-md"
+                                    : "bg-white border border-stone-200 text-zinc-600 hover:bg-stone-50"
                                     }`}>
                                 {t.icon} {t.label}
                             </button>
@@ -445,7 +524,6 @@ const AdminPOS = () => {
                                     </button>
                                 </div>
 
-                                {/* Column headers */}
                                 <div className="grid gap-2 mt-4 mb-1 px-1"
                                     style={{ gridTemplateColumns: "1fr 56px 80px 68px 72px 24px" }}>
                                     {["Item Name", "Qty", "Rate (₹)", "GST %", "Total", ""].map(h => (
@@ -462,17 +540,14 @@ const AdminPOS = () => {
                                                 style={{ gridTemplateColumns: "1fr 56px 80px 68px 72px 24px" }}>
                                                 <input
                                                     className="bg-white border border-stone-200 rounded-lg px-2.5 py-2 text-sm font-medium text-zinc-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
-                                                    placeholder="Item name"
-                                                    value={item.name}
+                                                    placeholder="Item name" value={item.name}
                                                     onChange={e => updateItem(idx, "name", e.target.value)} />
                                                 <input type="number" min={1}
                                                     className="bg-white border border-stone-200 rounded-lg px-2 py-2 text-sm font-bold text-zinc-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all text-center"
-                                                    value={item.qty}
-                                                    onChange={e => updateItem(idx, "qty", e.target.value)} />
+                                                    value={item.qty} onChange={e => updateItem(idx, "qty", e.target.value)} />
                                                 <input type="number" min={0}
                                                     className="bg-white border border-stone-200 rounded-lg px-2.5 py-2 text-sm font-medium text-zinc-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
-                                                    placeholder="0"
-                                                    value={item.price}
+                                                    placeholder="0" value={item.price}
                                                     onChange={e => updateItem(idx, "price", e.target.value)} />
                                                 <select
                                                     className="bg-white border border-stone-200 rounded-lg px-2 py-2 text-sm font-medium text-zinc-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
@@ -520,8 +595,8 @@ const AdminPOS = () => {
                                     {PAYMENT_MODES.map(mode => (
                                         <button key={mode.value} onClick={() => setPaymentMode(mode.value)}
                                             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 text-sm font-bold transition-all cursor-pointer ${paymentMode === mode.value
-                                                    ? "border-amber-400 bg-amber-50 text-amber-800"
-                                                    : "border-stone-200 bg-white text-zinc-600 hover:bg-stone-50"
+                                                ? "border-amber-400 bg-amber-50 text-amber-800"
+                                                : "border-stone-200 bg-white text-zinc-600 hover:bg-stone-50"
                                                 }`}>
                                             <span className={`w-8 h-8 rounded-lg ${mode.color} text-white flex items-center justify-center shadow-sm`}>
                                                 {mode.icon}
@@ -604,7 +679,7 @@ const AdminPOS = () => {
                         ) : (
                             <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
                                 <div className="grid gap-2 px-5 py-3 bg-stone-50 border-b border-stone-100"
-                                    style={{ gridTemplateColumns: "120px 1fr 130px 50px 70px 100px 110px" }}>
+                                    style={{ gridTemplateColumns: "120px 1fr 130px 50px 70px 100px 90px" }}>
                                     {["Bill No", "Customer", "Date", "Items", "Payment", "Total", "Actions"].map(h => (
                                         <p key={h} className="text-[10px] font-black text-zinc-400 uppercase tracking-wide">{h}</p>
                                     ))}
@@ -612,7 +687,7 @@ const AdminPOS = () => {
                                 <div className="divide-y divide-stone-50">
                                     {bills.map(bill => (
                                         <div key={bill._id} className="grid gap-2 px-5 py-3.5 items-center hover:bg-stone-50/70 transition-colors"
-                                            style={{ gridTemplateColumns: "120px 1fr 130px 50px 70px 100px 110px" }}>
+                                            style={{ gridTemplateColumns: "120px 1fr 130px 50px 70px 100px 90px" }}>
                                             <p className="font-mono font-bold text-xs text-amber-600 truncate">{bill.billNumber}</p>
                                             <div>
                                                 <p className="font-bold text-zinc-800 text-sm truncate">{bill.customerName}</p>
@@ -633,39 +708,24 @@ const AdminPOS = () => {
                                             <p className="font-black text-emerald-600 text-sm">
                                                 ₹{Number(bill.grandTotal).toLocaleString("en-IN")}
                                             </p>
-                                            <div className="flex items-center gap-1">
-                                                {/* Download */}
+                                            {/* Actions — always 3 clean icon buttons, no inline expansion */}
+                                            <div className="flex items-center gap-1.5">
                                                 <button onClick={() => handleDownload(bill._id, bill.billNumber)}
                                                     disabled={downloadingId === bill._id}
                                                     className="p-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg hover:bg-amber-100 transition disabled:opacity-50 cursor-pointer"
                                                     title="Download PDF">
                                                     <FaFileInvoice size={11} />
                                                 </button>
-                                                {/* Email */}
                                                 <button onClick={() => setEmailBill(bill)}
                                                     className="p-1.5 bg-blue-50 border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-100 transition cursor-pointer"
                                                     title="Email Invoice">
                                                     <FaEnvelope size={11} />
                                                 </button>
-                                                {/* Delete */}
-                                                {confirmDeleteId === bill._id ? (
-                                                    <div className="flex items-center gap-1">
-                                                        <button onClick={() => handleDelete(bill._id)} disabled={deletingId === bill._id}
-                                                            className="px-2 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600 transition disabled:opacity-60 cursor-pointer">
-                                                            {deletingId === bill._id ? "..." : "Yes"}
-                                                        </button>
-                                                        <button onClick={() => setConfirmDeleteId(null)}
-                                                            className="px-2 py-1.5 bg-stone-100 text-zinc-600 text-xs font-bold rounded-lg hover:bg-stone-200 transition cursor-pointer">
-                                                            No
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <button onClick={() => setConfirmDeleteId(bill._id)}
-                                                        className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
-                                                        title="Delete">
-                                                        <FaTrash size={11} />
-                                                    </button>
-                                                )}
+                                                <button onClick={() => setDeleteBill(bill)}
+                                                    className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 rounded-lg transition cursor-pointer"
+                                                    title="Delete">
+                                                    <FaTrash size={11} />
+                                                </button>
                                             </div>
                                         </div>
                                     ))}

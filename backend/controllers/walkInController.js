@@ -1,6 +1,7 @@
 import WalkInOrder from "../models/WalkInOrder.js";
 import { generateWalkInBill, generateWalkInBillBuffer, SHOP } from "../utils/walkInBillGenerator.js";
 import nodemailer from "nodemailer";
+import PosSecurity from "../models/posSecurityModel.js";
 
 const transporter = nodemailer.createTransport({
     service: "gmail",
@@ -116,15 +117,102 @@ export const getWalkInOrderById = async (req, res) => {
 // ─────────────────────────────────────────────
 export const deleteWalkInOrder = async (req, res) => {
     try {
+
+        const { pin } = req.body;
+
+        if (!pin)
+            return res.status(400).json({ message: "Delete PIN required" });
+
+        const security = await PosSecurity.findOne();
+
+        if (!security || security.deletePin !== pin)
+            return res.status(401).json({ message: "Invalid delete PIN" });
+
         const order = await WalkInOrder.findById(req.params.id);
-        if (!order) return res.status(404).json({ message: "Bill not found" });
+
+        if (!order)
+            return res.status(404).json({ message: "Bill not found" });
+
         await order.deleteOne();
+
         res.json({ message: "Bill deleted" });
-    } catch {
+
+    } catch (err) {
+
+        console.error("DELETE WALKIN ERROR:", err);
+
         res.status(500).json({ message: "Failed to delete bill" });
+
     }
 };
 
+// walkInController.js — sirf sendDeletePinResetOtp fix karo, baaki same rahega
+
+export const sendDeletePinResetOtp = async (req, res) => {
+    try {
+        const otp = Math.floor(100000 + Math.random() * 900000);
+        const expiry = Date.now() + 10 * 60 * 1000; // 10 min
+
+        // findOne ke baad null check — pehli baar document exist nahi hoga
+        let security = await PosSecurity.findOne();
+
+        if (!security) {
+            // First time setup — document create karo placeholder PIN ke saath
+            security = new PosSecurity({
+                deletePin: "",   // blank, reset ke baad set hoga
+                resetOtp: otp,
+                resetOtpExpire: expiry,
+            });
+        } else {
+            security.resetOtp = otp;
+            security.resetOtpExpire = expiry;
+        }
+
+        await security.save();
+
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: process.env.ADMIN_EMAIL,
+            subject: "RV Gifts — POS Delete PIN Reset OTP",
+            html: `
+                <div style="font-family:sans-serif;max-width:400px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
+                    <h2 style="color:#0f0f0f;margin-bottom:8px">POS Delete PIN Reset</h2>
+                    <p style="color:#6b7280;font-size:14px">Your OTP is:</p>
+                    <div style="font-size:36px;font-weight:900;letter-spacing:8px;color:#d97706;padding:16px 0">${otp}</div>
+                    <p style="color:#6b7280;font-size:12px">This OTP is valid for 10 minutes. Do not share it with anyone.</p>
+                </div>
+            `,
+        });
+
+        res.json({ message: "OTP sent to admin email" });
+
+    } catch (err) {
+        console.error("SEND OTP ERROR:", err);
+        res.status(500).json({ message: "Failed to send OTP" });
+    }
+};
+
+
+export const resetDeletePin = async (req, res) => {
+
+    const { otp, newPin } = req.body;
+
+    const security = await PosSecurity.findOne();
+
+    if (!security)
+        return res.status(400).json({ message: "Security config not found" });
+
+    if (security.resetOtp !== otp || security.resetOtpExpire < Date.now())
+        return res.status(400).json({ message: "Invalid or expired OTP" });
+
+    security.deletePin = newPin;
+    security.resetOtp = null;
+    security.resetOtpExpire = null;
+
+    await security.save();
+
+    res.json({ message: "Delete PIN updated" });
+};
 // ─────────────────────────────────────────────
 // DOWNLOAD PDF  ✅ async with QR
 // ─────────────────────────────────────────────

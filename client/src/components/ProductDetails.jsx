@@ -8,7 +8,7 @@ import {
     FaStar, FaRegStar, FaShoppingCart, FaBolt,
     FaTrash, FaCheckCircle, FaArrowLeft,
     FaUpload, FaTimes, FaPencilAlt, FaStickyNote,
-    FaRuler, FaHeart, FaBell,
+    FaRuler, FaBell,
 } from "react-icons/fa";
 
 const StarRow = ({ value }) => (
@@ -34,7 +34,6 @@ const ProductDetails = () => {
     const [error, setError] = useState("");
     const [selectedSize, setSelectedSize] = useState("");
     const [imgZoomed, setImgZoomed] = useState(false);
-    const [wished, setWished] = useState(false);
     const [addedFlash, setAddedFlash] = useState(false);
 
     const [customText, setCustomText] = useState("");
@@ -262,10 +261,6 @@ const ProductDetails = () => {
                                     </span>
                                 )}
                             </div>
-                            <button onClick={() => setWished(w => !w)}
-                                className={`absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm cursor-pointer ${wished ? "bg-red-500 text-white" : "bg-white text-zinc-300 hover:text-red-400 border border-stone-200"}`}>
-                                <FaHeart size={14} />
-                            </button>
                         </div>
 
                         {/* INFO */}

@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../hooks/useCart";
-import { FaTrash, FaArrowRight, FaShoppingBag, FaTag, FaShoppingCart } from "react-icons/fa";
+import { FaArrowRight, FaShoppingBag, FaTag, FaShoppingCart, FaMinus, FaPlus, FaTrash } from "react-icons/fa";
 
 const PLATFORM_FEE = 9;
 const FREE_DELIVERY_ABOVE = 499;
@@ -14,165 +14,202 @@ const Cart = () => {
     const grandTotal = totalPrice + PLATFORM_FEE + delivery;
     const savingsOnDelivery = delivery === 0 ? DELIVERY_CHARGE : 0;
     const amountNeededForFree = FREE_DELIVERY_ABOVE - totalPrice;
+    const deliveryProgress = Math.min((totalPrice / FREE_DELIVERY_ABOVE) * 100, 100);
 
     if (cartItems.length === 0) {
         return (
-            <div className="min-h-screen bg-stone-50 flex flex-col items-center justify-center px-4">
-                <div className="w-24 h-24 bg-amber-50 rounded-full flex items-center justify-center mb-5">
-                    <FaShoppingCart size={36} className="text-amber-300" />
+            <div className="min-h-screen flex flex-col items-center justify-center px-4"
+                style={{ fontFamily: "'DM Sans', sans-serif", background: "#f8f7f5" }}>
+                <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');`}</style>
+                <div className="text-center">
+                    <div className="w-28 h-28 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner"
+                        style={{ background: "linear-gradient(135deg, #fef9f0, #fef3c7)" }}>
+                        <FaShoppingCart size={42} className="text-amber-300" />
+                    </div>
+                    <h1 className="text-2xl font-black text-zinc-800 mb-2">Your cart is empty</h1>
+                    <p className="text-zinc-400 text-sm mb-8 max-w-xs mx-auto leading-relaxed">
+                        Looks like you haven't added anything yet. Let's find something special!
+                    </p>
+                    <Link to="/"
+                        className="inline-flex items-center gap-2 px-8 py-3.5 text-white rounded-2xl font-bold text-sm transition-all active:scale-95 cursor-pointer"
+                        style={{ background: "linear-gradient(135deg, #f59e0b, #fbbf24)", boxShadow: "0 8px 24px rgba(245,158,11,0.35)" }}>
+                        <FaShoppingBag size={13} /> Start Shopping
+                    </Link>
                 </div>
-                <h1 className="text-xl font-black text-zinc-800 mb-1">Your cart is empty</h1>
-                <p className="text-zinc-400 text-sm mb-6">Add items to get started</p>
-                <Link to="/"
-                    className="flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-sm transition-all active:scale-95 shadow-md shadow-amber-200">
-                    <FaShoppingBag size={13} /> Go Shopping
-                </Link>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-stone-50 py-8 px-4">
-            <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap'); .cart-font{font-family:'DM Sans',sans-serif;}`}</style>
+        <div className="min-h-screen py-8 px-4" style={{ fontFamily: "'DM Sans', sans-serif", background: "#f8f7f5" }}>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
+                @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+                .fade-up { animation: fadeUp 0.3s ease forwards; }
+                .item-card { transition: all 0.2s ease; }
+                .item-card:hover { transform: translateY(-1px); }
+                .qty-btn { transition: all 0.15s ease; }
+                .qty-btn:hover { transform: scale(1.1); }
+                .qty-btn:active { transform: scale(0.92); }
+                .checkout-btn { transition: all 0.2s ease; }
+                .checkout-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(245,158,11,0.45); }
+                .checkout-btn:active { transform: scale(0.97); }
+            `}</style>
 
-            <div className="cart-font max-w-6xl mx-auto">
+            <div className="max-w-6xl mx-auto fade-up">
 
                 {/* Header */}
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-7">
                     <div>
-                        <h1 className="text-2xl font-black text-zinc-900">Shopping Cart</h1>
-                        <p className="text-zinc-400 text-sm mt-0.5">{totalItems} item{totalItems !== 1 ? "s" : ""}</p>
+                        <h1 className="text-2xl font-black text-zinc-900">My Cart</h1>
+                        <p className="text-zinc-400 text-sm mt-0.5 font-medium">{totalItems} item{totalItems !== 1 ? "s" : ""} added</p>
                     </div>
                     <button onClick={clear}
-                        className="flex items-center gap-1.5 text-xs text-red-400 font-bold hover:text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-xl transition-all">
-                        <FaTrash size={10} /> Clear Cart
+                        className="flex items-center gap-1.5 text-xs text-zinc-400 font-bold hover:text-red-500 px-3 py-2 rounded-xl hover:bg-red-50 transition-all duration-200 cursor-pointer border border-transparent hover:border-red-100">
+                        <FaTrash size={10} /> Clear all
                     </button>
                 </div>
 
                 <div className="flex flex-col lg:flex-row gap-5 items-start">
 
-                    {/* Cart Items */}
+                    {/* ── Cart Items ── */}
                     <div className="flex-1 min-w-0 w-full space-y-3">
                         {cartItems.map((item, index) => {
                             const imageUrl = item.images?.[0]?.url || item.image || null;
                             return (
                                 <div key={`${item._id}-${index}`}
-                                    className="bg-white rounded-2xl border border-stone-100 hover:border-amber-100 hover:shadow-lg shadow-sm p-4 flex items-center gap-4 transition-all duration-200 group/item">
+                                    className="item-card bg-white rounded-2xl border border-stone-100 hover:border-amber-200 hover:shadow-xl shadow-sm p-4 group/item">
+                                    <div className="flex items-center gap-4">
 
-                                    {/* Image */}
-                                    <div className="w-20 h-20 rounded-2xl overflow-hidden flex items-center justify-center shrink-0"
-                                        style={{ background: "linear-gradient(135deg, #fafaf9, #fef9f0)" }}>
-                                        {imageUrl ? (
-                                            <img src={imageUrl} alt={item.name}
-                                                className="w-full h-full object-contain p-1.5 group-hover/item:scale-110 transition-transform duration-300"
-                                                onError={e => { e.target.style.display = "none"; }} />
-                                        ) : (
-                                            <FaShoppingBag size={24} className="text-stone-300" />
-                                        )}
-                                    </div>
+                                        {/* Image */}
+                                        <div className="w-[72px] h-[72px] rounded-xl overflow-hidden shrink-0 flex items-center justify-center"
+                                            style={{ background: "linear-gradient(135deg, #fafaf9, #fef9f0)" }}>
+                                            {imageUrl ? (
+                                                <img src={imageUrl} alt={item.name}
+                                                    className="w-full h-full object-contain p-1.5 group-hover/item:scale-110 transition-transform duration-300"
+                                                    onError={e => { e.target.style.display = "none"; }} />
+                                            ) : (
+                                                <FaShoppingBag size={22} className="text-stone-300" />
+                                            )}
+                                        </div>
 
-                                    {/* Info */}
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="font-bold text-zinc-800 text-sm truncate group-hover/item:text-amber-600 transition-colors">
-                                            {item.name}
-                                        </h3>
-                                        <p className="text-zinc-400 text-xs mt-0.5 font-medium">
-                                            ₹{item.price.toLocaleString("en-IN")} × {item.quantity}
-                                        </p>
-                                        {item.customization?.text && (
-                                            <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                                                ✏️ {item.customization.text}
-                                            </span>
-                                        )}
-                                    </div>
+                                        {/* Info */}
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-bold text-zinc-800 text-sm truncate group-hover/item:text-amber-600 transition-colors mb-0.5">
+                                                {item.name}
+                                            </h3>
+                                            <p className="text-zinc-400 text-xs font-medium">
+                                                ₹{item.price.toLocaleString("en-IN")} per item
+                                            </p>
+                                            {item.selectedSize && (
+                                                <span className="inline-flex items-center mt-1.5 text-[10px] font-bold text-zinc-500 bg-stone-100 px-2 py-0.5 rounded-full">
+                                                    Size: {item.selectedSize}
+                                                </span>
+                                            )}
+                                            {item.customization?.text && (
+                                                <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                                                    ✏️ {item.customization.text}
+                                                </span>
+                                            )}
+                                        </div>
 
-                                    {/* Qty Controls */}
-                                    <div className="flex items-center gap-1.5 rounded-2xl p-1 shrink-0"
-                                        style={{ background: "#f5f4f2" }}>
-                                        <button onClick={() => decQty(item._id)}
-                                            disabled={item.quantity <= 1}
-                                            className="w-7 h-7 flex items-center justify-center font-black rounded-xl text-zinc-600 hover:bg-white hover:text-red-500 disabled:opacity-30 transition-all text-base leading-none">
-                                            −
-                                        </button>
-                                        <span className="font-black text-zinc-800 w-6 text-center text-sm">{item.quantity}</span>
-                                        <button onClick={() => incQty(item._id)}
-                                            className="w-7 h-7 flex items-center justify-center font-black rounded-xl text-zinc-600 hover:bg-white hover:text-emerald-600 transition-all text-base leading-none">
-                                            +
-                                        </button>
-                                    </div>
+                                        {/* Right side */}
+                                        <div className="flex flex-col items-end gap-3 shrink-0">
+                                            {/* Price */}
+                                            <p className="font-black text-zinc-900 text-base">
+                                                ₹{(item.price * item.quantity).toLocaleString("en-IN")}
+                                            </p>
 
-                                    {/* Total + Remove */}
-                                    <div className="text-right shrink-0 ml-1">
-                                        <p className="font-black text-zinc-900 text-base leading-none">
-                                            ₹{(item.price * item.quantity).toLocaleString("en-IN")}
-                                        </p>
-                                        <button onClick={() => removeItem(item._id)}
-                                            className="text-stone-300 hover:text-red-500 mt-2 transition-colors flex items-center gap-1 ml-auto">
-                                            <FaTrash size={11} />
-                                        </button>
+                                            {/* Qty Controls */}
+                                            <div className="flex items-center gap-1 rounded-xl p-0.5"
+                                                style={{ background: "#f1f0ee" }}>
+                                                <button onClick={() => decQty(item._id)}
+                                                    disabled={item.quantity <= 1}
+                                                    className="qty-btn w-7 h-7 flex items-center justify-center rounded-lg text-zinc-500 hover:bg-white hover:text-red-500 disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer">
+                                                    <FaMinus size={9} />
+                                                </button>
+                                                <span className="font-black text-zinc-800 w-7 text-center text-sm">{item.quantity}</span>
+                                                <button onClick={() => incQty(item._id)}
+                                                    className="qty-btn w-7 h-7 flex items-center justify-center rounded-lg text-zinc-500 hover:bg-white hover:text-emerald-600 cursor-pointer">
+                                                    <FaPlus size={9} />
+                                                </button>
+                                            </div>
+
+                                            {/* Remove */}
+                                            <button onClick={() => removeItem(item._id)}
+                                                className="flex items-center gap-1 text-[11px] text-zinc-300 hover:text-red-500 font-semibold transition-colors duration-150 cursor-pointer hover:underline underline-offset-2">
+                                                <FaTrash size={9} /> Remove
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             );
                         })}
                     </div>
 
-                    {/* Price Breakdown */}
-                    <div className="w-full lg:w-96 shrink-0">
+                    {/* ── Price Summary ── */}
+                    <div className="w-full lg:w-[360px] shrink-0">
                         <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-5 sticky top-24">
-                            <h2 className="font-black text-zinc-800 text-sm mb-4 flex items-center gap-2">
-                                <FaTag size={12} className="text-amber-500" /> Price Details
+
+                            <h2 className="font-black text-zinc-800 text-sm mb-5 flex items-center gap-2 pb-4 border-b border-stone-100">
+                                <span className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center">
+                                    <FaTag size={10} className="text-amber-600" />
+                                </span>
+                                Price Breakdown
                             </h2>
 
                             <div className="space-y-3 text-sm">
-                                <div className="flex justify-between text-zinc-600">
-                                    <span>Price ({totalItems} items)</span>
-                                    <span className="font-semibold">₹{totalPrice.toLocaleString("en-IN")}</span>
+                                <div className="flex justify-between text-zinc-500">
+                                    <span>Subtotal ({totalItems} items)</span>
+                                    <span className="font-semibold text-zinc-700">₹{totalPrice.toLocaleString("en-IN")}</span>
                                 </div>
-                                <div className="flex justify-between text-zinc-600">
+                                <div className="flex justify-between text-zinc-500">
                                     <span>Platform Fee</span>
-                                    <span className="font-semibold">₹{PLATFORM_FEE}</span>
+                                    <span className="font-semibold text-zinc-700">₹{PLATFORM_FEE}</span>
                                 </div>
-                                <div className="flex justify-between text-zinc-600">
-                                    <span>Delivery Charges</span>
+                                <div className="flex justify-between text-zinc-500">
+                                    <span>Delivery</span>
                                     {delivery === 0 ? (
                                         <span className="text-emerald-600 font-bold">FREE ✓</span>
                                     ) : (
-                                        <span className="font-semibold">₹{delivery}</span>
+                                        <span className="font-semibold text-zinc-700">₹{delivery}</span>
                                     )}
                                 </div>
 
+                                {/* Free delivery progress */}
                                 {delivery > 0 && amountNeededForFree > 0 && (
-                                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
-                                        <p className="text-xs text-amber-700 font-medium mb-1.5">
-                                            Add ₹{amountNeededForFree} more for FREE delivery!
+                                    <div className="rounded-xl p-3 mt-1" style={{ background: "#fffbeb", border: "1px solid #fde68a" }}>
+                                        <p className="text-xs text-amber-700 font-semibold mb-2">
+                                            🚚 Add <span className="font-black">₹{amountNeededForFree}</span> more for FREE delivery
                                         </p>
-                                        <div className="h-1.5 bg-amber-100 rounded-full overflow-hidden">
-                                            <div className="h-full bg-amber-500 rounded-full transition-all duration-500"
-                                                style={{ width: `${Math.min((totalPrice / FREE_DELIVERY_ABOVE) * 100, 100)}%` }} />
+                                        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#fef3c7" }}>
+                                            <div className="h-full rounded-full transition-all duration-700"
+                                                style={{ width: `${deliveryProgress}%`, background: "linear-gradient(90deg, #f59e0b, #fbbf24)" }} />
                                         </div>
                                     </div>
                                 )}
 
-                                <div className="border-t border-stone-100 pt-3 flex justify-between items-center">
-                                    <span className="font-black text-zinc-900">Total Amount</span>
-                                    <span className="font-black text-zinc-900 text-xl">
-                                        ₹{grandTotal.toLocaleString("en-IN")}
-                                    </span>
+                                {/* Total */}
+                                <div className="border-t border-stone-100 pt-4 mt-1">
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-black text-zinc-900 text-base">Total</span>
+                                        <span className="font-black text-zinc-900 text-2xl">₹{grandTotal.toLocaleString("en-IN")}</span>
+                                    </div>
+                                    {savingsOnDelivery > 0 && (
+                                        <p className="text-emerald-600 text-xs font-bold mt-2 flex items-center gap-1">
+                                            🎉 Saved ₹{savingsOnDelivery} on delivery!
+                                        </p>
+                                    )}
                                 </div>
-
-                                {savingsOnDelivery > 0 && (
-                                    <p className="text-emerald-600 text-xs font-bold text-center bg-emerald-50 rounded-xl py-2 border border-emerald-100">
-                                        🎉 You saved ₹{savingsOnDelivery} on delivery!
-                                    </p>
-                                )}
                             </div>
 
                             <button onClick={() => navigate("/checkout")}
-                                className="w-full mt-5 py-3.5 bg-amber-500 hover:bg-amber-600 text-white font-black text-sm rounded-xl transition-all active:scale-95 shadow-md shadow-amber-200 flex items-center justify-center gap-2">
+                                className="checkout-btn w-full mt-5 py-3.5 text-white font-black text-sm rounded-2xl flex items-center justify-center gap-2 cursor-pointer"
+                                style={{ background: "linear-gradient(135deg, #f59e0b, #fbbf24)", color: "#111", boxShadow: "0 8px 24px rgba(245,158,11,0.35)" }}>
                                 Proceed to Checkout <FaArrowRight size={12} />
                             </button>
 
-                            <p className="text-center text-xs text-zinc-400 mt-3">🔒 Safe & Secure Payments</p>
+                            <p className="text-center text-xs text-zinc-400 mt-3 font-medium">🔒 100% Secure Checkout</p>
                         </div>
                     </div>
                 </div>

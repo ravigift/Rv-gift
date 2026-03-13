@@ -5,7 +5,9 @@ import {
     FaBox, FaChevronRight, FaWhatsapp, FaBoxOpen,
     FaCheckCircle, FaTruck, FaClock, FaPencilAlt,
     FaStickyNote, FaImage, FaBan, FaFileInvoice,
-    FaShippingFast, FaBarcode, FaExternalLinkAlt,
+    // FaShippingFast,   // TODO: Re-enable when Shiprocket integration is active
+    // FaBarcode,        // TODO: Re-enable when Shiprocket integration is active
+    // FaExternalLinkAlt, // TODO: Re-enable when Shiprocket integration is active
     FaTag, FaSpinner, FaUndo, FaTimesCircle,
 } from "react-icons/fa";
 
@@ -68,109 +70,115 @@ const CustomizationCard = ({ customization }) => {
     );
 };
 
-/* ── Shipping Card ── */
-const ShippingCard = ({ shipping, orderId }) => {
-    const [trackData, setTrackData] = useState(null);
-    const [trackLoad, setTrackLoad] = useState(false);
-    const [trackErr, setTrackErr] = useState("");
-    const [labelLoad, setLabelLoad] = useState(false);
-
-    // ✅ Hooks BEFORE early return — React rules compliance
-    const fetchTracking = async () => {
-        try {
-            setTrackLoad(true); setTrackErr("");
-            const { data } = await api.get(`/shipping/track/${orderId}`);
-            setTrackData(data);
-        } catch (err) {
-            setTrackErr(err.response?.data?.message || "Could not fetch tracking");
-        } finally { setTrackLoad(false); }
-    };
-
-    const downloadLabel = async () => {
-        try {
-            setLabelLoad(true);
-            const { data } = await api.get(`/shipping/label/${orderId}`);
-            if (data.label_url) window.open(data.label_url, "_blank");
-            else alert("Label not available yet");
-        } catch { alert("Could not fetch label"); }
-        finally { setLabelLoad(false); }
-    };
-
-    if (!shipping?.shipmentId && !shipping?.awbCode) {
-        return (
-            <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 flex items-center gap-3">
-                <FaShippingFast size={16} className="text-stone-300 shrink-0" />
-                <div>
-                    <p className="text-xs font-bold text-zinc-500">Shiprocket</p>
-                    <p className="text-xs text-zinc-400 mt-0.5">Shipment will be created when order is marked PACKED</p>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-                <p className="text-xs font-black text-indigo-700 flex items-center gap-1.5">
-                    <FaShippingFast size={12} /> Shiprocket Shipment
-                    {shipping.mock && (
-                        <span className="text-[9px] font-black bg-orange-100 text-orange-600 border border-orange-200 px-1.5 py-0.5 rounded-full ml-1">MOCK</span>
-                    )}
-                </p>
-                <div className="flex items-center gap-3">
-                    {shipping.trackingUrl && (
-                        <a href={shipping.trackingUrl} target="_blank" rel="noreferrer"
-                            className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:underline">
-                            <FaExternalLinkAlt size={9} /> Track
-                        </a>
-                    )}
-                    <button onClick={downloadLabel} disabled={labelLoad}
-                        className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:underline disabled:opacity-50 cursor-pointer">
-                        {labelLoad ? <FaSpinner size={9} className="animate-spin" /> : <FaTag size={9} />} Label
-                    </button>
-                </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-                {shipping.awbCode && (
-                    <div className="bg-white rounded-lg px-3 py-2 border border-indigo-100">
-                        <p className="text-[10px] text-indigo-400 font-bold">AWB</p>
-                        <p className="font-black text-zinc-800 font-mono">{shipping.awbCode}</p>
-                    </div>
-                )}
-                {shipping.courierName && (
-                    <div className="bg-white rounded-lg px-3 py-2 border border-indigo-100">
-                        <p className="text-[10px] text-indigo-400 font-bold">Courier</p>
-                        <p className="font-bold text-zinc-700">{shipping.courierName}</p>
-                    </div>
-                )}
-            </div>
-            <button onClick={fetchTracking} disabled={trackLoad}
-                className="w-full flex items-center justify-center gap-2 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-60 cursor-pointer">
-                {trackLoad ? <><FaSpinner size={10} className="animate-spin" /> Fetching...</> : <><FaBarcode size={10} /> Get Live Status</>}
-            </button>
-            {trackErr && <p className="text-red-500 text-xs text-center">{trackErr}</p>}
-            {trackData && (
-                <div className="bg-white rounded-lg border border-indigo-100 p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-zinc-700">{trackData.label}</span>
-                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{trackData.courier}</span>
-                    </div>
-                    {trackData.detail && <p className="text-xs text-zinc-500">{trackData.detail}</p>}
-                    {trackData.activities?.length > 0 && (
-                        <div className="space-y-1 border-t border-stone-100 pt-2 max-h-28 overflow-y-auto">
-                            {trackData.activities.slice(0, 5).map((act, i) => (
-                                <div key={i} className="flex items-start gap-2 text-[10px] text-zinc-500">
-                                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full mt-1 shrink-0" />
-                                    <span>{act.activity}{act.location ? ` — ${act.location}` : ""}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-};
+/*
+ * ─────────────────────────────────────────────────────────────
+ * TODO (3 months): Re-enable ShippingCard when Shiprocket goes live.
+ * This component handles shipment tracking, AWB display, label
+ * download, and live status via /shipping/track & /shipping/label.
+ * ─────────────────────────────────────────────────────────────
+ *
+ * const ShippingCard = ({ shipping, orderId }) => {
+ *     const [trackData, setTrackData] = useState(null);
+ *     const [trackLoad, setTrackLoad] = useState(false);
+ *     const [trackErr, setTrackErr] = useState("");
+ *     const [labelLoad, setLabelLoad] = useState(false);
+ *
+ *     const fetchTracking = async () => {
+ *         try {
+ *             setTrackLoad(true); setTrackErr("");
+ *             const { data } = await api.get(`/shipping/track/${orderId}`);
+ *             setTrackData(data);
+ *         } catch (err) {
+ *             setTrackErr(err.response?.data?.message || "Could not fetch tracking");
+ *         } finally { setTrackLoad(false); }
+ *     };
+ *
+ *     const downloadLabel = async () => {
+ *         try {
+ *             setLabelLoad(true);
+ *             const { data } = await api.get(`/shipping/label/${orderId}`);
+ *             if (data.label_url) window.open(data.label_url, "_blank");
+ *             else alert("Label not available yet");
+ *         } catch { alert("Could not fetch label"); }
+ *         finally { setLabelLoad(false); }
+ *     };
+ *
+ *     if (!shipping?.shipmentId && !shipping?.awbCode) {
+ *         return (
+ *             <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 flex items-center gap-3">
+ *                 <FaShippingFast size={16} className="text-stone-300 shrink-0" />
+ *                 <div>
+ *                     <p className="text-xs font-bold text-zinc-500">Shiprocket</p>
+ *                     <p className="text-xs text-zinc-400 mt-0.5">Shipment will be created when order is marked PACKED</p>
+ *                 </div>
+ *             </div>
+ *         );
+ *     }
+ *
+ *     return (
+ *         <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 space-y-3">
+ *             <div className="flex items-center justify-between">
+ *                 <p className="text-xs font-black text-indigo-700 flex items-center gap-1.5">
+ *                     <FaShippingFast size={12} /> Shiprocket Shipment
+ *                     {shipping.mock && (
+ *                         <span className="text-[9px] font-black bg-orange-100 text-orange-600 border border-orange-200 px-1.5 py-0.5 rounded-full ml-1">MOCK</span>
+ *                     )}
+ *                 </p>
+ *                 <div className="flex items-center gap-3">
+ *                     {shipping.trackingUrl && (
+ *                         <a href={shipping.trackingUrl} target="_blank" rel="noreferrer"
+ *                             className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:underline">
+ *                             <FaExternalLinkAlt size={9} /> Track
+ *                         </a>
+ *                     )}
+ *                     <button onClick={downloadLabel} disabled={labelLoad}
+ *                         className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:underline disabled:opacity-50 cursor-pointer">
+ *                         {labelLoad ? <FaSpinner size={9} className="animate-spin" /> : <FaTag size={9} />} Label
+ *                     </button>
+ *                 </div>
+ *             </div>
+ *             <div className="grid grid-cols-2 gap-2 text-xs">
+ *                 {shipping.awbCode && (
+ *                     <div className="bg-white rounded-lg px-3 py-2 border border-indigo-100">
+ *                         <p className="text-[10px] text-indigo-400 font-bold">AWB</p>
+ *                         <p className="font-black text-zinc-800 font-mono">{shipping.awbCode}</p>
+ *                     </div>
+ *                 )}
+ *                 {shipping.courierName && (
+ *                     <div className="bg-white rounded-lg px-3 py-2 border border-indigo-100">
+ *                         <p className="text-[10px] text-indigo-400 font-bold">Courier</p>
+ *                         <p className="font-bold text-zinc-700">{shipping.courierName}</p>
+ *                     </div>
+ *                 )}
+ *             </div>
+ *             <button onClick={fetchTracking} disabled={trackLoad}
+ *                 className="w-full flex items-center justify-center gap-2 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-60 cursor-pointer">
+ *                 {trackLoad ? <><FaSpinner size={10} className="animate-spin" /> Fetching...</> : <><FaBarcode size={10} /> Get Live Status</>}
+ *             </button>
+ *             {trackErr && <p className="text-red-500 text-xs text-center">{trackErr}</p>}
+ *             {trackData && (
+ *                 <div className="bg-white rounded-lg border border-indigo-100 p-3 space-y-2">
+ *                     <div className="flex items-center justify-between">
+ *                         <span className="text-xs font-black text-zinc-700">{trackData.label}</span>
+ *                         <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{trackData.courier}</span>
+ *                     </div>
+ *                     {trackData.detail && <p className="text-xs text-zinc-500">{trackData.detail}</p>}
+ *                     {trackData.activities?.length > 0 && (
+ *                         <div className="space-y-1 border-t border-stone-100 pt-2 max-h-28 overflow-y-auto">
+ *                             {trackData.activities.slice(0, 5).map((act, i) => (
+ *                                 <div key={i} className="flex items-start gap-2 text-[10px] text-zinc-500">
+ *                                     <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full mt-1 shrink-0" />
+ *                                     <span>{act.activity}{act.location ? ` — ${act.location}` : ""}</span>
+ *                                 </div>
+ *                             ))}
+ *                         </div>
+ *                     )}
+ *                 </div>
+ *             )}
+ *         </div>
+ *     );
+ * };
+ */
 
 /* ── Refund Card (Admin) ── */
 const RefundCard = ({ order, onRefundUpdate }) => {
@@ -183,8 +191,6 @@ const RefundCard = ({ order, onRefundUpdate }) => {
     const refund = order.refund;
     if (!refund || refund.status === "NONE") return null;
 
-    // ✅ FIX: Route is /orders/:id/refund/process (orderRoutes.js)
-    // NOT /payment/refund/:id/process
     const handleApprove = async () => {
         try {
             setProcessing(true); setError("");
@@ -243,7 +249,6 @@ const RefundCard = ({ order, onRefundUpdate }) => {
             {refund.status === "PROCESSED" && refund.razorpayRefundId && (
                 <p className="text-[10px] font-mono opacity-70">Refund ID: {refund.razorpayRefundId}</p>
             )}
-            {/* ✅ FIX: rejectionReason (not rejectionNote / adminNote) */}
             {refund.status === "REJECTED" && (refund.rejectionReason || refund.adminNote) && (
                 <p className="text-xs">Note: {refund.rejectionReason || refund.adminNote}</p>
             )}
@@ -325,8 +330,6 @@ const AdminOrders = () => {
     const [expandedId, setExpandedId] = useState(null);
     const [downloadingId, setDownloadingId] = useState(null);
 
-    // ✅ FIX: /orders/admin/all → /orders
-    // Route is GET /api/orders/ protected by adminOnly middleware
     const fetchOrders = useCallback(async () => {
         try {
             setError(""); setLoading(true);
@@ -346,7 +349,6 @@ const AdminOrders = () => {
         if (!nextStatus) return;
         try {
             setUpdatingId(orderId);
-            // Use full updated order from API — needed when PACKED triggers Shiprocket
             const { data: updatedOrder } = await api.put(`/orders/${orderId}`, { status: nextStatus });
             if (updatedOrder?._id) {
                 setOrders(prev => prev.map(o => o._id === orderId ? updatedOrder : o));
@@ -487,7 +489,7 @@ const AdminOrders = () => {
                         const stepIdx = FLOW_STEPS.indexOf(order.orderStatus);
                         const isDownloading = downloadingId === order._id;
                         const hasCustom = order.items?.some(i => i.customization?.text || i.customization?.imageUrl || i.customization?.note);
-                        const hasShipping = !!(order.shipping?.shipmentId || order.shipping?.awbCode);
+                        // const hasShipping = !!(order.shipping?.shipmentId || order.shipping?.awbCode); // TODO: Re-enable with Shiprocket
                         const hasRefundPending = order.refund?.status === "REQUESTED";
 
                         return (
@@ -508,12 +510,15 @@ const AdminOrders = () => {
                                                 {hasCustom && !isCancelled && (
                                                     <span className="bg-amber-100 text-amber-700 border border-amber-200 text-[10px] font-black px-1.5 py-0.5 rounded-full">Custom</span>
                                                 )}
-                                                {hasShipping && !isCancelled && (
-                                                    <span className="bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-black px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                                                        <FaShippingFast size={8} />
-                                                        {order.shipping?.mock ? "SR Mock" : "Shiprocket"}
-                                                    </span>
-                                                )}
+                                                {/*
+                                                 * TODO (3 months): Re-enable Shiprocket badge when live.
+                                                 * {hasShipping && !isCancelled && (
+                                                 *     <span className="bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-black px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                                                 *         <FaShippingFast size={8} />
+                                                 *         {order.shipping?.mock ? "SR Mock" : "Shiprocket"}
+                                                 *     </span>
+                                                 * )}
+                                                 */}
                                                 {hasRefundPending && (
                                                     <span className="bg-orange-100 text-orange-700 border border-orange-200 text-[10px] font-black px-1.5 py-0.5 rounded-full flex items-center gap-1">
                                                         <FaUndo size={8} /> Refund Pending
@@ -626,13 +631,15 @@ const AdminOrders = () => {
                                             </div>
                                         )}
 
-                                        {/* Shipping */}
-                                        {!isCancelled && (
-                                            <div>
-                                                <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-2">Shipping</p>
-                                                <ShippingCard shipping={order.shipping} orderId={order._id} />
-                                            </div>
-                                        )}
+                                        {/*
+                                         * TODO (3 months): Re-enable Shipping section when Shiprocket is live.
+                                         * {!isCancelled && (
+                                         *     <div>
+                                         *         <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-2">Shipping</p>
+                                         *         <ShippingCard shipping={order.shipping} orderId={order._id} />
+                                         *     </div>
+                                         * )}
+                                         */}
 
                                         {/* Order Items */}
                                         <div>

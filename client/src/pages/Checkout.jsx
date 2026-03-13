@@ -9,17 +9,16 @@ import {
     FaPencilAlt, FaCreditCard, FaLock, FaRedo, FaMoneyBillWave,
     FaImage, FaLocationArrow, FaSpinner, FaTimesCircle,
     FaBookmark, FaPlus, FaEdit, FaTrash,
-    FaHome, FaBriefcase, FaShippingFast,
+    FaHome, FaBriefcase,
+    // FaShippingFast, // TODO: Re-enable when Shiprocket integration is active
 } from "react-icons/fa";
 
 /* ─────────────────────────────────────
    CONSTANTS
-   BUG FIX: FREE_DELIVERY_ABOVE = 0 matlab har order FREE tha
-   Sahi values set karo yahan
 ───────────────────────────────────── */
 const PLATFORM_FEE = 0;
-const FREE_DELIVERY_ABOVE = 0;   // ← orders above ₹499 = free delivery
-const DEFAULT_DELIVERY = 0;    // ← default if Shiprocket rate fetch fails
+const FREE_DELIVERY_ABOVE = 0;
+const DEFAULT_DELIVERY = 0;
 
 const LABEL_ICONS = {
     Home: <FaHome size={10} />,
@@ -226,13 +225,62 @@ const Checkout = () => {
     const checkoutItems = buyNowItem ? [buyNowItem] : cartItems;
     const itemsTotal = buyNowItem ? buyNowItem.price * (buyNowItem.quantity || 1) : totalPrice;
 
-    // ── Shipping ──
-    // BUG FIX: was always 0 because FREE_DELIVERY_ABOVE was 0
-    const [shippingRate, setShippingRate] = useState(itemsTotal >= FREE_DELIVERY_ABOVE ? 0 : DEFAULT_DELIVERY);
-    const [shippingCourier, setShippingCourier] = useState("");
-    const [shippingEtd, setShippingEtd] = useState("");
-    const [shippingLoading, setShippingLoading] = useState(false);
-    const shippingFetched = useRef(false);
+    /*
+     * ─────────────────────────────────────────────────────────────
+     * TODO (3 months): Re-enable dynamic Shiprocket shipping rates.
+     * When active, fetchShippingRate() calls POST /shipping/rate
+     * with deliveryPincode + weight + cod flag to get real courier
+     * rates (shippingRate, shippingCourier, shippingEtd).
+     * shippingFetched ref prevents duplicate calls on re-renders.
+     * ─────────────────────────────────────────────────────────────
+     *
+     * const [shippingRate, setShippingRate] = useState(itemsTotal >= FREE_DELIVERY_ABOVE ? 0 : DEFAULT_DELIVERY);
+     * const [shippingCourier, setShippingCourier] = useState("");
+     * const [shippingEtd, setShippingEtd] = useState("");
+     * const [shippingLoading, setShippingLoading] = useState(false);
+     * const shippingFetched = useRef(false);
+     *
+     * const fetchShippingRate = useCallback(async (pincode, isCod = false) => {
+     *     if (!pincode || !/^\d{6}$/.test(pincode)) return;
+     *     if (itemsTotal >= FREE_DELIVERY_ABOVE) { setShippingRate(0); return; }
+     *     try {
+     *         setShippingLoading(true);
+     *         const { data } = await api.post("/shipping/rate", {
+     *             deliveryPincode: pincode,
+     *             weight: checkoutItems.reduce((sum, i) => sum + 500 * (i.quantity || i.qty || 1), 0),
+     *             cod: isCod,
+     *         });
+     *         if (data.rate !== undefined) {
+     *             setShippingRate(data.rate);
+     *             setShippingCourier(data.courier || "");
+     *             setShippingEtd(data.etd || "");
+     *         }
+     *     } catch {
+     *         // Keep DEFAULT_DELIVERY on error
+     *     } finally { setShippingLoading(false); }
+     * }, [checkoutItems, itemsTotal]);
+     *
+     * // Auto-fetch when address selected (only once per address)
+     * useEffect(() => {
+     *     if (selectedAddress?.pincode && !shippingFetched.current) {
+     *         shippingFetched.current = true;
+     *         fetchShippingRate(selectedAddress.pincode, paymentMethod === "cod");
+     *     }
+     * }, [selectedAddress]);
+     *
+     * // Re-fetch on payment method change (COD may carry higher rate)
+     * useEffect(() => {
+     *     if (selectedAddress?.pincode && paymentMethod) {
+     *         fetchShippingRate(selectedAddress.pincode, paymentMethod === "cod");
+     *     }
+     * }, [paymentMethod]);
+     */
+
+    // Shipping is free for all orders until Shiprocket is live
+    const shippingRate = 0;
+    const shippingLoading = false;
+    // const shippingCourier = ""; // TODO: Re-enable with Shiprocket
+    // const shippingEtd = "";     // TODO: Re-enable with Shiprocket
 
     const deliveryCharge = itemsTotal >= FREE_DELIVERY_ABOVE ? 0 : shippingRate;
     const finalTotal = itemsTotal + PLATFORM_FEE + deliveryCharge;
@@ -271,44 +319,7 @@ const Checkout = () => {
         finally { setAddrLoading(false); }
     }, []);
 
-    // ── Fetch shipping rate from Shiprocket ──
-    const fetchShippingRate = useCallback(async (pincode, isCod = false) => {
-        if (!pincode || !/^\d{6}$/.test(pincode)) return;
-        // BUG FIX: skip if free delivery applies
-        if (itemsTotal >= FREE_DELIVERY_ABOVE) { setShippingRate(0); return; }
-        try {
-            setShippingLoading(true);
-            const { data } = await api.post("/shipping/rate", {
-                deliveryPincode: pincode,
-                weight: checkoutItems.reduce((sum, i) => sum + 500 * (i.quantity || i.qty || 1), 0),
-                cod: isCod,
-            });
-            if (data.rate !== undefined) {
-                setShippingRate(data.rate);
-                setShippingCourier(data.courier || "");
-                setShippingEtd(data.etd || "");
-            }
-        } catch {
-            // keep DEFAULT_DELIVERY on error — don't crash
-        } finally { setShippingLoading(false); }
-    }, [checkoutItems, itemsTotal]);
-
     const selectedAddress = savedAddresses.find(a => a._id === selectedAddrId);
-
-    // Auto-fetch when address selected (only once per address)
-    useEffect(() => {
-        if (selectedAddress?.pincode && !shippingFetched.current) {
-            shippingFetched.current = true;
-            fetchShippingRate(selectedAddress.pincode, paymentMethod === "cod");
-        }
-    }, [selectedAddress]);
-
-    // Re-fetch on payment method change (COD may have higher rate)
-    useEffect(() => {
-        if (selectedAddress?.pincode && paymentMethod) {
-            fetchShippingRate(selectedAddress.pincode, paymentMethod === "cod");
-        }
-    }, [paymentMethod]);
 
     const handleAddAddress = async (form) => {
         try {
@@ -318,8 +329,9 @@ const Checkout = () => {
             const newAddr = data.addresses[data.addresses.length - 1];
             setSelectedAddrId(newAddr._id);
             setShowAddForm(false);
-            shippingFetched.current = false;
-            fetchShippingRate(form.pincode, paymentMethod === "cod");
+            // TODO (3 months): Re-enable after Shiprocket is live
+            // shippingFetched.current = false;
+            // fetchShippingRate(form.pincode, paymentMethod === "cod");
         } catch (err) { alert(err.response?.data?.message || "Failed to save address"); }
         finally { setSavingAddr(false); }
     };
@@ -330,11 +342,11 @@ const Checkout = () => {
             const { data } = await api.put(`/addresses/${editingAddr._id}`, form);
             setSavedAddresses(data.addresses);
             setEditingAddr(null);
-            // re-fetch rate if this was selected address
-            if (editingAddr._id === selectedAddrId) {
-                shippingFetched.current = false;
-                fetchShippingRate(form.pincode, paymentMethod === "cod");
-            }
+            // TODO (3 months): Re-enable after Shiprocket is live
+            // if (editingAddr._id === selectedAddrId) {
+            //     shippingFetched.current = false;
+            //     fetchShippingRate(form.pincode, paymentMethod === "cod");
+            // }
         } catch (err) { alert(err.response?.data?.message || "Failed to update address"); }
         finally { setSavingAddr(false); }
     };
@@ -373,8 +385,9 @@ const Checkout = () => {
     const handleAddressContinue = () => {
         if (!selectedAddress) return setError("Please select or add a delivery address");
         setError("");
-        shippingFetched.current = false;
-        fetchShippingRate(selectedAddress.pincode, paymentMethod === "cod");
+        // TODO (3 months): Re-enable after Shiprocket is live
+        // shippingFetched.current = false;
+        // fetchShippingRate(selectedAddress.pincode, paymentMethod === "cod");
         setStep(3);
     };
 
@@ -698,15 +711,17 @@ const Checkout = () => {
                                         <p className="text-zinc-500 text-xs mt-0.5">{selectedAddress.phone}</p>
                                         <p className="text-zinc-600 text-xs mt-1.5 leading-relaxed">{getAddress()}</p>
 
-                                        {/* BUG FIX: only show shipping info when delivery is NOT free */}
-                                        {itemsTotal < FREE_DELIVERY_ABOVE && (shippingCourier || shippingLoading) && (
-                                            <div className="mt-3 flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2">
-                                                <FaShippingFast size={12} className="text-indigo-500 shrink-0" />
-                                                {shippingLoading
-                                                    ? <p className="text-xs text-indigo-600 font-medium">Calculating shipping rate…</p>
-                                                    : <p className="text-xs text-indigo-700 font-medium">{shippingCourier} · {shippingEtd}</p>}
-                                            </div>
-                                        )}
+                                        {/*
+                                         * TODO (3 months): Re-enable courier/ETD info when Shiprocket is live.
+                                         * {itemsTotal < FREE_DELIVERY_ABOVE && (shippingCourier || shippingLoading) && (
+                                         *     <div className="mt-3 flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2">
+                                         *         <FaShippingFast size={12} className="text-indigo-500 shrink-0" />
+                                         *         {shippingLoading
+                                         *             ? <p className="text-xs text-indigo-600 font-medium">Calculating shipping rate…</p>
+                                         *             : <p className="text-xs text-indigo-700 font-medium">{shippingCourier} · {shippingEtd}</p>}
+                                         *     </div>
+                                         * )}
+                                         */}
                                     </div>
                                 )}
 
@@ -788,13 +803,9 @@ const Checkout = () => {
                                     <div className="flex justify-between text-sm">
                                         <span className="text-zinc-600 flex items-center gap-1.5">
                                             <FaTruck size={11} className="text-zinc-400" /> Delivery
-                                            {shippingLoading && <FaSpinner size={9} className="animate-spin text-amber-400" />}
                                         </span>
-                                        {itemsTotal >= FREE_DELIVERY_ABOVE
-                                            ? <span className="font-semibold text-emerald-600">FREE</span>
-                                            : shippingLoading
-                                                ? <span className="text-zinc-400 text-xs">Calculating…</span>
-                                                : <span className="font-semibold">Rs.{shippingRate}</span>}
+                                        {/* Always FREE until Shiprocket is live — TODO (3 months): wire up dynamic shippingRate here */}
+                                        <span className="font-semibold text-emerald-600">FREE</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-zinc-600 flex items-center gap-1.5"><FaShieldAlt size={11} className="text-zinc-400" /> Platform Fee</span>
@@ -804,17 +815,10 @@ const Checkout = () => {
                                         <span className="font-bold text-zinc-800">Total Amount</span>
                                         <span className="font-black text-zinc-900 text-lg">Rs.{finalTotal.toLocaleString("en-IN")}</span>
                                     </div>
-                                    {itemsTotal >= FREE_DELIVERY_ABOVE && (
-                                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center gap-2">
-                                            <FaCheckCircle className="text-emerald-500" size={12} />
-                                            <p className="text-emerald-700 text-xs font-medium">FREE delivery on this order!</p>
-                                        </div>
-                                    )}
-                                    {itemsTotal < FREE_DELIVERY_ABOVE && !shippingLoading && (
-                                        <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                                            <p className="text-amber-700 text-xs font-medium">Add Rs.{(FREE_DELIVERY_ABOVE - itemsTotal).toLocaleString("en-IN")} more for FREE delivery</p>
-                                        </div>
-                                    )}
+                                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                                        <FaCheckCircle className="text-emerald-500" size={12} />
+                                        <p className="text-emerald-700 text-xs font-medium">FREE delivery on this order!</p>
+                                    </div>
                                 </div>
                             </div>
                             <div className="bg-white rounded-2xl border border-stone-200 shadow-sm px-5 py-4 space-y-3">

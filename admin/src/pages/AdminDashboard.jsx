@@ -4,9 +4,256 @@ import api from "../api/adminApi";
 import {
     FaBox, FaClipboardList, FaPlus, FaRupeeSign,
     FaShoppingBag, FaTruck, FaCheckCircle, FaClock,
-    FaArrowRight, FaFire, FaMapMarkerAlt, FaCashRegister
+    FaArrowRight, FaFire, FaMapMarkerAlt, FaCashRegister,
+    FaShieldAlt, FaKey, FaEnvelope, FaPaperPlane, FaLock, FaRedo,
 } from "react-icons/fa";
 
+// ══════════════════════════════════════════════
+// SECURITY SECTION (inline — same pages folder)
+// ══════════════════════════════════════════════
+const STEPS = { IDLE: "idle", OTP_SENT: "otp_sent", SUCCESS: "success" };
+
+const SecuritySection = () => {
+    const [step, setStep] = useState(STEPS.IDLE);
+    const [sendingOtp, setSendingOtp] = useState(false);
+    const [otp, setOtp] = useState("");
+    const [newPin, setNewPin] = useState("");
+    const [confirmPin, setConfirmPin] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+    const [info, setInfo] = useState("");
+
+    const resetState = () => {
+        setOtp(""); setNewPin(""); setConfirmPin("");
+        setError(""); setInfo(""); setStep(STEPS.IDLE);
+    };
+
+    const handleSendOtp = async () => {
+        setSendingOtp(true); setError(""); setInfo("");
+        try {
+            await api.post("/walkin/delete-pin/send-otp");
+            setStep(STEPS.OTP_SENT);
+            setInfo("OTP admin email pe bhej diya gaya ✉️");
+        } catch (err) {
+            setError(err.response?.data?.message || "OTP send karne mein error aaya");
+        } finally { setSendingOtp(false); }
+    };
+
+    const handleSavePin = async () => {
+        setError("");
+        if (!otp.trim()) return setError("OTP required hai");
+        if (newPin.length < 4) return setError("PIN kam se kam 4 digits ka hona chahiye");
+        if (newPin !== confirmPin) return setError("PINs match nahi kar rahe");
+        setSaving(true);
+        try {
+            await api.post("/walkin/delete-pin/reset", { otp: Number(otp), newPin });
+            setStep(STEPS.SUCCESS);
+        } catch (err) {
+            setError(err.response?.data?.message || "PIN reset mein error aaya");
+        } finally { setSaving(false); }
+    };
+
+    const inputStyle = {
+        width: "100%", padding: "10px 12px",
+        border: "1px solid #E2E8F0", borderRadius: 10,
+        fontSize: 13, fontWeight: 600, color: "#0F172A",
+        outline: "none", fontFamily: "'DM Sans', sans-serif",
+        boxSizing: "border-box",
+    };
+    const labelStyle = { fontSize: 11, fontWeight: 700, color: "#64748B", marginBottom: 6, display: "block", textTransform: "uppercase", letterSpacing: "0.05em" };
+
+    return (
+        <div style={{
+            background: "#fff", borderRadius: 16,
+            border: "1px solid #E2E8F0",
+            overflow: "hidden",
+            boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
+        }}>
+            {/* Header */}
+            <div style={{
+                padding: "14px 18px", borderBottom: "1px solid #F1F5F9",
+                display: "flex", alignItems: "center", gap: 10,
+                background: "linear-gradient(135deg,#1E1B4B,#312E81)",
+            }}>
+                <div style={{
+                    width: 30, height: 30, borderRadius: 8,
+                    background: "rgba(167,139,250,0.2)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                    <FaShieldAlt size={13} color="#A78BFA" />
+                </div>
+                <div>
+                    <div style={{ fontWeight: 800, fontSize: 13, color: "#fff" }}>Security</div>
+                    <div style={{ fontSize: 10, color: "#A78BFA" }}>Delete PIN manage karo</div>
+                </div>
+            </div>
+
+            <div style={{ padding: "16px 18px" }}>
+
+                {/* ── SUCCESS ── */}
+                {step === STEPS.SUCCESS && (
+                    <div style={{
+                        background: "#ECFDF5", border: "1px solid #A7F3D0",
+                        borderRadius: 12, padding: "20px 16px", textAlign: "center",
+                    }}>
+                        <FaCheckCircle size={26} color="#10B981" style={{ margin: "0 auto 10px" }} />
+                        <div style={{ fontWeight: 800, fontSize: 14, color: "#065F46", marginBottom: 4 }}>
+                            PIN successfully set ho gaya!
+                        </div>
+                        <div style={{ fontSize: 11, color: "#059669", marginBottom: 14 }}>
+                            Ab bill delete karte waqt yeh naya PIN use karo.
+                        </div>
+                        <button onClick={resetState} style={{
+                            padding: "8px 20px", borderRadius: 8,
+                            background: "#10B981", color: "#fff",
+                            fontWeight: 700, fontSize: 12, border: "none", cursor: "pointer",
+                            fontFamily: "'DM Sans', sans-serif",
+                        }}>Done</button>
+                    </div>
+                )}
+
+                {/* ── IDLE ── */}
+                {step === STEPS.IDLE && (
+                    <>
+                        <div style={{
+                            background: "#F5F3FF", border: "1px solid #DDD6FE",
+                            borderRadius: 10, padding: "12px 14px", marginBottom: 14,
+                            display: "flex", gap: 10, alignItems: "flex-start",
+                        }}>
+                            <FaKey size={12} color="#7C3AED" style={{ marginTop: 2, flexShrink: 0 }} />
+                            <div style={{ fontSize: 12, color: "#5B21B6", lineHeight: 1.6 }}>
+                                Admin email pe OTP aayega → verify karo → naya Delete PIN set karo.
+                                Yeh PIN bill delete karte waqt maanga jaayega.
+                            </div>
+                        </div>
+
+                        {error && (
+                            <div style={{ fontSize: 12, color: "#DC2626", fontWeight: 600, marginBottom: 10 }}>
+                                ⚠ {error}
+                            </div>
+                        )}
+
+                        <button onClick={handleSendOtp} disabled={sendingOtp} style={{
+                            width: "100%", padding: "11px 0",
+                            background: "linear-gradient(135deg,#7C3AED,#6D28D9)",
+                            color: "#fff", border: "none", borderRadius: 10,
+                            fontWeight: 800, fontSize: 13, cursor: "pointer",
+                            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                            fontFamily: "'DM Sans', sans-serif",
+                            boxShadow: "0 4px 14px rgba(109,40,217,0.25)",
+                            opacity: sendingOtp ? 0.7 : 1,
+                        }}>
+                            {sendingOtp ? (
+                                <><div style={{
+                                    width: 14, height: 14, border: "2px solid rgba(255,255,255,0.4)",
+                                    borderTop: "2px solid #fff", borderRadius: "50%",
+                                    animation: "spin 0.8s linear infinite",
+                                }} /> OTP bhej rahe hain...</>
+                            ) : (
+                                <><FaEnvelope size={12} /> OTP Email Bhejo</>
+                            )}
+                        </button>
+                    </>
+                )}
+
+                {/* ── OTP SENT ── */}
+                {step === STEPS.OTP_SENT && (
+                    <>
+                        {info && (
+                            <div style={{
+                                background: "#EFF6FF", border: "1px solid #BFDBFE",
+                                borderRadius: 10, padding: "10px 12px", marginBottom: 14,
+                                display: "flex", alignItems: "center", gap: 8,
+                                fontSize: 12, fontWeight: 600, color: "#1D4ED8",
+                            }}>
+                                <FaPaperPlane size={10} /> {info}
+                            </div>
+                        )}
+
+                        <div style={{ marginBottom: 12 }}>
+                            <label style={labelStyle}>Email OTP</label>
+                            <input type="number" value={otp} placeholder="6-digit OTP"
+                                onChange={e => { setOtp(e.target.value); setError(""); }}
+                                style={{ ...inputStyle, letterSpacing: "0.2em", fontFamily: "monospace" }} />
+                        </div>
+
+                        <div style={{ marginBottom: 12 }}>
+                            <label style={labelStyle}>Naya Delete PIN</label>
+                            <div style={{ position: "relative" }}>
+                                <FaLock size={10} style={{ position: "absolute", left: 12, top: 12, color: "#94A3B8" }} />
+                                <input type="password" value={newPin} placeholder="Min 4 digits"
+                                    inputMode="numeric"
+                                    onChange={e => { setNewPin(e.target.value); setError(""); }}
+                                    style={{ ...inputStyle, paddingLeft: 32, letterSpacing: "0.15em" }} />
+                            </div>
+                        </div>
+
+                        <div style={{ marginBottom: 14 }}>
+                            <label style={labelStyle}>PIN Confirm Karo</label>
+                            <div style={{ position: "relative" }}>
+                                <FaLock size={10} style={{ position: "absolute", left: 12, top: 12, color: "#94A3B8" }} />
+                                <input type="password" value={confirmPin} placeholder="Same PIN dobara"
+                                    inputMode="numeric"
+                                    onChange={e => { setConfirmPin(e.target.value); setError(""); }}
+                                    style={{ ...inputStyle, paddingLeft: 32, letterSpacing: "0.15em" }} />
+                            </div>
+                        </div>
+
+                        {error && (
+                            <div style={{ fontSize: 12, color: "#DC2626", fontWeight: 600, marginBottom: 10 }}>
+                                ⚠ {error}
+                            </div>
+                        )}
+
+                        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                            <button onClick={handleSendOtp} disabled={sendingOtp} style={{
+                                padding: "10px 14px", borderRadius: 10,
+                                border: "1px solid #E2E8F0", background: "#fff",
+                                fontSize: 12, fontWeight: 700, color: "#64748B",
+                                cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                                fontFamily: "'DM Sans', sans-serif",
+                                opacity: sendingOtp ? 0.6 : 1,
+                            }}>
+                                <FaRedo size={9} /> {sendingOtp ? "..." : "Resend"}
+                            </button>
+                            <button onClick={handleSavePin} disabled={saving} style={{
+                                flex: 1, padding: "10px 0",
+                                background: "linear-gradient(135deg,#7C3AED,#6D28D9)",
+                                color: "#fff", border: "none", borderRadius: 10,
+                                fontWeight: 800, fontSize: 13, cursor: "pointer",
+                                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                                fontFamily: "'DM Sans', sans-serif",
+                                opacity: saving ? 0.7 : 1,
+                                boxShadow: "0 4px 14px rgba(109,40,217,0.25)",
+                            }}>
+                                {saving ? (
+                                    <><div style={{
+                                        width: 13, height: 13, border: "2px solid rgba(255,255,255,0.4)",
+                                        borderTop: "2px solid #fff", borderRadius: "50%",
+                                        animation: "spin 0.8s linear infinite",
+                                    }} /> Saving...</>
+                                ) : (
+                                    <><FaCheckCircle size={11} /> Set PIN</>
+                                )}
+                            </button>
+                        </div>
+
+                        <button onClick={resetState} style={{
+                            width: "100%", padding: "6px 0",
+                            background: "none", border: "none",
+                            fontSize: 12, color: "#94A3B8", cursor: "pointer",
+                            fontFamily: "'DM Sans', sans-serif",
+                        }}>Cancel</button>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ══════════════════════════════════════════════
+// MAIN DASHBOARD
+// ══════════════════════════════════════════════
 const AdminDashboard = () => {
     const [stats, setStats] = useState(null);
     const [recentOrders, setRecentOrders] = useState([]);
@@ -95,6 +342,11 @@ const AdminDashboard = () => {
 
     return (
         <div style={{ fontFamily: "'DM Sans', sans-serif", minHeight: "100%", background: "#F1F5F9" }}>
+            <style>{`
+                @keyframes spin { to { transform: rotate(360deg); } }
+                @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+            `}</style>
+
             <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 20px 48px" }}>
 
                 {/* ── Header ── */}
@@ -113,7 +365,6 @@ const AdminDashboard = () => {
                             padding: "9px 16px", borderRadius: 10,
                             background: "#1E293B", color: "#fff",
                             fontWeight: 700, fontSize: 13, textDecoration: "none",
-                            transition: "all 0.15s"
                         }}>
                             <FaCashRegister size={12} /> Shop POS
                         </Link>
@@ -122,7 +373,7 @@ const AdminDashboard = () => {
                             padding: "9px 16px", borderRadius: 10,
                             background: "linear-gradient(135deg,#F59E0B,#D97706)", color: "#fff",
                             fontWeight: 700, fontSize: 13, textDecoration: "none",
-                            boxShadow: "0 4px 14px rgba(245,158,11,0.3)"
+                            boxShadow: "0 4px 14px rgba(245,158,11,0.3)",
                         }}>
                             <FaPlus size={11} /> Add Product
                         </Link>
@@ -133,7 +384,7 @@ const AdminDashboard = () => {
                 {fetchError && (
                     <div style={{
                         background: "#FEF2F2", border: "1px solid #FECACA", color: "#DC2626",
-                        padding: "12px 16px", borderRadius: 12, fontSize: 13, fontWeight: 500, marginBottom: 20
+                        padding: "12px 16px", borderRadius: 12, fontSize: 13, fontWeight: 500, marginBottom: 20,
                     }}>
                         ⚠️ {fetchError}
                     </div>
@@ -154,13 +405,13 @@ const AdminDashboard = () => {
                         <div key={label} style={{
                             background: "#fff", border: `1px solid ${border}`,
                             borderRadius: 14, padding: "16px 18px",
-                            boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
+                            boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
                         }}>
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                                 <span style={{ fontSize: 11, color: "#94A3B8", fontWeight: 600 }}>{label}</span>
                                 <div style={{
                                     width: 28, height: 28, borderRadius: 8, background: bg,
-                                    display: "flex", alignItems: "center", justifyContent: "center", color: accent
+                                    display: "flex", alignItems: "center", justifyContent: "center", color: accent,
                                 }}>{icon}</div>
                             </div>
                             <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 22, color: accent }}>
@@ -182,7 +433,7 @@ const AdminDashboard = () => {
                                 background: "#fff", border: `1px solid ${border}`,
                                 borderRadius: 14, padding: "14px 18px",
                                 display: "flex", alignItems: "center", justifyContent: "space-between",
-                                boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
+                                boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
                             }}>
                                 <div>
                                     <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 600 }}>{label}</div>
@@ -201,14 +452,14 @@ const AdminDashboard = () => {
                         display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center",
                         justifyContent: "space-between", marginBottom: 20,
                         border: "1px solid rgba(245,158,11,0.15)",
-                        boxShadow: "0 4px 20px rgba(0,0,0,0.12)"
+                        boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
                     }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                             <div style={{
                                 width: 42, height: 42, borderRadius: 12,
                                 background: "linear-gradient(135deg,#F59E0B,#D97706)",
                                 display: "flex", alignItems: "center", justifyContent: "center",
-                                boxShadow: "0 4px 14px rgba(245,158,11,0.3)"
+                                boxShadow: "0 4px 14px rgba(245,158,11,0.3)",
                             }}>
                                 <FaCashRegister size={17} color="#fff" />
                             </div>
@@ -234,15 +485,16 @@ const AdminDashboard = () => {
                             padding: "10px 18px", borderRadius: 10,
                             background: "linear-gradient(135deg,#F59E0B,#D97706)", color: "#fff",
                             fontWeight: 700, fontSize: 13, textDecoration: "none",
-                            boxShadow: "0 4px 14px rgba(245,158,11,0.3)"
+                            boxShadow: "0 4px 14px rgba(245,158,11,0.3)",
                         }}>
                             Open POS <FaArrowRight size={10} />
                         </Link>
                     </div>
                 )}
 
-                {/* ── Map + City ── */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+                {/* ── Map + City + Security ── */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 320px", gap: 16, marginBottom: 20 }}>
+
                     {/* City Stats */}
                     <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #E2E8F0", overflow: "hidden", boxShadow: "0 1px 6px rgba(0,0,0,0.04)" }}>
                         <div style={{ padding: "14px 18px", borderBottom: "1px solid #F1F5F9", display: "flex", alignItems: "center", gap: 8 }}>
@@ -252,8 +504,8 @@ const AdminDashboard = () => {
                         </div>
                         <div style={{ padding: "16px 18px" }}>
                             {cityStats.length === 0 ? (
-                                <div style={{ textAlign: "center", padding: "28px 0", color: "#CBD5E1" }}>
-                                    <FaMapMarkerAlt size={26} style={{ margin: "0 auto 8px" }} />
+                                <div style={{ textAlign: "center", padding: "28px 0" }}>
+                                    <FaMapMarkerAlt size={26} style={{ margin: "0 auto 8px", color: "#CBD5E1", display: "block" }} />
                                     <p style={{ fontSize: 13, color: "#94A3B8" }}>No location data yet</p>
                                 </div>
                             ) : (
@@ -269,7 +521,7 @@ const AdminDashboard = () => {
                                                     height: "100%", borderRadius: 10,
                                                     background: "linear-gradient(90deg,#F59E0B,#D97706)",
                                                     width: `${(count / maxCount) * 100}%`,
-                                                    transition: "width 0.6s ease"
+                                                    transition: "width 0.6s ease",
                                                 }} />
                                             </div>
                                         </div>
@@ -334,6 +586,9 @@ const AdminDashboard = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Security Section */}
+                    <SecuritySection />
                 </div>
 
                 {/* ── Quick Actions ── */}
@@ -350,12 +605,12 @@ const AdminDashboard = () => {
                             textDecoration: "none", display: "flex", flexDirection: "column", gap: 10,
                             transition: "all 0.15s", boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
                         }}
-                            onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 20px rgba(0,0,0,0.1)`}
+                            onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.1)"}
                             onMouseLeave={e => e.currentTarget.style.boxShadow = "0 1px 6px rgba(0,0,0,0.04)"}
                         >
                             <div style={{
                                 width: 38, height: 38, borderRadius: 10, background: bg,
-                                display: "flex", alignItems: "center", justifyContent: "center", color: accent
+                                display: "flex", alignItems: "center", justifyContent: "center", color: accent,
                             }}>{icon}</div>
                             <div>
                                 <div style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{label}</div>
@@ -381,8 +636,8 @@ const AdminDashboard = () => {
                             {[0, 1, 2].map(i => <div key={i} style={{ height: 48, borderRadius: 10, background: "#F1F5F9" }} />)}
                         </div>
                     ) : recentOrders.length === 0 ? (
-                        <div style={{ padding: "40px 0", textAlign: "center", color: "#CBD5E1" }}>
-                            <FaShoppingBag size={26} style={{ margin: "0 auto 8px" }} />
+                        <div style={{ padding: "40px 0", textAlign: "center" }}>
+                            <FaShoppingBag size={26} style={{ margin: "0 auto 8px", color: "#CBD5E1", display: "block" }} />
                             <p style={{ fontSize: 13, color: "#94A3B8" }}>No orders yet</p>
                         </div>
                     ) : recentOrders.map(order => {
@@ -391,7 +646,7 @@ const AdminDashboard = () => {
                             <div key={order._id} style={{
                                 display: "flex", alignItems: "center", justifyContent: "space-between",
                                 padding: "12px 20px", borderBottom: "1px solid #F8FAFC",
-                                transition: "background 0.12s"
+                                transition: "background 0.12s", cursor: "default",
                             }}
                                 onMouseEnter={e => e.currentTarget.style.background = "#F8FAFC"}
                                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}
@@ -400,7 +655,7 @@ const AdminDashboard = () => {
                                     <div style={{
                                         width: 34, height: 34, borderRadius: "50%",
                                         background: "#FFFBEB", border: "1px solid #FDE68A",
-                                        display: "flex", alignItems: "center", justifyContent: "center"
+                                        display: "flex", alignItems: "center", justifyContent: "center",
                                     }}>
                                         <FaShoppingBag size={12} color="#F59E0B" />
                                     </div>
