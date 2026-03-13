@@ -41,7 +41,7 @@ export const adminOrderEmailHTML = ({ order }) => {
 
       <p><b>Total Amount:</b> ₹${Number(order.totalAmount).toLocaleString("en-IN")}</p>
 
-      <a href="https://rv-gift-admin.vercel.app"
+      <a href="https://admin.rvgift.com/orders/${order._id}" target="_blank" rel="noopener"
         style="display:inline-block;margin-top:20px;padding:14px 22px;background:#111827;color:white;text-decoration:none;border-radius:6px;font-weight:bold">
         🔐 Open Admin Dashboard
       </a>

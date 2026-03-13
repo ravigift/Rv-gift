@@ -50,7 +50,12 @@ const userSchema = new mongoose.Schema(
             default: "user",
         },
 
-        /* ── GPS Location (from browser on login/register) ── */
+        /* ── Email Verification ── */
+        isEmailVerified: { type: Boolean, default: false },
+        emailOtp: { type: String, default: undefined },
+        emailOtpExpires: { type: Date, default: undefined },
+
+        /* ── GPS Location ── */
         location: {
             latitude: { type: Number, default: null },
             longitude: { type: Number, default: null },
@@ -73,9 +78,7 @@ const userSchema = new mongoose.Schema(
         passwordResetToken: { type: String, default: undefined },
         passwordResetExpires: { type: Date, default: undefined },
     },
-    {
-        timestamps: true,  // createdAt, updatedAt auto
-    }
+    { timestamps: true }
 );
 
 export default mongoose.model("User", userSchema);

@@ -1,17 +1,16 @@
 /**
  * orderController.js — Production Grade
  * ✅ Auto Shiprocket on PACKED
- * ✅ Return system (7-day window)  
  * ✅ Refund via Razorpay API
  * ✅ Payment logs on every event
  * ✅ Fraud detection
+ * ❌ No return system
  */
 
 import Razorpay from "razorpay";
 import Order, { generateInvoiceNumber } from "../models/Order.js";
 import Product from "../models/Product.js";
 import { sendEmail } from "../utils/emailService.js";
-import { generateWhatsAppLink, generateUserWhatsAppLink } from "../utils/whatsapp.js";
 import { getOrderStatusEmailTemplate } from "../utils/orderStatusEmail.js";
 import { adminOrderEmailHTML } from "../utils/adminOrderEmail.js";
 import { generateInvoiceBuffer } from "../utils/invoiceEmailHelper.js";
@@ -72,7 +71,7 @@ const checkFraud = async ({ userId, ip, amount, paymentId }) => {
 };
 
 /* ════════════════════════════════════════
-   CREATE ORDER (COD or post-Razorpay verify)
+   CREATE ORDER
 ════════════════════════════════════════ */
 export const createOrder = async (req, res) => {
     try {
@@ -181,6 +180,7 @@ export const createOrder = async (req, res) => {
 
 /* ════════════════════════════════════════
    CANCEL ORDER (USER)
+   Only allowed if status is PLACED or CONFIRMED (not yet packed)
 ════════════════════════════════════════ */
 export const cancelOrder = async (req, res) => {
     try {
@@ -191,7 +191,7 @@ export const cancelOrder = async (req, res) => {
         if (order.orderStatus === "CANCELLED")
             return res.status(400).json({ message: "Already cancelled" });
         if (!["PLACED", "CONFIRMED"].includes(order.orderStatus))
-            return res.status(400).json({ message: `Cannot cancel — order is ${order.orderStatus.toLowerCase().replace(/_/g, " ")}` });
+            return res.status(400).json({ message: `Cannot cancel — order is already ${order.orderStatus.toLowerCase().replace(/_/g, " ")}. Cancellation is only allowed before packing.` });
 
         order.orderStatus = "CANCELLED";
         order.cancellationReason = String(req.body?.reason || "Cancelled by customer").trim().slice(0, 500);
@@ -211,6 +211,7 @@ export const cancelOrder = async (req, res) => {
 
         await order.save();
 
+        // Restore stock
         for (const item of order.items) {
             try {
                 const p = await Product.findById(item.productId);
@@ -276,7 +277,6 @@ export const updateOrderStatus = async (req, res) => {
         if (status === "DELIVERED") {
             update["payment.status"] = "PAID";
             update["payment.paidAt"] = new Date();
-            update["return.deadlineAt"] = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
         }
         if (status === "SHIPPED") update["shipping.status"] = "SHIPPED";
 
@@ -317,7 +317,6 @@ export const updateOrderStatus = async (req, res) => {
                         });
                         console.log(`[Shiprocket AUTO] PACKED → AWB: ${srResult.awb_code} ${srResult.mock ? "(MOCK)" : ""}`);
 
-                        // Email with tracking
                         if (order.email && !order.email.includes("@rvgifts.com")) {
                             const tMail = getOrderStatusEmailTemplate({
                                 customerName: order.customerName, orderId: order._id,
@@ -369,110 +368,7 @@ export const getAllOrders = async (req, res) => {
 };
 
 /* ════════════════════════════════════════
-   REQUEST RETURN (USER)
-   Only DELIVERED + within 7 days
-════════════════════════════════════════ */
-export const requestReturn = async (req, res) => {
-    try {
-        const order = await Order.findById(req.params.id);
-        if (!order) return res.status(404).json({ message: "Order not found" });
-        if (order.user.toString() !== req.user._id.toString())
-            return res.status(403).json({ message: "Not authorized" });
-        if (order.orderStatus !== "DELIVERED")
-            return res.status(400).json({ message: "Return only allowed for delivered orders" });
-
-        const deliveredAt = order.statusTimeline?.deliveredAt;
-        const deadline = order.return?.deadlineAt || (deliveredAt ? new Date(new Date(deliveredAt).getTime() + 7 * 24 * 60 * 60 * 1000) : null);
-        if (deadline && new Date() > new Date(deadline)) {
-            const days = deliveredAt ? Math.floor((Date.now() - new Date(deliveredAt).getTime()) / (1000 * 60 * 60 * 24)) : "?";
-            return res.status(400).json({ message: `Return window closed. Orders can only be returned within 7 days of delivery (delivered ${days} days ago)` });
-        }
-
-        if (order.return?.status && order.return.status !== "NONE")
-            return res.status(400).json({ message: `Return already ${order.return.status.toLowerCase()}` });
-
-        const { reason, images = [] } = req.body;
-        if (!reason?.trim()) return res.status(400).json({ message: "Return reason is required" });
-
-        order.return = {
-            requested: true, requestedAt: new Date(),
-            reason: reason.trim().slice(0, 1000),
-            images: Array.isArray(images) ? images.slice(0, 5) : [],
-            status: "REQUESTED",
-            deadlineAt: deadline,
-        };
-        order.orderStatus = "RETURN_REQUESTED";
-        const existing = order.statusTimeline?.toObject ? order.statusTimeline.toObject() : { ...order.statusTimeline };
-        order.statusTimeline = { ...existing, returnRequestedAt: new Date() };
-        order.markModified("statusTimeline");
-        order.markModified("return");
-        await order.save();
-
-        res.json({ success: true, message: "Return request submitted. Admin will review within 24-48 hours.", return: order.return });
-
-        sendEmail({
-            to: process.env.ADMIN_EMAIL,
-            subject: `🔄 Return Request #${order._id.toString().slice(-6).toUpperCase()} — ${order.customerName}`,
-            html: `<h2>Return Request</h2><p><b>Order:</b> #${order._id.toString().slice(-8).toUpperCase()}</p><p><b>Customer:</b> ${order.customerName} | ${order.phone}</p><p><b>Reason:</b> ${reason}</p><p><b>Amount:</b> ₹${order.totalAmount.toLocaleString("en-IN")}</p>`,
-            label: "Admin/ReturnRequest",
-        });
-
-    } catch (err) {
-        console.error("REQUEST RETURN:", err);
-        res.status(500).json({ message: "Failed to submit return request" });
-    }
-};
-
-/* ════════════════════════════════════════
-   PROCESS RETURN (ADMIN) — approve/reject
-════════════════════════════════════════ */
-export const processReturn = async (req, res) => {
-    try {
-        const { action, adminNote, refundAmount } = req.body;
-        if (!["approve", "reject"].includes(action))
-            return res.status(400).json({ message: "Action must be approve or reject" });
-
-        const order = await Order.findById(req.params.id);
-        if (!order) return res.status(404).json({ message: "Order not found" });
-        if (order.return?.status !== "REQUESTED")
-            return res.status(400).json({ message: "No pending return request" });
-
-        if (action === "reject") {
-            order.return.status = "REJECTED";
-            order.return.adminNote = adminNote?.trim() || "";
-            order.return.processedAt = new Date();
-            order.return.processedBy = req.user._id;
-            order.orderStatus = "DELIVERED";
-            order.markModified("return");
-            await order.save();
-            if (order.email && !order.email.includes("@rvgifts.com"))
-                sendEmail({ to: order.email, subject: `Return Request Rejected — Order #${order._id.toString().slice(-6).toUpperCase()}`, html: `<p>Hi ${order.customerName}, your return request has been rejected. ${adminNote || "Please contact support."}</p>`, label: "User/ReturnRejected" });
-            return res.json({ success: true, message: "Return rejected" });
-        }
-
-        // APPROVE
-        order.return.status = "APPROVED";
-        order.return.adminNote = adminNote?.trim() || "";
-        order.return.refundAmount = Number(refundAmount) || order.totalAmount;
-        order.return.processedAt = new Date();
-        order.return.processedBy = req.user._id;
-        order.orderStatus = "RETURN_APPROVED";
-        order.markModified("return");
-        await order.save();
-
-        res.json({ success: true, message: "Return approved", order });
-
-        if (order.email && !order.email.includes("@rvgifts.com"))
-            sendEmail({ to: order.email, subject: `Return Approved — Order #${order._id.toString().slice(-6).toUpperCase()}`, html: `<p>Hi ${order.customerName}, your return is approved! Refund of ₹${order.return.refundAmount.toLocaleString("en-IN")} will be processed soon.</p>`, label: "User/ReturnApproved" });
-
-    } catch (err) {
-        console.error("PROCESS RETURN:", err);
-        res.status(500).json({ message: "Failed to process return" });
-    }
-};
-
-/* ════════════════════════════════════════
-   REQUEST REFUND (USER)
+   REQUEST REFUND (USER) — fallback for cancelled paid orders
 ════════════════════════════════════════ */
 export const requestRefund = async (req, res) => {
     try {
@@ -507,8 +403,7 @@ export const requestRefund = async (req, res) => {
 };
 
 /* ════════════════════════════════════════
-   PROCESS REFUND (ADMIN)
-   Calls Razorpay API
+   PROCESS REFUND (ADMIN) — approve/reject via Razorpay
 ════════════════════════════════════════ */
 export const processRefund = async (req, res) => {
     try {
@@ -532,7 +427,7 @@ export const processRefund = async (req, res) => {
             return res.json({ success: true, message: "Refund rejected" });
         }
 
-        // APPROVE → Razorpay API call
+        // APPROVE → Razorpay API
         const refundAmount = order.refund.amount || order.totalAmount;
         const paymentId = order.payment.razorpayPaymentId;
         if (!paymentId) return res.status(400).json({ message: "No Razorpay payment ID" });
@@ -606,13 +501,6 @@ export const getFlaggedOrders = async (req, res) => {
     } catch { res.status(500).json({ message: "Failed" }); }
 };
 
-export const getReturnQueue = async (req, res) => {
-    try {
-        const orders = await Order.find({ "return.status": "REQUESTED" }).sort({ "return.requestedAt": -1 }).lean();
-        res.json(orders);
-    } catch { res.status(500).json({ message: "Failed" }); }
-};
-
 export const getRefundQueue = async (req, res) => {
     try {
         const orders = await Order.find({ "refund.status": "REQUESTED" }).sort({ "refund.requestedAt": -1 }).lean();
@@ -620,33 +508,21 @@ export const getRefundQueue = async (req, res) => {
     } catch { res.status(500).json({ message: "Failed" }); }
 };
 
-
 /* ════════════════════════════════════════
-   SHIPROCKET WEBHOOK (AUTO TRACKING)
+   SHIPROCKET WEBHOOK
 ════════════════════════════════════════ */
-
 export const shiprocketWebhook = async (req, res) => {
     try {
-        const data = req.body;
-
-        const awb = data.awb;
-        const status = data.current_status;
-
-        const order = await Order.findOne({
-            "shipping.awbCode": awb
-        });
-
+        const { awb, current_status: status } = req.body;
+        const order = await Order.findOne({ "shipping.awbCode": awb });
         if (!order) return res.sendStatus(200);
 
         order.shipping.status = status;
-
         if (status === "DELIVERED") {
             order.orderStatus = "DELIVERED";
             order.statusTimeline.deliveredAt = new Date();
         }
-
         await order.save();
-
         res.sendStatus(200);
     } catch (err) {
         console.error("Shiprocket webhook error", err);

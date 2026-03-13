@@ -5,7 +5,7 @@ import {
     FaArrowLeft, FaBoxOpen, FaMapMarkerAlt,
     FaPhone, FaUser, FaShoppingBag,
     FaTimesCircle, FaGift, FaUndo, FaInfoCircle,
-    FaSpinner,
+    FaSpinner, FaFileInvoice,
 } from "react-icons/fa";
 
 /* ─────────────────────────────────────────────
@@ -19,13 +19,10 @@ const STATUS_CONFIG = {
     OUT_FOR_DELIVERY: { label: "Out for Delivery", color: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-400" },
     DELIVERED: { label: "Delivered", color: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" },
     CANCELLED: { label: "Cancelled", color: "bg-red-50 text-red-700 border-red-200", dot: "bg-red-400" },
-    RETURN_REQUESTED: { label: "Return Requested", color: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-400" },
-    RETURN_APPROVED: { label: "Return Approved", color: "bg-teal-50 text-teal-700 border-teal-200", dot: "bg-teal-400" },
 };
 
 /* ─────────────────────────────────────────────
    REFUND STATUS CONFIG
-   Matches Order.js schema: NONE|REQUESTED|PROCESSING|PROCESSED|FAILED|REJECTED
 ───────────────────────────────────────────── */
 const REFUND_STATUS = {
     NONE: null,
@@ -76,13 +73,15 @@ const OrderDetails = () => {
     const [confirmCancel, setConfirmCancel] = useState(false);
     const [cancelError, setCancelError] = useState("");
 
-    // Refund state
+    // Refund state (for cancelled paid orders)
     const [showRefundForm, setShowRefundForm] = useState(false);
     const [refundReason, setRefundReason] = useState("");
     const [requestingRefund, setRequestingRefund] = useState(false);
     const [refundError, setRefundError] = useState("");
 
-    /* ── Fetch order ── */
+    // Invoice download
+    const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+
     const fetchOrder = async () => {
         try {
             setLoading(true);
@@ -93,19 +92,12 @@ const OrderDetails = () => {
         } finally { setLoading(false); }
     };
 
-    useEffect(() => {
-        if (id) fetchOrder();
-    }, [id]);
+    useEffect(() => { if (id) fetchOrder(); }, [id]);
 
-    /* ── Cancel order ──
-       BUG FIX 1: was api.patch → correct is api.put (route: PUT /orders/:id/cancel)
-       BUG FIX 2: data.order now returned from backend after cancelOrder fix
-    ── */
     const handleCancel = async () => {
         try {
             setCancelling(true); setCancelError("");
-            const { data } = await api.put(`/orders/${id}/cancel`);
-            // cancelOrder returns: { success, message, order, refundRequested }
+            const { data } = await api.patch(`/orders/${id}/cancel`);
             setOrder(data.order);
             setConfirmCancel(false);
         } catch (err) {
@@ -113,14 +105,12 @@ const OrderDetails = () => {
         } finally { setCancelling(false); }
     };
 
-    /* ── Manual refund request (fallback for old orders) ── */
     const handleRefundRequest = async () => {
         try {
             setRequestingRefund(true); setRefundError("");
             const { data } = await api.post(`/payment/refund/${id}`, {
                 reason: refundReason || "Requested by customer",
             });
-            // orderController requestRefund returns: { success, message, refund }
             setOrder(prev => ({ ...prev, refund: data.refund }));
             setShowRefundForm(false);
         } catch (err) {
@@ -128,7 +118,23 @@ const OrderDetails = () => {
         } finally { setRequestingRefund(false); }
     };
 
-    /* ── Loading ── */
+    const handleDownloadInvoice = async () => {
+        try {
+            setDownloadingInvoice(true);
+            const response = await api.get(`/orders/${id}/invoice`, { responseType: "blob" });
+            const url = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+            const link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", `RVGifts_Invoice_${id.slice(-8).toUpperCase()}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch {
+            alert("Failed to download invoice. Please try again.");
+        } finally { setDownloadingInvoice(false); }
+    };
+
     if (loading) return (
         <div className="min-h-screen bg-gradient-to-br from-stone-50 to-amber-50/30 flex items-center justify-center">
             <div className="text-center">
@@ -138,7 +144,6 @@ const OrderDetails = () => {
         </div>
     );
 
-    /* ── Not found ── */
     if (!order) return (
         <div className="min-h-screen bg-stone-50 flex flex-col items-center justify-center px-4">
             <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mb-5">
@@ -152,18 +157,16 @@ const OrderDetails = () => {
         </div>
     );
 
-    /* ── Derived state ── */
     const cfg = STATUS_CONFIG[order?.orderStatus] || STATUS_CONFIG.PLACED;
     const stepIdx = FLOW_STEPS.indexOf(order?.orderStatus);
     const isCancelled = order?.orderStatus === "CANCELLED";
+    const isDelivered = order?.orderStatus === "DELIVERED";
     const canCancel = CANCELLABLE.includes(order?.orderStatus);
     const isRazorpay = order?.payment?.method === "RAZORPAY";
     const isPaid = order?.payment?.status === "PAID";
 
     const refundStatus = order?.refund?.status || "NONE";
     const refundInfo = REFUND_STATUS[refundStatus] || null;
-
-    // Show manual refund button only for old orders where auto-request failed
     const canRequestRefund = isCancelled && isRazorpay && isPaid && refundStatus === "NONE";
 
     return (
@@ -207,10 +210,22 @@ const OrderDetails = () => {
                             </span>
                         </p>
                     </div>
-                    <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${cfg.color}`}>
-                        <span className={`w-2 h-2 rounded-full ${cfg.dot} animate-pulse`} />
-                        {cfg.label}
-                    </span>
+                    <div className="flex items-center gap-2">
+                        {isDelivered && (
+                            <button
+                                onClick={handleDownloadInvoice}
+                                disabled={downloadingInvoice}
+                                className="flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-50 cursor-pointer"
+                            >
+                                <FaFileInvoice size={11} />
+                                {downloadingInvoice ? "Downloading..." : "Invoice"}
+                            </button>
+                        )}
+                        <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${cfg.color}`}>
+                            <span className={`w-2 h-2 rounded-full ${cfg.dot} animate-pulse`} />
+                            {cfg.label}
+                        </span>
+                    </div>
                 </div>
 
                 {/* ── Cancelled Banner ── */}
@@ -240,59 +255,43 @@ const OrderDetails = () => {
                             {refundInfo.desc && (
                                 <p className="text-xs mt-0.5 opacity-80">{refundInfo.desc}</p>
                             )}
-                            {/* BUG FIX 3: field is adminNote not rejectionReason */}
                             {refundStatus === "REJECTED" && order.refund?.adminNote && (
-                                <p className="text-xs mt-1 font-medium">
-                                    Reason: {order.refund.adminNote}
-                                </p>
+                                <p className="text-xs mt-1 font-medium">Reason: {order.refund.adminNote}</p>
                             )}
                             {refundStatus === "PROCESSED" && order.refund?.razorpayRefundId && (
-                                <p className="text-xs mt-1 font-mono opacity-70">
-                                    Refund ID: {order.refund.razorpayRefundId}
-                                </p>
+                                <p className="text-xs mt-1 font-mono opacity-70">Refund ID: {order.refund.razorpayRefundId}</p>
                             )}
                             {refundStatus === "PROCESSED" && order.refund?.amount && (
-                                <p className="text-xs mt-0.5 font-bold">
-                                    ₹{Number(order.refund.amount).toLocaleString("en-IN")} refunded
-                                </p>
+                                <p className="text-xs mt-0.5 font-bold">₹{Number(order.refund.amount).toLocaleString("en-IN")} refunded</p>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Shipment Tracking ── */}
+                {order.shipping?.trackingUrl && (
+                    <div className="card p-5">
+                        <h3 className="font-bold text-zinc-800 mb-3 text-sm flex items-center gap-2">
+                            <span className="w-1 h-4 bg-amber-500 rounded-full" />
+                            Shipment Tracking
+                        </h3>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="text-sm text-zinc-600">
+                                🚚 Courier:
+                                <span className="font-bold ml-1">{order.shipping.courierName || "Courier"}</span>
+                                {order.shipping.awbCode && (
+                                    <span className="ml-3 text-zinc-400 font-mono text-xs">AWB: {order.shipping.awbCode}</span>
+                                )}
+                            </div>
+                            <a href={order.shipping.trackingUrl} target="_blank" rel="noreferrer"
+                                className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition font-bold">
+                                Track Shipment →
+                            </a>
                         </div>
                     </div>
                 )}
 
                 {/* ── Order Tracking ── */}
-                {/* ── Shipment Tracking ── */}
-                {order.shipping?.trackingUrl && (
-                    <div className="bg-white rounded-xl shadow-sm p-5 border mt-4">
-                        <h3 className="font-bold text-zinc-800 mb-3">Shipment Tracking</h3>
-
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-
-                            <div className="text-sm text-zinc-600">
-                                🚚 Courier:
-                                <span className="font-bold ml-1">
-                                    {order.shipping.courierName || "Courier"}
-                                </span>
-
-                                {order.shipping.awbCode && (
-                                    <span className="ml-3 text-zinc-400 font-mono">
-                                        AWB: {order.shipping.awbCode}
-                                    </span>
-                                )}
-                            </div>
-
-                            <a
-                                href={order.shipping.trackingUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition"
-                            >
-                                Track Shipment
-                            </a>
-
-                        </div>
-                    </div>
-                )}
                 {!isCancelled && stepIdx >= 0 && (
                     <div className="card p-5">
                         <h2 className="font-black text-zinc-800 text-sm mb-5 flex items-center gap-2">
@@ -324,14 +323,6 @@ const OrderDetails = () => {
                                 </p>
                             ))}
                         </div>
-
-                        {/* Tracking link if shipped */}
-                        {order.shipping?.trackingUrl && ["SHIPPED", "OUT_FOR_DELIVERY"].includes(order.orderStatus) && (
-                            <a href={order.shipping.trackingUrl} target="_blank" rel="noreferrer"
-                                className="mt-4 flex items-center justify-center gap-2 w-full py-2.5 border border-indigo-200 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-all">
-                                🚚 Track with {order.shipping.courierName || "Courier"} — AWB: {order.shipping.awbCode}
-                            </a>
-                        )}
                     </div>
                 )}
 
@@ -482,7 +473,7 @@ const OrderDetails = () => {
                     </div>
                 )}
 
-                {/* ── Manual Refund Request (fallback for old orders) ── */}
+                {/* ── Manual Refund Request ── */}
                 {canRequestRefund && (
                     <div className="card p-5 border-amber-100">
                         <h2 className="font-black text-zinc-800 text-sm mb-1 flex items-center gap-2">

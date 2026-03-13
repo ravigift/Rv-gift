@@ -11,12 +11,9 @@ import {
     getOrderById,
     updateOrderStatus,
     cancelOrder,
-    requestReturn,
-    processReturn,
     processRefund,
     retryRefund,
     getRefundQueue,
-    getReturnQueue,
     getFlaggedOrders,
     shiprocketWebhook,
 } from "../controllers/orderController.js";
@@ -36,7 +33,6 @@ router.get("/my", protect, getMyOrders);
 
 /* ── ADMIN QUEUE ROUTES (before /:id) ── */
 router.get("/admin/refunds", protect, adminOnly, getRefundQueue);
-router.get("/admin/returns", protect, adminOnly, getReturnQueue);
 router.get("/admin/flagged", protect, adminOnly, getFlaggedOrders);
 
 /* ── ADMIN MANAGEMENT ── */
@@ -45,11 +41,9 @@ router.put("/:id", protect, adminOnly, updateOrderStatus);
 
 /* ── USER ACTIONS ── */
 router.patch("/:id/cancel", protect, cancelOrder);
-router.post("/:id/return", protect, requestReturn);
 
-/* ── ADMIN ACTIONS on specific order ── */
-router.put("/:id/return/process", protect, adminOnly, processReturn);
-router.put("/:id/refund/process", protect, adminOnly, processRefund);   // also callable from AdminRefundReturn
+/* ── ADMIN REFUND ACTIONS ── */
+router.put("/:id/refund/process", protect, adminOnly, processRefund);
 router.put("/:id/refund/retry", protect, adminOnly, retryRefund);
 
 /* ── INVOICE (owner or admin) ── */
@@ -58,7 +52,7 @@ router.get("/:id/invoice", protect, downloadInvoice);
 /* ── GET SINGLE ORDER — MUST be last ── */
 router.get("/:id", protect, getOrderById);
 
+/* ── SHIPROCKET WEBHOOK (no auth) ── */
+// router.post("/shipping/webhook", shiprocketWebhook);
 
-// shiprocket webhook (no auth — called by Shiprocket)
-router.post("/shipping/webhook", shiprocketWebhook);
 export default router;

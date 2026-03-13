@@ -27,9 +27,6 @@ const MyOrders = () => {
     const [cancellingId, setCancellingId] = useState(null);
     const [confirmCancelId, setConfirmCancelId] = useState(null);
     const [downloadingId, setDownloadingId] = useState(null);
-    const [returnModal, setReturnModal] = useState(null); // order._id
-    const [returnReason, setReturnReason] = useState("");
-    const [returnLoading, setReturnLoading] = useState(false);
 
     useEffect(() => { dispatch(getMyOrders()); }, [dispatch]);
 
@@ -38,83 +35,6 @@ const MyOrders = () => {
         dispatch(getMyOrders());
         setRefreshing(false);
     };
-
-    const handleReturn = async (orderId) => {
-        if (!returnReason.trim()) { alert("Please enter return reason"); return; }
-        try {
-            setReturnLoading(true);
-            await api.post(`/orders/${orderId}/return`, { reason: returnReason });
-            alert("Return request submitted! Admin will review within 24-48 hours.");
-            setReturnModal(null);
-            setReturnReason("");
-            handleRefresh(); // Fixed: use handleRefresh instead of fetchOrders()
-        } catch (err) {
-            alert(err.response?.data?.message || "Failed to submit return request");
-        } finally { setReturnLoading(false); }
-    };
-
-
-
-    const ReturnButton = ({ order }) => {
-        // Check if within 7-day window
-        const deadline = order.return?.deadlineAt;
-        const withinWindow = !deadline || new Date() < new Date(deadline);
-        const returnStatus = order.return?.status;
-
-        if (returnStatus && returnStatus !== "NONE") {
-            // Show return status
-            const cfg = {
-                REQUESTED: { cls: "bg-yellow-100 text-yellow-700", label: "Return Requested" },
-                APPROVED: { cls: "bg-emerald-100 text-emerald-700", label: "Return Approved" },
-                REJECTED: { cls: "bg-red-100 text-red-700", label: "Return Rejected" },
-                PICKED_UP: { cls: "bg-blue-100 text-blue-700", label: "Return Picked Up" },
-                REFUNDED: { cls: "bg-violet-100 text-violet-700", label: "Refunded" },
-            }[returnStatus] || { cls: "bg-stone-100 text-stone-500", label: returnStatus };
-            return (
-                <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${cfg.cls}`}>
-                    {cfg.label}
-                </span>
-            );
-        }
-
-        if (!withinWindow) {
-            return <span className="text-xs text-zinc-400">Return window closed</span>;
-        }
-
-        return (
-            <button
-                onClick={() => { setReturnModal(order._id); setReturnReason(""); }}
-                className="flex items-center gap-1.5 text-xs font-bold text-violet-600 border border-violet-200 bg-violet-50 px-3 py-1.5 rounded-xl hover:bg-violet-100 transition-all cursor-pointer">
-                Return
-            </button>
-        );
-    };
-
-    const ReturnModal = () => returnModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
-                <h3 className="font-black text-zinc-800 text-lg mb-4">Request Return</h3>
-                <p className="text-xs text-zinc-500 mb-3">Returns are accepted within 7 days of delivery.</p>
-                <textarea
-                    placeholder="Why are you returning this order? (required)"
-                    value={returnReason}
-                    onChange={e => setReturnReason(e.target.value)}
-                    rows={4}
-                    className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none mb-4"
-                />
-                <div className="flex gap-3">
-                    <button onClick={() => handleReturn(returnModal)} disabled={returnLoading}
-                        className="flex-1 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm disabled:opacity-60 cursor-pointer">
-                        {returnLoading ? "Submitting..." : "Submit Return Request"}
-                    </button>
-                    <button onClick={() => setReturnModal(null)}
-                        className="px-4 py-3 bg-stone-100 hover:bg-stone-200 text-zinc-600 rounded-xl font-bold text-sm cursor-pointer">
-                        Cancel
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
 
     const handleCancel = async (orderId) => {
         try {
@@ -255,7 +175,6 @@ const MyOrders = () => {
                             const isDelivered = order.orderStatus === "DELIVERED";
                             const isDownloading = downloadingId === order._id;
 
-                            // ── Payment badge ──
                             const payMethod = order.payment?.method || "COD";
                             const payStatus = order.payment?.status || "PENDING";
                             const isPaid = payMethod === "RAZORPAY" && payStatus === "PAID";
@@ -281,7 +200,6 @@ const MyOrders = () => {
                                                 <p className="font-black text-[10px] uppercase tracking-widest text-zinc-400 mb-0.5">Total</p>
                                                 <p className="font-black text-zinc-800">₹{Number(order.totalAmount).toLocaleString("en-IN")}</p>
                                             </div>
-                                            {/* Payment badge */}
                                             <div>
                                                 <p className="font-black text-[10px] uppercase tracking-widest text-zinc-400 mb-0.5">Payment</p>
                                                 <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${isPaid ? "bg-emerald-50 text-emerald-700 border-emerald-200"
@@ -305,8 +223,6 @@ const MyOrders = () => {
                                                     {isDownloading ? "Downloading..." : "Invoice"}
                                                 </button>
                                             )}
-                                            {/* Return Button - only for DELIVERED */}
-                                            {isDelivered && <ReturnButton order={order} />}
                                             <Link to={`/orders/${order._id}`}
                                                 className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer transition-colors">
                                                 View Details <FaArrowRight size={8} />
@@ -362,8 +278,7 @@ const MyOrders = () => {
                                         })}
                                     </div>
 
-                                    {/* Progress tracker */}
-                                    {/* ── Live Shipment Tracking ── */}
+                                    {/* Live Shipment Tracking */}
                                     {order.shipping?.trackingUrl && ["PACKED", "SHIPPED", "OUT_FOR_DELIVERY"].includes(order.orderStatus) && (
                                         <div className="px-5 pb-4 border-t border-stone-100 bg-indigo-50/40">
                                             <div className="flex flex-wrap items-center justify-between gap-2 pt-3">
@@ -377,18 +292,15 @@ const MyOrders = () => {
                                                         </span>
                                                     )}
                                                 </div>
-
-                                                <a
-                                                    href={order.shipping.trackingUrl}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 border border-indigo-200 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-all cursor-pointer"
-                                                >
+                                                <a href={order.shipping.trackingUrl} target="_blank" rel="noreferrer"
+                                                    className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 border border-indigo-200 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-all cursor-pointer">
                                                     Track Shipment →
                                                 </a>
                                             </div>
                                         </div>
                                     )}
+
+                                    {/* Progress tracker */}
                                     {!isCancelled && (
                                         <div className="px-5 py-4 border-t border-stone-100 bg-stone-50/50">
                                             <div className="flex items-center">
@@ -446,9 +358,6 @@ const MyOrders = () => {
                     </div>
                 </div>
             </div>
-
-            {/* Return Modal - moved to end */}
-            <ReturnModal />
         </div>
     );
 };

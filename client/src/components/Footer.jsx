@@ -81,17 +81,17 @@ const Footer = () => {
                             </ul>
                         </div>
 
-                        {/* CATEGORIES */}
+                        {/* LEGAL */}
                         <div>
                             <h4 className="text-white font-black mb-5 text-sm uppercase tracking-widest">
-                                Categories
+                                Legal
                             </h4>
                             <ul className="space-y-3 text-sm">
                                 {[
-                                    { to: "/?category=gift", label: "Gifts" },
-                                    { to: "/?category=toys", label: "Toys" },
-                                    { to: "/?category=watch", label: "Watches" },
-                                    { to: "/?category=custom", label: "Customized" },
+                                    { to: "/privacy-policy", label: "Privacy Policy" },
+                                    { to: "/terms-conditions", label: "Terms & Conditions" },
+                                    { to: "/refund-policy", label: "Refund Policy" },
+                                    { to: "/contact", label: "Contact Us" },
                                 ].map(({ to, label }) => (
                                     <li key={to}>
                                         <Link to={to} className="footer-link hover:text-amber-400 flex items-center gap-1.5">
@@ -116,25 +116,29 @@ const Footer = () => {
                                         <div className="w-7 h-7 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center shrink-0 group-hover:bg-amber-500 group-hover:border-amber-500 transition-all">
                                             <FaMapMarkerAlt size={11} className="text-amber-500 group-hover:text-white" />
                                         </div>
-                                        <span className="mt-1">Shop Location</span>
+                                        <span className="mt-0.5 leading-relaxed">
+                                            Gadri chowk Dostpur chauraha,<br />
+                                            Akbarpur, Ambedkar Nagar<br />
+                                            UP – 224122
+                                        </span>
                                     </a>
                                 </li>
                                 <li>
-                                    <a href="tel:+919792770976"
+                                    <a href="tel:+918299519532"
                                         className="flex items-center gap-3 hover:text-amber-400 transition-colors group">
                                         <div className="w-7 h-7 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center shrink-0 group-hover:bg-amber-500 group-hover:border-amber-500 transition-all">
                                             <FaPhoneAlt size={11} className="text-amber-500 group-hover:text-white" />
                                         </div>
-                                        +91 9792770976
+                                        +91 82995 19532
                                     </a>
                                 </li>
                                 <li>
-                                    <a href="mailto:hello@rvgiftshop.com"
+                                    <a href="mailto:officialrvgift@gmail.com"
                                         className="flex items-center gap-3 hover:text-amber-400 transition-colors group">
                                         <div className="w-7 h-7 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center shrink-0 group-hover:bg-amber-500 group-hover:border-amber-500 transition-all">
                                             <FaEnvelope size={11} className="text-amber-500 group-hover:text-white" />
                                         </div>
-                                        hello@rvgiftshop.com
+                                        officialrvgift@gmail.com
                                     </a>
                                 </li>
                             </ul>
@@ -143,7 +147,7 @@ const Footer = () => {
 
                     {/* BOTTOM BAR */}
                     <div className="border-t border-white/5 pt-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-                        <p>© {new Date().getFullYear()} RV Gift Shop & Printing. All rights reserved.</p>
+                        <p>© {new Date().getFullYear()} RV Gift and Printing. All rights reserved.</p>
                         <p className="flex items-center gap-1.5">
                             Made with <FaHeart size={10} className="text-red-500 animate-pulse" /> in India 🇮🇳 •
                             <a href="https://your-portfolio-link" target="_blank" rel="noopener noreferrer"

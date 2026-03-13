@@ -15,6 +15,11 @@ import Wishlist from "../pages/Wishlist";
 import ForgotPassword from "../pages/Forgotpassword";
 import ResetPassword from "../pages/Resetpassword";
 import VerifyInvoice from "../pages/Verifyinvoice";
+import PrivacyPolicy from "../pages/PrivacyPolicy";
+import TermsConditions from "../pages/TermsConditions";
+import RefundPolicy from "../pages/RefundPolicy";
+import ContactUs from "../pages/Contactus ";
+
 
 const ScrollToTop = () => {
     const { pathname } = useLocation();
@@ -35,6 +40,10 @@ const AppRoutes = () => {
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password/:token" element={<ResetPassword />} />
                 <Route path="/verify/:invoiceNumber" element={<VerifyInvoice />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                <Route path="/terms-conditions" element={<TermsConditions />} />
+                <Route path="/refund-policy" element={<RefundPolicy />} />
+                <Route path="/contact" element={<ContactUs />} />
 
                 {/* PROTECTED */}
                 <Route element={<ProtectedRoute />}>

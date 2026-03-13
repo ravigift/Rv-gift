@@ -89,9 +89,11 @@ const Navbar = () => {
                 {/* LOGO */}
                 <button onClick={() => go("/")}
                     className="flex items-center gap-2 hover:opacity-80 transition-all duration-200 cursor-pointer shrink-0 group">
+                    {/* \u2705 h-14 w-14 \u2014 phone & laptop dono pe clearly visible */}
                     <img src={Logo} alt="RV Gifts"
-                        className="h-9 w-9 object-contain group-hover:scale-105 transition-transform duration-200" />
-                    <span className="font-bold text-lg text-zinc-800 group-hover:text-amber-600 transition-colors duration-200">
+                        className="h-14 w-14 object-contain group-hover:scale-105 transition-transform duration-200" />
+                    {/* \u2705 whitespace-nowrap \u2014 text kabhi wrap nahi hoga */}
+                    <span className="font-bold text-lg text-zinc-800 group-hover:text-amber-600 transition-colors duration-200 whitespace-nowrap">
                         RV<span className="text-amber-500">Gifts</span>
                     </span>
                 </button>

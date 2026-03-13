@@ -4,17 +4,15 @@ import api from "../api/axios";
 const AuthContext = createContext(null);
 
 /* =========================
-   📍 GET LOCATION HELPER
+   GET LOCATION HELPER
 ========================= */
 const requestLocation = () => {
     return new Promise((resolve) => {
         if (!navigator.geolocation) return resolve(null);
-
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
                 try {
                     const { latitude, longitude } = pos.coords;
-                    // Reverse geocode — city name pata karo
                     const res = await fetch(
                         `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
                     );
@@ -31,7 +29,7 @@ const requestLocation = () => {
                     resolve(null);
                 }
             },
-            () => resolve(null), // denied
+            () => resolve(null),
             { timeout: 5000 }
         );
     });
@@ -65,45 +63,31 @@ export const AuthProvider = ({ children }) => {
     const saveUserLocation = async (userId) => {
         if (locationAsked) return;
         setLocationAsked(true);
-
         const location = await requestLocation();
         if (location) {
             try {
-                await api.post("/auth/save-location", {
-                    userId,
-                    ...location,
-                });
+                await api.post("/auth/save-location", { userId, ...location });
             } catch {
                 // silent fail
             }
         }
     };
 
-    /* ── Login ── */
+    /* ── Login (email + password) ── */
     const login = async (email, password) => {
         const { data } = await api.post("/auth/login", { email, password });
-
-        const authData = {
-            token: data.token,
-            user: {
-                _id: data._id,
-                name: data.name,
-                email: data.email,
-                role: data.role,
-            },
-        };
-
-        localStorage.setItem("auth", JSON.stringify(authData));
-        setUser(authData.user);
-
-        // ✅ Location save karo (browser popup aayega)
+        _saveAuth(data);
         saveUserLocation(data._id);
     };
 
-    /* ── Register ── */
-    const register = async (name, email, password) => {
-        const { data } = await api.post("/auth/register", { name, email, password });
+    /* ── Login with data directly (after OTP verify) ── */
+    const loginWithData = (data) => {
+        _saveAuth(data);
+        saveUserLocation(data._id);
+    };
 
+    /* ── Internal: save to localStorage + state ── */
+    const _saveAuth = (data) => {
         const authData = {
             token: data.token,
             user: {
@@ -113,12 +97,15 @@ export const AuthProvider = ({ children }) => {
                 role: data.role,
             },
         };
-
         localStorage.setItem("auth", JSON.stringify(authData));
         setUser(authData.user);
+    };
 
-        // ✅ Location save karo
-        saveUserLocation(data._id);
+    /* ── Register — now just calls API, no auto login ── */
+    // Register.jsx handles OTP flow itself
+    const register = async (name, email, password) => {
+        await api.post("/auth/register", { name, email, password });
+        // No auto login — OTP verification required
     };
 
     /* ── Logout ── */
@@ -129,7 +116,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, loginWithData, register, logout, loading }}>
             {children}
         </AuthContext.Provider>
     );
