@@ -5,7 +5,8 @@ import {
     FaArrowLeft, FaBoxOpen, FaMapMarkerAlt,
     FaPhone, FaUser, FaShoppingBag,
     FaTimesCircle, FaGift, FaUndo, FaInfoCircle,
-    FaSpinner, FaFileInvoice, FaTruck,
+    FaSpinner, FaFileInvoice,
+    // FaTruck, // TODO: Re-enable when Shiprocket integration is active
 } from "react-icons/fa";
 
 /* ─────────────────────────────────────────────
@@ -56,7 +57,6 @@ const REFUND_STATUS = {
 const FLOW_STEPS = ["PLACED", "CONFIRMED", "PACKED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"];
 const CANCELLABLE = ["PLACED", "CONFIRMED"];
 
-// Step dot indicators — no emojis, just colored dots with step number
 const STEP_DOTS = FLOW_STEPS.map((_, i) => i + 1);
 
 const getItemImage = (item) => item.images?.[0]?.url || item.image || null;
@@ -268,29 +268,36 @@ const OrderDetails = () => {
                     </div>
                 )}
 
-                {/* ── Shipment Tracking ── */}
-                {order.shipping?.trackingUrl && (
-                    <div className="card p-5">
-                        <h3 className="font-bold text-zinc-800 mb-3 text-sm flex items-center gap-2">
-                            <span className="w-1 h-4 bg-amber-500 rounded-full" />
-                            Shipment Tracking
-                        </h3>
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-2 text-sm text-zinc-600">
-                                <FaTruck size={13} className="text-amber-500" />
-                                <span>Courier:</span>
-                                <span className="font-bold text-zinc-800">{order.shipping.courierName || "Courier"}</span>
-                                {order.shipping.awbCode && (
-                                    <span className="text-zinc-400 font-mono text-xs">AWB: {order.shipping.awbCode}</span>
-                                )}
-                            </div>
-                            <a href={order.shipping.trackingUrl} target="_blank" rel="noreferrer"
-                                className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition font-bold">
-                                Track Shipment →
-                            </a>
-                        </div>
-                    </div>
-                )}
+                {/*
+                 * ─────────────────────────────────────────────────────────────
+                 * TODO (3 months): Re-enable Shipment Tracking card when
+                 * Shiprocket is live. Displays courier name, AWB code, and a
+                 * "Track Shipment" link using order.shipping.trackingUrl.
+                 * ─────────────────────────────────────────────────────────────
+                 *
+                 * {order.shipping?.trackingUrl && (
+                 *     <div className="card p-5">
+                 *         <h3 className="font-bold text-zinc-800 mb-3 text-sm flex items-center gap-2">
+                 *             <span className="w-1 h-4 bg-amber-500 rounded-full" />
+                 *             Shipment Tracking
+                 *         </h3>
+                 *         <div className="flex flex-wrap items-center justify-between gap-3">
+                 *             <div className="flex items-center gap-2 text-sm text-zinc-600">
+                 *                 <FaTruck size={13} className="text-amber-500" />
+                 *                 <span>Courier:</span>
+                 *                 <span className="font-bold text-zinc-800">{order.shipping.courierName || "Courier"}</span>
+                 *                 {order.shipping.awbCode && (
+                 *                     <span className="text-zinc-400 font-mono text-xs">AWB: {order.shipping.awbCode}</span>
+                 *                 )}
+                 *             </div>
+                 *             <a href={order.shipping.trackingUrl} target="_blank" rel="noreferrer"
+                 *                 className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition font-bold">
+                 *                 Track Shipment →
+                 *             </a>
+                 *         </div>
+                 *     </div>
+                 * )}
+                 */}
 
                 {/* ── Order Tracking ── */}
                 {!isCancelled && stepIdx >= 0 && (
