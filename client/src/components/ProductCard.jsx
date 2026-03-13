@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useCart } from "../hooks/useCart";
 import { FaStar, FaRegStar, FaShoppingCart, FaBolt, FaCheckCircle } from "react-icons/fa";
 import { useState } from "react";
+import { imgUrl } from "../utils/imageUrl";
 
 const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
     const navigate = useNavigate();
@@ -10,12 +11,11 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
     const inCart = cartItems.some((item) => item._id === product._id);
     const [addedFlash, setAddedFlash] = useState(false);
     const [imgLoaded, setImgLoaded] = useState(false);
-    const [imgHovered, setImgHovered] = useState(false);
 
-    const imageUrl =
-        product?.images?.[0]?.url ||
-        product?.image ||
-        "https://via.placeholder.com/400x400?text=No+Image";
+    // ✅ Optimized: 400px card size, WebP/AVIF auto format, auto quality
+    const imageUrl = imgUrl.card(
+        product?.images?.[0]?.url || product?.image || ""
+    );
 
     const rating = product.rating || 0;
     const numReviews = product.numReviews || 0;
@@ -54,7 +54,7 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                     0%,100% { opacity: 1; }
                     50%     { opacity: 0.7; }
                 }
-                .add-pop   { animation: addPop 0.35s ease forwards; }
+                .add-pop     { animation: addPop 0.35s ease forwards; }
                 .badge-pulse { animation: shimmerBadge 2s ease-in-out infinite; }
 
                 .pcard {
@@ -103,28 +103,12 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                     transition: all 0.18s ease;
                     cursor: pointer; border: none; outline: none;
                 }
-                .btn-cart-default {
-                    background: #18181b; color: #fff;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-                }
-                .btn-cart-default:hover {
-                    background: #27272a;
-                    box-shadow: 0 4px 14px rgba(0,0,0,0.2);
-                    transform: translateY(-1px);
-                }
+                .btn-cart-default { background: #18181b; color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+                .btn-cart-default:hover { background: #27272a; box-shadow: 0 4px 14px rgba(0,0,0,0.2); transform: translateY(-1px); }
                 .btn-cart-default:active { transform: scale(0.95); }
-
-                .btn-cart-incart {
-                    background: #f0fdf4; color: #16a34a;
-                    border: 1.5px solid #bbf7d0;
-                }
-                .btn-cart-flash {
-                    background: #22c55e; color: #fff;
-                }
-                .btn-cart-disabled {
-                    background: #f4f4f5; color: #a1a1aa;
-                    cursor: not-allowed;
-                }
+                .btn-cart-incart   { background: #f0fdf4; color: #16a34a; border: 1.5px solid #bbf7d0; }
+                .btn-cart-flash    { background: #22c55e; color: #fff; }
+                .btn-cart-disabled { background: #f4f4f5; color: #a1a1aa; cursor: not-allowed; }
 
                 .btn-buy {
                     flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
@@ -136,27 +120,31 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                     transition: all 0.18s ease;
                     cursor: pointer; border: none; outline: none;
                 }
-                .btn-buy:hover {
-                    background: linear-gradient(135deg, #d97706, #f59e0b);
-                    box-shadow: 0 5px 18px rgba(245,158,11,0.45);
-                    transform: translateY(-1px);
-                }
+                .btn-buy:hover { background: linear-gradient(135deg, #d97706, #f59e0b); box-shadow: 0 5px 18px rgba(245,158,11,0.45); transform: translateY(-1px); }
                 .btn-buy:active { transform: scale(0.95); }
                 .btn-buy:disabled { background: #f4f4f5; color: #a1a1aa; box-shadow: none; cursor: not-allowed; transform: none; }
             `}</style>
 
-            <div className="pcard" onClick={() => navigate(`/products/${product._id}`)}>
+            <div className="pcard" onClick={() => navigate(`/products/${product._id}`, { state: { product } })}>
 
                 {/* ── IMAGE ── */}
                 <div className="pcard-img-wrap">
+                    {/* Skeleton shimmer while image loads */}
                     {!imgLoaded && <div className="absolute inset-0 bg-stone-100 animate-pulse" />}
 
                     <img
                         src={imageUrl}
                         alt={product.name}
+                        loading="lazy"
+                        decoding="async"
+                        width={400}
+                        height={400}
                         onLoad={() => setImgLoaded(true)}
-                        onError={(e) => { e.target.src = "https://via.placeholder.com/400x400?text=No+Image"; setImgLoaded(true); }}
-                        className={`pcard-img ${imgLoaded ? "opacity-100" : "opacity-0"} ${isOutOfStock ? "opacity-40 grayscale" : ""}`}
+                        onError={(e) => {
+                            e.target.src = "https://via.placeholder.com/400x400?text=No+Image";
+                            setImgLoaded(true);
+                        }}
+                        className={`pcard-img transition-opacity duration-300 ${imgLoaded ? "opacity-100" : "opacity-0"} ${isOutOfStock ? "opacity-40 grayscale" : ""}`}
                     />
                     <div className="pcard-overlay" />
 
@@ -174,11 +162,10 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                         )}
                     </div>
 
-                    {/* Rating pill — top right */}
+                    {/* Rating pill */}
                     {numReviews > 0 && (
                         <div className="absolute top-2.5 right-2.5 z-10">
-                            <span className={`flex items-center gap-0.5 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm ${rating >= 4 ? "bg-emerald-500" : rating >= 3 ? "bg-amber-400" : "bg-red-400"
-                                }`}>
+                            <span className={`flex items-center gap-0.5 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm ${rating >= 4 ? "bg-emerald-500" : rating >= 3 ? "bg-amber-400" : "bg-red-400"}`}>
                                 {rating.toFixed(1)} <FaStar size={7} />
                             </span>
                         </div>
@@ -188,12 +175,10 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                 {/* ── CONTENT ── */}
                 <div className="flex flex-col flex-1 px-3 pt-3 pb-3">
 
-                    {/* Name */}
-                    <h3 className="font-bold text-zinc-800 text-[13px] line-clamp-2 leading-snug mb-1.5 group-hover:text-amber-600 transition-colors" style={{ minHeight: "2.4em" }}>
+                    <h3 className="font-bold text-zinc-800 text-[13px] line-clamp-2 leading-snug mb-1.5" style={{ minHeight: "2.4em" }}>
                         {product.name}
                     </h3>
 
-                    {/* Reviews count */}
                     {numReviews > 0 ? (
                         <div className="flex items-center gap-1 mb-2">
                             {[1, 2, 3, 4, 5].map(s => (
@@ -210,12 +195,10 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                         </div>
                     )}
 
-                    {/* Stock */}
                     <div className="mb-2">
                         {isOutOfStock ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-zinc-400">
-                                <span className="w-1.5 h-1.5 rounded-full bg-zinc-300 inline-block" />
-                                Out of Stock
+                                <span className="w-1.5 h-1.5 rounded-full bg-zinc-300 inline-block" /> Out of Stock
                             </span>
                         ) : isLowStock ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
@@ -223,42 +206,24 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                             </span>
                         ) : (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
-                                In Stock
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" /> In Stock
                             </span>
                         )}
                     </div>
 
-                    {/* Price */}
                     <p className={`text-[18px] font-black leading-none mb-3 ${isOutOfStock ? "text-zinc-400" : "text-zinc-900"}`}>
                         ₹{product.price.toLocaleString("en-IN")}
                     </p>
 
-                    {/* ── BUTTONS ── */}
                     <div className="flex gap-1.5 mt-auto">
                         <button
                             onClick={handleAddToCart}
                             disabled={inCart || isOutOfStock}
-                            className={`btn-cart ${inCart ? "btn-cart-incart"
-                                    : addedFlash ? "btn-cart-flash add-pop"
-                                        : isOutOfStock ? "btn-cart-disabled"
-                                            : "btn-cart-default"
-                                }`}
+                            className={`btn-cart ${inCart ? "btn-cart-incart" : addedFlash ? "btn-cart-flash add-pop" : isOutOfStock ? "btn-cart-disabled" : "btn-cart-default"}`}
                         >
-                            {inCart ? (
-                                <><FaCheckCircle size={10} /> In Cart</>
-                            ) : addedFlash ? (
-                                <>✓ Added!</>
-                            ) : (
-                                <><FaShoppingCart size={10} /> Add</>
-                            )}
+                            {inCart ? <><FaCheckCircle size={10} /> In Cart</> : addedFlash ? <>✓ Added!</> : <><FaShoppingCart size={10} /> Add</>}
                         </button>
-
-                        <button
-                            onClick={handleBuyNow}
-                            disabled={isOutOfStock}
-                            className="btn-buy"
-                        >
+                        <button onClick={handleBuyNow} disabled={isOutOfStock} className="btn-buy">
                             <FaBolt size={9} /> Buy Now
                         </button>
                     </div>

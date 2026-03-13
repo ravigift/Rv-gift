@@ -2,14 +2,13 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../api/axios";
+import { imgUrl } from "../utils/imageUrl"; // ✅ Cloudinary optimizer
 import {
     FaShoppingBag, FaClipboardList, FaWhatsapp,
     FaCheckCircle, FaMapMarkerAlt, FaPhone, FaUser,
 } from "react-icons/fa";
 
 const OrderSuccess = () => {
-    // BUG FIX: Checkout now navigates to /order-success/${orderId}
-    // So useParams :id is correct — no longer relies on location.state.orderId
     const { id } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -66,7 +65,7 @@ const OrderSuccess = () => {
 
             <div className="max-w-3xl mx-auto space-y-3">
 
-                {/* Success banner */}
+                {/* ── Success Banner ── */}
                 <div className="bg-white rounded-sm border border-stone-200 overflow-hidden">
                     <div className="h-1.5 bg-amber-500 w-full" />
                     <div className="px-6 py-5 flex items-center gap-4">
@@ -82,7 +81,7 @@ const OrderSuccess = () => {
                     </div>
                 </div>
 
-                {/* Order Info */}
+                {/* ── Order Info ── */}
                 <div className="bg-white rounded-sm border border-stone-200">
                     <div className="px-5 py-3 border-b border-stone-100 flex items-center justify-between">
                         <h2 className="font-black text-zinc-800 text-sm">Order Summary</h2>
@@ -102,20 +101,34 @@ const OrderSuccess = () => {
                     </div>
                 </div>
 
-                {/* Items */}
+                {/* ── Items ── */}
                 <div className="bg-white rounded-sm border border-stone-200">
                     <div className="px-5 py-3 border-b border-stone-100">
                         <h2 className="font-black text-zinc-800 text-sm">Items Ordered</h2>
                     </div>
                     <div className="divide-y divide-stone-50">
                         {order.items?.map((item, idx) => {
-                            const img = item.images?.[0]?.url || item.image || null;
+                            // ✅ Optimized: 200px thumbnail — lazy load (below fold)
+                            const rawImg = item.images?.[0]?.url || item.image || null;
+                            const thumbImg = rawImg ? imgUrl.thumbnail(rawImg) : null;
+
                             return (
                                 <div key={idx} className="px-5 py-4 flex gap-4 items-center">
                                     <div className="w-16 h-16 rounded border border-stone-100 bg-stone-50 overflow-hidden flex items-center justify-center shrink-0">
-                                        {img
-                                            ? <img src={img} alt={item.name} className="w-full h-full object-contain p-1" onError={e => { e.target.style.display = "none"; }} />
-                                            : <span className="text-2xl">🎁</span>}
+                                        {thumbImg ? (
+                                            <img
+                                                src={thumbImg}
+                                                alt={item.name}
+                                                loading="lazy"
+                                                decoding="async"
+                                                width={64}
+                                                height={64}
+                                                className="w-full h-full object-contain p-1"
+                                                onError={e => { e.target.style.display = "none"; }}
+                                            />
+                                        ) : (
+                                            <span className="text-2xl">🎁</span>
+                                        )}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="font-bold text-zinc-800 text-sm line-clamp-1">{item.name}</p>
@@ -137,7 +150,7 @@ const OrderSuccess = () => {
                     </div>
                 </div>
 
-                {/* Delivery Info */}
+                {/* ── Delivery Info ── */}
                 <div className="bg-white rounded-sm border border-stone-200">
                     <div className="px-5 py-3 border-b border-stone-100">
                         <h2 className="font-black text-zinc-800 text-sm">Delivery Details</h2>
@@ -156,7 +169,7 @@ const OrderSuccess = () => {
                     </div>
                 </div>
 
-                {/* CTAs */}
+                {/* ── CTAs ── */}
                 <div className="bg-white rounded-sm border border-stone-200 p-4 space-y-2">
                     <a href={userWhatsApp} target="_blank" rel="noreferrer"
                         className="flex items-center justify-center gap-2 w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-sm transition-all active:scale-95 text-sm cursor-pointer">

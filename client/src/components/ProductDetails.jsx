@@ -4,6 +4,7 @@ import api from "../api/axios";
 import { useCart } from "../hooks/useCart";
 import { useAuth } from "../contexts/AuthContext";
 import RelatedProductsSlider from "../components/RelatedProductsSlider";
+import { imgUrl } from "../utils/imageUrl";
 import {
     FaStar, FaRegStar, FaShoppingCart, FaBolt,
     FaTrash, FaCheckCircle, FaArrowLeft,
@@ -49,7 +50,6 @@ const ProductDetails = () => {
     const [reviewSuccess, setReviewSuccess] = useState(false);
     const [highlightsOpen, setHighlightsOpen] = useState(true);
 
-    // Notify Me
     const [notifyEmail, setNotifyEmail] = useState("");
     const [notifySubmitting, setNotifySubmitting] = useState(false);
     const [notifySuccess, setNotifySuccess] = useState(false);
@@ -198,7 +198,10 @@ const ProductDetails = () => {
         </div>
     );
 
-    const imageUrl = product.images?.[0]?.url || "";
+    // ✅ Optimized image URLs — different sizes for different uses
+    const heroImageUrl = imgUrl.detail(product.images?.[0]?.url || "");   // 800px for hero
+    const zoomImageUrl = imgUrl.zoom(product.images?.[0]?.url || "");     // 1200px for lightbox
+
     const highlightEntries = product.highlights
         ? (product.highlights instanceof Map ? [...product.highlights.entries()] : Object.entries(product.highlights))
         : [];
@@ -237,14 +240,22 @@ const ProductDetails = () => {
                 <div className="bg-white rounded-3xl border border-stone-100 shadow-sm overflow-hidden">
                     <div className="grid md:grid-cols-2 gap-0">
 
-                        {/* IMAGE */}
+                        {/* ── IMAGE ── */}
                         <div className="relative bg-gradient-to-br from-stone-50 via-white to-amber-50/20 flex items-center justify-center overflow-hidden"
                             style={{ minHeight: "420px" }}>
-                            {imageUrl ? (
+                            {heroImageUrl ? (
                                 <div className="w-full h-full flex items-center justify-center p-8 overflow-hidden cursor-zoom-in"
                                     onClick={() => setImgZoomed(true)}>
-                                    <img src={imageUrl} alt={product.name}
-                                        className="max-h-80 w-full object-contain img-zoom drop-shadow-lg" />
+                                    {/* ✅ 800px optimized hero — eager load (above the fold) */}
+                                    <img
+                                        src={heroImageUrl}
+                                        alt={product.name}
+                                        loading="eager"
+                                        decoding="async"
+                                        width={800}
+                                        height={800}
+                                        className="max-h-80 w-full object-contain img-zoom drop-shadow-lg"
+                                    />
                                 </div>
                             ) : (
                                 <span className="text-7xl">🎁</span>
@@ -263,7 +274,7 @@ const ProductDetails = () => {
                             </div>
                         </div>
 
-                        {/* INFO */}
+                        {/* ── INFO ── */}
                         <div className="flex flex-col p-6 md:p-8 border-t md:border-t-0 md:border-l border-stone-100">
 
                             {product.category && (
@@ -361,7 +372,14 @@ const ProductDetails = () => {
                                             </label>
                                         ) : (
                                             <div className="relative inline-block">
-                                                <img src={customImagePreview} alt="custom" className="h-20 w-20 object-cover rounded-xl border-2 border-amber-300" />
+                                                {/* ✅ Customer upload preview — lazy load, small size */}
+                                                <img
+                                                    src={customImagePreview}
+                                                    alt="custom"
+                                                    loading="lazy"
+                                                    decoding="async"
+                                                    className="h-20 w-20 object-cover rounded-xl border-2 border-amber-300"
+                                                />
                                                 <button onClick={removeCustomImage} className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center cursor-pointer">
                                                     <FaTimes size={9} />
                                                 </button>
@@ -380,7 +398,7 @@ const ProductDetails = () => {
                                 </div>
                             )}
 
-                            {/* ✅ BUTTONS */}
+                            {/* ── BUTTONS ── */}
                             {product.inStock ? (
                                 <div className="flex gap-3 mt-auto">
                                     <button onClick={handleAddToCart}
@@ -394,7 +412,6 @@ const ProductDetails = () => {
                                     </button>
                                 </div>
                             ) : (
-                                /* ✅ OUT OF STOCK — Notify Me */
                                 <div className="mt-auto space-y-3">
                                     <div className="flex gap-3">
                                         <button disabled className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm bg-stone-100 text-stone-400 cursor-not-allowed">
@@ -404,7 +421,6 @@ const ProductDetails = () => {
                                             <FaBolt size={13} /> Buy Now
                                         </button>
                                     </div>
-
                                     {notifySuccess ? (
                                         <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">
                                             <FaCheckCircle className="text-emerald-500 shrink-0" size={18} />
@@ -427,13 +443,10 @@ const ProductDetails = () => {
                                             {showNotifyInput ? (
                                                 <div className="slide-down space-y-2">
                                                     <div className="flex gap-2">
-                                                        <input
-                                                            type="email"
-                                                            value={notifyEmail}
+                                                        <input type="email" value={notifyEmail}
                                                             onChange={e => { setNotifyEmail(e.target.value); setNotifyError(""); }}
                                                             placeholder="your@email.com"
-                                                            className="flex-1 px-3 py-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 transition-all"
-                                                        />
+                                                            className="flex-1 px-3 py-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 transition-all" />
                                                         <button onClick={handleNotifyMe} disabled={notifySubmitting}
                                                             className="px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-black transition-all active:scale-95 disabled:opacity-60 cursor-pointer whitespace-nowrap">
                                                             {notifySubmitting ? "..." : "Notify Me"}
@@ -485,6 +498,7 @@ const ProductDetails = () => {
                     </div>
                 )}
 
+                {/* ── Reviews ── */}
                 <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6">
                     <h2 className="font-black text-zinc-900 text-lg mb-5 flex items-center gap-2">
                         <span className="w-1 h-5 bg-amber-500 rounded-full" />Ratings & Reviews
@@ -588,10 +602,18 @@ const ProductDetails = () => {
                 )}
             </div>
 
+            {/* ── Lightbox ── */}
             {imgZoomed && (
                 <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-zoom-out"
                     onClick={() => setImgZoomed(false)}>
-                    <img src={imageUrl} alt={product.name} className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl" />
+                    {/* ✅ 1200px for lightbox — full quality zoom */}
+                    <img
+                        src={zoomImageUrl}
+                        alt={product.name}
+                        loading="eager"
+                        decoding="async"
+                        className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl"
+                    />
                     <button className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-all cursor-pointer">
                         <FaTimes size={16} />
                     </button>

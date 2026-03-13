@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useCart } from "../hooks/useCart";
+import { imgUrl } from "../utils/imageUrl";
 import { FaStar, FaRegStar, FaSearch, FaFire, FaArrowRight, FaShoppingCart } from "react-icons/fa";
 
 /* ── Skeleton Card ── */
@@ -25,7 +26,9 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
     const navigate = useNavigate();
     const { cartItems } = useCart();
     const inCart = cartItems.some(i => i._id === product._id);
-    const imageUrl = product.images?.[0]?.url || "https://via.placeholder.com/400x400?text=No+Image";
+
+    // ✅ Optimized 400px card image — WebP auto format
+    const imageUrl = imgUrl.card(product.images?.[0]?.url || "");
     const rating = product.rating || 0;
     const numReviews = product.numReviews || 0;
     const [imgLoaded, setImgLoaded] = useState(false);
@@ -35,10 +38,17 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
             className="group bg-white rounded-2xl border border-stone-100 hover:border-amber-200 hover:shadow-2xl shadow-sm transition-all duration-300 cursor-pointer flex flex-col overflow-hidden select-none">
             <div className="relative h-52 bg-stone-50 flex items-center justify-center overflow-hidden">
                 {!imgLoaded && <div className="absolute inset-0 bg-stone-100 animate-pulse" />}
-                <img src={imageUrl} alt={product.name}
+                <img
+                    src={imageUrl || "https://via.placeholder.com/400x400?text=No+Image"}
+                    alt={product.name}
+                    loading="lazy"
+                    decoding="async"
+                    width={400}
+                    height={400}
                     onLoad={() => setImgLoaded(true)}
                     onError={e => { e.target.src = "https://via.placeholder.com/400x400?text=No+Image"; setImgLoaded(true); }}
-                    className={`w-full h-full object-contain p-3 group-hover:scale-110 transition-transform duration-500 ${imgLoaded ? "opacity-100" : "opacity-0"}`} />
+                    className={`w-full h-full object-contain p-3 group-hover:scale-110 transition-transform duration-500 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
+                />
                 <div className="absolute top-2 left-2 flex flex-col gap-1">
                     {product.isCustomizable && (
                         <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">✏️ Custom</span>
@@ -89,7 +99,9 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
     );
 };
 
-/* ── Main Home ── */
+/* ════════════════════════════════════════
+   MAIN HOME
+════════════════════════════════════════ */
 const Home = () => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -97,27 +109,20 @@ const Home = () => {
     const activeCategory = searchParams.get("category") || "";
     const { addItem } = useCart();
 
-    const [products, setProducts] = useState([]);
+    // ✅ Single source of truth — fetch ALL products ONCE
+    const [allProducts, setAllProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [allProducts, setAllProducts] = useState([]);
-
-    const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))];
 
     useEffect(() => {
-        api.get("/products").then(({ data }) => setAllProducts(data)).catch(() => { });
-    }, []);
-
-    useEffect(() => {
+        // Only fetch if not already loaded
+        if (allProducts.length > 0) return;
         const fetchProducts = async () => {
             try {
                 setLoading(true);
                 setError("");
-                const params = {};
-                if (searchQuery) params.search = searchQuery;
-                if (activeCategory) params.category = activeCategory;
-                const { data } = await api.get("/products", { params });
-                setProducts(data);
+                const { data } = await api.get("/products");
+                setAllProducts(data);
             } catch {
                 setError("Failed to load products. Please check your connection.");
             } finally {
@@ -125,7 +130,35 @@ const Home = () => {
             }
         };
         fetchProducts();
-    }, [searchQuery, activeCategory]);
+    }, []); // ✅ Empty deps — fetch once, never again
+
+    // ✅ Client-side filtering — no extra API calls
+    const products = useMemo(() => {
+        let filtered = allProducts;
+
+        if (activeCategory) {
+            filtered = filtered.filter(p =>
+                p.category?.toLowerCase() === activeCategory.toLowerCase()
+            );
+        }
+
+        if (searchQuery && searchQuery.trim().length >= 2) {
+            const q = searchQuery.trim().toLowerCase();
+            filtered = filtered.filter(p =>
+                p.name?.toLowerCase().includes(q) ||
+                p.description?.toLowerCase().includes(q) ||
+                p.tags?.some(t => t.toLowerCase().includes(q))
+            );
+        }
+
+        return filtered;
+    }, [allProducts, searchQuery, activeCategory]);
+
+    // ✅ Categories derived from allProducts — no extra call
+    const categories = useMemo(() =>
+        [...new Set(allProducts.map(p => p.category).filter(Boolean))],
+        [allProducts]
+    );
 
     const handleAddToCart = useCallback((product) => addItem(product), [addItem]);
     const handleBuyNow = useCallback((product) => {
@@ -148,42 +181,13 @@ const Home = () => {
                 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@400;500;600;700;800&display=swap');
                 .hero-font { font-family: 'Playfair Display', serif; }
                 .body-font { font-family: 'DM Sans', sans-serif; }
-
-                @keyframes shimmer {
-                    0% { background-position: -200% center; }
-                    100% { background-position: 200% center; }
-                }
-                @keyframes fadeUp {
-                    from { opacity: 0; transform: translateY(20px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                @keyframes fadeRight {
-                    from { opacity: 0; transform: translateX(20px); }
-                    to { opacity: 1; transform: translateX(0); }
-                }
-                @keyframes float {
-                    0%, 100% { transform: translateY(0px); }
-                    50% { transform: translateY(-6px); }
-                }
-                @keyframes pulse-ring {
-                    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245,158,11,0.4); }
-                    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(245,158,11,0); }
-                    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245,158,11,0); }
-                }
-                @keyframes gradientMove {
-                    0% { background-position: 0% 50%; }
-                    50% { background-position: 100% 50%; }
-                    100% { background-position: 0% 50%; }
-                }
-
-                .shimmer-text {
-                    background: linear-gradient(90deg, #f59e0b, #fcd34d, #f59e0b, #fbbf24);
-                    background-size: 200% auto;
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    background-clip: text;
-                    animation: shimmer 3s linear infinite;
-                }
+                @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+                @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+                @keyframes fadeRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+                @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-6px); } }
+                @keyframes pulse-ring { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245,158,11,0.4); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(245,158,11,0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245,158,11,0); } }
+                @keyframes gradientMove { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+                .shimmer-text { background: linear-gradient(90deg, #f59e0b, #fcd34d, #f59e0b, #fbbf24); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: shimmer 3s linear infinite; }
                 .hero-anim-1 { animation: fadeUp 0.6s ease 0.1s both; }
                 .hero-anim-2 { animation: fadeUp 0.6s ease 0.25s both; }
                 .hero-anim-3 { animation: fadeUp 0.6s ease 0.4s both; }
@@ -193,20 +197,9 @@ const Home = () => {
                 .float-2 { animation: float 3.5s ease-in-out 0.5s infinite; }
                 .float-3 { animation: float 3.5s ease-in-out 1s infinite; }
                 .pulse-btn { animation: pulse-ring 2s ease-in-out infinite; }
-                .animated-bg {
-                    background: linear-gradient(135deg, #0a0f1a, #111827, #0f172a, #1a1207);
-                    background-size: 300% 300%;
-                    animation: gradientMove 12s ease infinite;
-                }
-                .glass-card {
-                    background: rgba(255,255,255,0.04);
-                    border: 1px solid rgba(255,255,255,0.09);
-                    backdrop-filter: blur(8px);
-                }
-                .gold-border {
-                    border: 1px solid rgba(245,158,11,0.3);
-                    background: rgba(245,158,11,0.06);
-                }
+                .animated-bg { background: linear-gradient(135deg, #0a0f1a, #111827, #0f172a, #1a1207); background-size: 300% 300%; animation: gradientMove 12s ease infinite; }
+                .glass-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); backdrop-filter: blur(8px); }
+                .gold-border { border: 1px solid rgba(245,158,11,0.3); background: rgba(245,158,11,0.06); }
                 .scrollbar-hide::-webkit-scrollbar { display: none; }
                 .btn-hover { transition: all 0.2s ease; }
                 .btn-hover:hover { transform: translateY(-2px); }
@@ -216,47 +209,31 @@ const Home = () => {
             {/* ── HERO ── */}
             {!searchQuery && !activeCategory && (
                 <div className="body-font animated-bg relative w-full overflow-hidden" style={{ minHeight: "500px" }}>
-
-                    {/* Glow orbs */}
                     <div className="absolute top-[-80px] right-[-80px] w-[500px] h-[500px] rounded-full pointer-events-none"
                         style={{ background: "radial-gradient(circle, rgba(245,158,11,0.12) 0%, transparent 65%)" }} />
                     <div className="absolute bottom-[-60px] left-[10%] w-[350px] h-[350px] rounded-full pointer-events-none"
                         style={{ background: "radial-gradient(circle, rgba(245,158,11,0.06) 0%, transparent 65%)" }} />
-
-                    {/* Dot grid */}
                     <div className="absolute inset-0 pointer-events-none opacity-[0.035]"
                         style={{ backgroundImage: "radial-gradient(circle, #f59e0b 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
-
-                    {/* Diagonal accent line */}
                     <div className="absolute top-0 right-[28%] w-px h-full pointer-events-none"
                         style={{ background: "linear-gradient(to bottom, transparent, rgba(245,158,11,0.15), transparent)" }} />
 
                     <div className="relative max-w-7xl mx-auto px-6 py-16 md:py-24">
                         <div className="flex flex-col md:flex-row items-center justify-between gap-10">
-
-                            {/* LEFT — Text */}
                             <div className="flex-1 max-w-xl text-center md:text-left">
-
-                                {/* Badge */}
                                 <div className="hero-anim-1 inline-flex items-center gap-2 mb-6 px-4 py-1.5 rounded-full gold-border">
                                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400 pulse-btn" />
                                     <span className="text-amber-400 text-[11px] font-black tracking-[0.18em] uppercase">Premium Gift Store</span>
                                 </div>
-
-                                {/* Heading */}
                                 <h1 className="hero-font hero-anim-2 text-[2.6rem] md:text-[3.6rem] font-black text-white leading-[1.08] mb-5 tracking-tight">
                                     Gifts That{" "}
                                     <span className="shimmer-text italic">Speak</span>
                                     <br />
                                     <span className="text-zinc-300">From The Heart</span>
                                 </h1>
-
-                                {/* Subtext */}
                                 <p className="hero-anim-3 text-zinc-400 text-sm md:text-[15px] mb-8 leading-[1.75] max-w-sm mx-auto md:mx-0">
                                     Handpicked gifts for every occasion. Personalize with your own touch — because every gift tells a story.
                                 </p>
-
-                                {/* CTA Buttons */}
                                 <div className="hero-anim-4 flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
                                     <button
                                         onClick={() => document.getElementById("products-section").scrollIntoView({ behavior: "smooth" })}
@@ -273,10 +250,7 @@ const Home = () => {
                                 </div>
                             </div>
 
-                            {/* RIGHT — Stats + Feature Cards */}
                             <div className="stats-anim flex flex-col gap-3 items-center md:items-end shrink-0">
-
-                                {/* Stat cards */}
                                 <div className="flex gap-3">
                                     {[
                                         { val: `${allProducts.length}+`, label: "Products", icon: "🎁" },
@@ -289,8 +263,6 @@ const Home = () => {
                                         </div>
                                     ))}
                                 </div>
-
-                                {/* Feature pills */}
                                 <div className="flex gap-2.5">
                                     {[
                                         { icon: "✏️", text: "Custom Gifts", cls: "float-1" },
@@ -303,8 +275,6 @@ const Home = () => {
                                         </div>
                                     ))}
                                 </div>
-
-                                {/* Decorative bottom tag */}
                                 <div className="gold-border rounded-xl px-4 py-2 flex items-center gap-2 cursor-default">
                                     <span className="text-amber-400 text-xs">✦</span>
                                     <span className="text-amber-300/80 text-[11px] font-semibold tracking-wide">Pan-India Delivery</span>
@@ -314,7 +284,6 @@ const Home = () => {
                         </div>
                     </div>
 
-                    {/* Bottom wave */}
                     <div className="absolute bottom-0 left-0 right-0 pointer-events-none">
                         <svg viewBox="0 0 1440 50" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
                             <path d="M0 50L80 42C160 34 320 18 480 13C640 8 800 14 960 20C1120 26 1280 32 1360 35L1440 38V50H0Z" fill="#f1f0ef" />
@@ -372,7 +341,7 @@ const Home = () => {
                 {error && (
                     <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center mb-6">
                         <p className="text-red-500 font-bold mb-3">⚠️ {error}</p>
-                        <button onClick={() => window.location.reload()}
+                        <button onClick={() => { setAllProducts([]); setError(""); }}
                             className="bg-zinc-900 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-zinc-800 transition-colors duration-200 cursor-pointer active:scale-95">
                             Retry
                         </button>
