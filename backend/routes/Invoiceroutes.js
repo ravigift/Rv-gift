@@ -1,6 +1,6 @@
 import express from "express";
 import Order from "../models/Order.js";
-// import { generateInvoicePDF } from "../utils/invoiceGenerator.js";
+import { generateInvoiceBuffer } from "../utils/invoiceEmailHelper.js";
 import { protect } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
@@ -13,19 +13,22 @@ router.get("/:invoiceNumber/download", protect, async (req, res) => {
             invoiceNumber: req.params.invoiceNumber,
         });
 
-        if (!order) return res.status(404).json({ message: "Invoice not found" });
+        if (!order)
+            return res.status(404).json({ message: "Invoice not found" });
 
-        // Only owner or admin
         const isOwner = order.user?.toString() === req.user._id.toString();
         const isAdmin = ["admin", "owner"].includes(req.user.role);
+
         if (!isOwner && !isAdmin)
             return res.status(403).json({ message: "Access denied" });
 
-        const doc = await generateInvoicePDF(order);
+        const pdfBuffer = await generateInvoiceBuffer(order);
+        const filename = `RVGifts_${order.invoiceNumber}.pdf`;
+
         res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition",
-            `attachment; filename="RVGifts_${order.invoiceNumber}.pdf"`);
-        doc.pipe(res);
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.send(pdfBuffer);
+
     } catch (err) {
         console.error("INVOICE DOWNLOAD ERROR:", err);
         res.status(500).json({ message: "Invoice generation failed" });
@@ -56,8 +59,9 @@ router.get("/:invoiceNumber/verify", async (req, res) => {
             paymentStatus: order.payment?.status,
             totalAmount: order.totalAmount,
             date: order.createdAt,
-            message: "✅ This is an authentic RV Gifts invoice.",
+            message: "This is an authentic RV Gifts invoice.",
         });
+
     } catch (err) {
         console.error("VERIFY ERROR:", err);
         res.status(500).json({ message: "Verification failed" });
