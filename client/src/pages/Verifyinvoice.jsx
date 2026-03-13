@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 
-const API = import.meta.env.VITE_API_URL || "https://rv-gift-backend-v1.onrender.com/api";
+const API = import.meta.env.VITE_API_URL || "https://rv-gift-backend-wojs.onrender.com/api";
 
 const VerifyInvoice = () => {
     const { invoiceNumber } = useParams();
@@ -35,8 +35,10 @@ const VerifyInvoice = () => {
     };
 
     return (
-        <div className="min-h-screen bg-stone-100 flex flex-col items-center justify-center px-4 py-12"
-            style={{ fontFamily: "'DM Sans', sans-serif" }}>
+        <div
+            className="min-h-screen bg-stone-100 flex flex-col items-center justify-center px-4 py-12"
+            style={{ fontFamily: "'DM Sans', sans-serif" }}
+        >
             <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
 
             {/* Logo */}
@@ -61,7 +63,11 @@ const VerifyInvoice = () => {
                 {/* Error */}
                 {!loading && error && (
                     <div className="bg-white rounded-2xl border border-red-200 shadow-sm p-8 text-center">
-                        <div className="text-5xl mb-4">⚠️</div>
+                        <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-7 h-7 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            </svg>
+                        </div>
                         <h2 className="font-black text-zinc-800 text-xl mb-2">Server Error</h2>
                         <p className="text-zinc-500 text-sm">{error}</p>
                     </div>
@@ -70,12 +76,14 @@ const VerifyInvoice = () => {
                 {/* VALID Invoice */}
                 {!loading && data?.valid && (
                     <div className="bg-white rounded-2xl border border-emerald-200 shadow-lg overflow-hidden">
-                        {/* Green header */}
+                        {/* Header */}
                         <div className="bg-emerald-500 px-6 py-5 text-center">
                             <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-md">
-                                <span className="text-3xl">✅</span>
+                                <svg className="w-8 h-8 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
                             </div>
-                            <h2 className="font-black text-white text-xl">Invoice Verified!</h2>
+                            <h2 className="font-black text-white text-xl">Invoice Verified</h2>
                             <p className="text-emerald-100 text-sm mt-1">This is an authentic RV Gifts invoice</p>
                         </div>
 
@@ -84,8 +92,17 @@ const VerifyInvoice = () => {
                             <Row label="Invoice No" value={data.invoiceNumber} mono />
                             <Row label="Order ID" value={data.orderId} mono />
                             <Row label="Customer" value={data.customerName} />
-                            <Row label="Amount" value={`₹${Number(data.totalAmount).toLocaleString("en-IN")}`} bold />
-                            <Row label="Date" value={new Date(data.date).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })} />
+                            <Row
+                                label="Amount"
+                                value={`Rs. ${Number(data.totalAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`}
+                                bold
+                            />
+                            <Row
+                                label="Date"
+                                value={new Date(data.date).toLocaleDateString("en-IN", {
+                                    day: "2-digit", month: "long", year: "numeric",
+                                })}
+                            />
                             <div className="flex justify-between items-center py-2 border-b border-stone-100">
                                 <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Order Status</span>
                                 <span className={`text-xs font-bold px-3 py-1 rounded-full ${statusColor[data.orderStatus] || "bg-stone-100 text-zinc-600"}`}>
@@ -94,7 +111,10 @@ const VerifyInvoice = () => {
                             </div>
                             <div className="flex justify-between items-center py-2">
                                 <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Payment</span>
-                                <span className={`text-xs font-bold px-3 py-1 rounded-full ${data.paymentStatus === "PAID" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                                <span className={`text-xs font-bold px-3 py-1 rounded-full ${data.paymentStatus === "PAID"
+                                        ? "bg-emerald-100 text-emerald-700"
+                                        : "bg-amber-100 text-amber-700"
+                                    }`}>
                                     {data.paymentStatus || "PENDING"}
                                 </span>
                             </div>
@@ -103,7 +123,8 @@ const VerifyInvoice = () => {
                         {/* Footer */}
                         <div className="bg-stone-50 border-t border-stone-100 px-6 py-4 text-center">
                             <p className="text-xs text-zinc-400">
-                                Verified by <span className="font-bold text-zinc-600">https://rv-gift.vercel.app/</span>
+                                Verified by{" "}
+                                <span className="font-bold text-zinc-600">rvgift.com</span>
                             </p>
                         </div>
                     </div>
@@ -112,25 +133,29 @@ const VerifyInvoice = () => {
                 {/* FAKE / Not Found */}
                 {!loading && data && !data.valid && (
                     <div className="bg-white rounded-2xl border border-red-200 shadow-lg overflow-hidden">
-                        {/* Red header */}
+                        {/* Header */}
                         <div className="bg-red-500 px-6 py-5 text-center">
                             <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-md">
-                                <span className="text-3xl">❌</span>
+                                <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
                             </div>
-                            <h2 className="font-black text-white text-xl">Invoice Not Found!</h2>
+                            <h2 className="font-black text-white text-xl">Invoice Not Found</h2>
                             <p className="text-red-100 text-sm mt-1">This invoice could not be verified</p>
                         </div>
 
                         <div className="p-6 text-center space-y-4">
                             <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                                <p className="text-red-700 font-bold text-sm mb-1">⚠️ Possible Fake Invoice</p>
+                                <p className="text-red-700 font-bold text-sm mb-1">Possible Fake Invoice</p>
                                 <p className="text-red-600 text-xs leading-relaxed">
-                                    This invoice number <span className="font-mono font-bold">{invoiceNumber}</span> does not exist in our system.
-                                    If you received this from RV Gifts, please contact us immediately.
+                                    Invoice number{" "}
+                                    <span className="font-mono font-bold">{invoiceNumber}</span>{" "}
+                                    does not exist in our system. If you received this from RV Gifts, please contact us immediately.
                                 </p>
                             </div>
                             <p className="text-zinc-400 text-xs">
-                                Contact: <span className="font-bold text-zinc-600">8808485840</span>
+                                Contact:{" "}
+                                <span className="font-bold text-zinc-600">8808485840</span>
                             </p>
                         </div>
                     </div>
@@ -139,8 +164,11 @@ const VerifyInvoice = () => {
                 {/* Back link */}
                 {!loading && (
                     <div className="text-center mt-6">
-                        <Link to="/" className="text-amber-600 font-semibold text-sm hover:text-amber-700 transition-colors">
-                            ← Back to RV Gifts
+                        <Link
+                            to="/"
+                            className="text-amber-600 font-semibold text-sm hover:text-amber-700 transition-colors"
+                        >
+                            Back to RV Gifts
                         </Link>
                     </div>
                 )}
