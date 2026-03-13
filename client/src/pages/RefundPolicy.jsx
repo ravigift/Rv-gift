@@ -14,7 +14,7 @@ export default function RefundPolicy() {
                     <h1 className="text-4xl font-bold text-gray-900" style={{ fontFamily: "'Playfair Display', serif" }}>
                         Cancellation &amp; Refund Policy
                     </h1>
-                    <p className="mt-3 text-gray-500 text-sm">Last updated: June 2025</p>
+                    <p className="mt-3 text-gray-500 text-sm">Last updated: March 2026</p>
                 </div>
             </div>
 
@@ -24,8 +24,16 @@ export default function RefundPolicy() {
 
                     {/* Quick Summary Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <SummaryCard icon="❌" title="No Returns" desc="We do not accept returns after delivery" />
-                        <SummaryCard icon="💰" title="Refunds" desc="Only on cancellation before packing" />
+                        <SummaryCard
+                            title="No Returns"
+                            desc="We do not accept returns after delivery"
+                            color="red"
+                        />
+                        <SummaryCard
+                            title="Refunds"
+                            desc="Only on cancellation before packing"
+                            color="amber"
+                        />
                     </div>
 
                     {/* Important Notice */}
@@ -53,7 +61,7 @@ export default function RefundPolicy() {
                         <p>Cancellation requests will be rejected in the following cases:</p>
                         <ul>
                             <li>The order has already been packed</li>
-                            <li>The order has been handed over to the courier/delivery partner</li>
+                            <li>The order has been handed over to our transport or delivery partner</li>
                             <li>The order has already been delivered</li>
                         </ul>
                         <p>In such cases, no refund will be issued.</p>
@@ -84,7 +92,7 @@ export default function RefundPolicy() {
                             <li>Change of mind after delivery</li>
                             <li>Customized or personalized items</li>
                             <li>Items that have been used or opened</li>
-                            <li>Delay in delivery due to courier partner or external factors</li>
+                            <li>Delay in delivery due to transport or external factors</li>
                         </ul>
                     </Section>
 
@@ -99,12 +107,19 @@ export default function RefundPolicy() {
     );
 }
 
-function SummaryCard({ icon, title, desc }) {
+function SummaryCard({ title, desc, color }) {
+    const styles = {
+        red: { card: "bg-red-50 border-red-100", dot: "bg-red-400", title: "text-red-800" },
+        amber: { card: "bg-amber-50 border-amber-100", dot: "bg-amber-400", title: "text-amber-800" },
+    };
+    const s = styles[color] || styles.amber;
     return (
-        <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-center">
-            <div className="text-2xl mb-2">{icon}</div>
-            <div className="font-semibold text-gray-800 text-sm">{title}</div>
-            <div className="text-gray-500 text-xs mt-1">{desc}</div>
+        <div className={`border rounded-xl p-4 flex items-start gap-3 ${s.card}`}>
+            <div className={`w-2.5 h-2.5 rounded-full mt-1 shrink-0 ${s.dot}`} />
+            <div>
+                <div className={`font-semibold text-sm ${s.title}`}>{title}</div>
+                <div className="text-gray-500 text-xs mt-1">{desc}</div>
+            </div>
         </div>
     );
 }
@@ -126,9 +141,10 @@ function ContactBox() {
     return (
         <div className="mt-3 bg-amber-50 border border-amber-100 rounded-xl p-5 text-sm text-gray-700 space-y-1">
             <p><strong>RV Gift and Printing</strong></p>
+            <p>Owner: Ravi Verma</p>
             <p>Email: officialrvgift@gmail.com</p>
             <p>Phone: +91 82995 19532</p>
-            <p>Gadri chowk Dostpur chauraha, Akbarpur</p>
+            <p>Gandhi Chowk, Dostpur Chauraha, Akbarpur</p>
             <p>Ambedkar Nagar – 224122, Uttar Pradesh, India</p>
             <p>GSTIN: 09AOHPV4034Q3Z3</p>
         </div>

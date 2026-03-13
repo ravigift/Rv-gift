@@ -14,7 +14,7 @@ export default function TermsConditions() {
                     <h1 className="text-4xl font-bold text-gray-900" style={{ fontFamily: "'Playfair Display', serif" }}>
                         Terms &amp; Conditions
                     </h1>
-                    <p className="mt-3 text-gray-500 text-sm">Last updated: June 2025</p>
+                    <p className="mt-3 text-gray-500 text-sm">Last updated: March 2026</p>
                 </div>
             </div>
 
@@ -23,7 +23,7 @@ export default function TermsConditions() {
                 <div className="bg-white rounded-2xl shadow-sm border border-amber-50 p-8 md:p-12 space-y-10">
 
                     <div className="bg-amber-50 border-l-4 border-amber-400 rounded-r-xl p-4 text-sm text-gray-700">
-                        Please read these Terms & Conditions carefully before using our website or placing an order. By accessing our website, you agree to be bound by these terms.
+                        Please read these Terms &amp; Conditions carefully before using our website or placing an order. By accessing our website, you agree to be bound by these terms.
                     </div>
 
                     <Section title="1. Acceptance of Terms">
@@ -42,7 +42,7 @@ export default function TermsConditions() {
 
                     <Section title="3. Products & Orders">
                         <p>All products listed on our website are subject to availability. We reserve the right to discontinue any product at any time.</p>
-                        <p>When you place an order, you are making an offer to purchase the product. We reserve the right to accept or decline your order at our discretion. An order confirmation email does not constitute acceptance until the order is dispatched.</p>
+                        <p>When you place an order, you are making an offer to purchase the product. We reserve the right to accept or decline your order at our discretion. An order confirmation does not constitute acceptance until the order is dispatched.</p>
                         <p>Product images are for illustrative purposes only. Actual products may vary slightly in appearance.</p>
                     </Section>
 
@@ -52,7 +52,7 @@ export default function TermsConditions() {
                     </Section>
 
                     <Section title="5. Shipping & Delivery">
-                        <p>We ship across India. Delivery times are estimates and may vary based on location and courier availability. We are not responsible for delays caused by courier partners or circumstances beyond our control.</p>
+                        <p>We deliver across India. Delivery times are estimates and may vary based on location and transport availability. We are not responsible for delays caused by our transport or delivery partners or circumstances beyond our control.</p>
                         <p>Risk of loss and title pass to you upon delivery. Please inspect your order upon receipt and contact us immediately if the item is defective or damaged.</p>
                     </Section>
 
@@ -100,9 +100,10 @@ function ContactBox() {
     return (
         <div className="mt-3 bg-amber-50 border border-amber-100 rounded-xl p-5 text-sm text-gray-700 space-y-1">
             <p><strong>RV Gift and Printing</strong></p>
+            <p>Owner: Ravi Verma</p>
             <p>Email: officialrvgift@gmail.com</p>
             <p>Phone: +91 82995 19532</p>
-            <p>Gadri chowk Dostpur chauraha, Akbarpur</p>
+            <p>Gandhi Chowk, Dostpur Chauraha, Akbarpur</p>
             <p>Ambedkar Nagar – 224122, Uttar Pradesh, India</p>
             <p>GSTIN: 09AOHPV4034Q3Z3</p>
         </div>

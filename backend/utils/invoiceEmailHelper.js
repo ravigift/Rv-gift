@@ -7,9 +7,9 @@ const SHOP = {
     city: process.env.SHOP_CITY || "Ambedkar Nagar - 224122, Uttar Pradesh",
     stateCode: process.env.SHOP_STATE_CODE || "09",
     gstin: process.env.SHOP_GSTIN || "09AOHPV4034Q3Z3",
-    email: process.env.SHOP_EMAIL || "shrivinayakgiftcentreindore@gmail.com",
-    phone: process.env.SHOP_PHONE || "8808485840",
-    website: process.env.SHOP_WEBSITE || "rv-gift.vercel.app",
+    email: process.env.SHOP_EMAIL || "officialrvgift@gmail.com",
+    phone: process.env.SHOP_PHONE || "8299519532",
+    website: process.env.SHOP_WEBSITE || "rvgift.com",
 };
 
 const VERIFY_BASE = process.env.CLIENT_URL || "https://rvgift.com";

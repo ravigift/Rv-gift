@@ -15,13 +15,13 @@ export const getOrderStatusEmailTemplate = ({
   const shortId = orderId.toString().slice(-8).toUpperCase();
 
   const statusMessages = {
-    PLACED: "We have received your order and it is being processed. ✅",
-    CONFIRMED: "Your order has been confirmed by our team. 🎉",
-    PACKED: "Your order has been packed and is ready to ship. 📦",
-    SHIPPED: "Your order has been shipped and is on its way! 🚚",
-    OUT_FOR_DELIVERY: "Your order is out for delivery — expect it today! 🏠",
-    DELIVERED: "Your order has been delivered successfully. Thank you! 🎁",
-    CANCELLED: "Your order has been cancelled. If you paid online, a refund will be processed within 5-7 business days.",
+    PLACED: "We have received your order and it is being processed.",
+    CONFIRMED: "Your order has been confirmed by our team.",
+    PACKED: "Your order has been packed and is ready to ship.",
+    SHIPPED: "Your order has been shipped and is on its way.",
+    OUT_FOR_DELIVERY: "Your order is out for delivery — expect it today.",
+    DELIVERED: "Your order has been delivered successfully. Thank you for shopping with us.",
+    CANCELLED: "Your order has been cancelled. If you paid online, a refund will be processed within 5–7 business days.",
   };
 
   const statusColors = {
@@ -40,12 +40,12 @@ export const getOrderStatusEmailTemplate = ({
   // Tracking section — only for SHIPPED
   const trackingSection = (status === "SHIPPED" && trackingUrl) ? `
         <div style="margin:20px 0;padding:16px;background:#eef2ff;border-radius:8px;border:1px solid #c7d2fe">
-            <p style="margin:0 0 8px;font-weight:700;color:#3730a3;font-size:14px">📍 Tracking Details</p>
+            <p style="margin:0 0 8px;font-weight:700;color:#3730a3;font-size:14px">Tracking Details</p>
             ${courier ? `<p style="margin:4px 0;font-size:13px;color:#4338ca"><b>Courier:</b> ${courier}</p>` : ""}
             ${awb ? `<p style="margin:4px 0;font-size:13px;color:#4338ca"><b>AWB:</b> ${awb}</p>` : ""}
-            <a href="${trackingUrl}" 
+            <a href="${trackingUrl}"
                style="display:inline-block;margin-top:10px;padding:10px 20px;background:#4f46e5;color:white;text-decoration:none;border-radius:6px;font-weight:bold;font-size:13px">
-                🔍 Track Your Order
+                Track Your Order
             </a>
         </div>
     ` : "";
@@ -54,13 +54,13 @@ export const getOrderStatusEmailTemplate = ({
   const invoiceNote = status === "DELIVERED" ? `
         <div style="margin:16px 0;padding:14px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0">
             <p style="margin:0;font-size:13px;color:#166534">
-                📄 Your invoice is attached to this email. Please keep it for your records.
+                Your invoice is attached to this email. Please keep it for your records.
             </p>
         </div>
     ` : "";
 
   return {
-    subject: `${getStatusEmoji(status)} Order ${readableStatus} — #${shortId} | RV Gift Shop`,
+    subject: `Order ${readableStatus} — #${shortId} | RV Gift Shop`,
     html: `
 <!DOCTYPE html>
 <html>
@@ -70,14 +70,14 @@ export const getOrderStatusEmailTemplate = ({
 
     <!-- Header -->
     <div style="background:linear-gradient(135deg,#111827,#1f2937);border-radius:12px 12px 0 0;padding:24px 30px;text-align:center">
-      <h1 style="margin:0;color:white;font-size:22px;letter-spacing:0.5px">🎁 RV Gift Shop</h1>
+      <h1 style="margin:0;color:white;font-size:22px;letter-spacing:0.5px">RV Gift Shop</h1>
       <p style="margin:4px 0 0;color:#9ca3af;font-size:13px">Order Notification</p>
     </div>
 
     <!-- Body -->
     <div style="background:white;padding:30px;border-radius:0 0 12px 12px;box-shadow:0 4px 6px rgba(0,0,0,0.05)">
 
-      <p style="font-size:16px;color:#111827;margin:0 0 8px">Hello <b>${customerName}</b> 👋</p>
+      <p style="font-size:16px;color:#111827;margin:0 0 8px">Hello <b>${customerName}</b>,</p>
 
       <!-- Status Badge -->
       <div style="margin:20px 0;padding:16px 20px;background:${colors.bg};border-radius:8px;border:1px solid ${colors.border}">
@@ -100,14 +100,14 @@ export const getOrderStatusEmailTemplate = ({
       <!-- Support -->
       <div style="margin:20px 0;padding:14px;background:#fff7ed;border-radius:8px;border:1px solid #fed7aa">
         <p style="margin:0;font-size:13px;color:#9a3412">
-          💬 Need help? WhatsApp us at <b>+91 88084 85840</b> or reply to this email.
+          Need help? WhatsApp us at <b>+91 82995 19532</b> or reply to this email.
         </p>
       </div>
 
       <!-- Thank you -->
       <div style="margin-top:24px;padding:20px;background:#ecfdf5;border-radius:8px;text-align:center">
-        <p style="margin:0;color:#065f46;font-weight:600;font-size:15px">Thank you for shopping with RV Gift Shop 💝</p>
-        <p style="margin:6px 0 0;color:#6b7280;font-size:12px">RV Gift and Printing • Gadhi Chowk, Akbarpur, Ambedkar Nagar</p>
+        <p style="margin:0;color:#065f46;font-weight:600;font-size:15px">Thank you for shopping with RV Gift Shop</p>
+        <p style="margin:6px 0 0;color:#6b7280;font-size:12px">RV Gift and Printing &bull; Gadhi Chowk, Akbarpur, Ambedkar Nagar</p>
       </div>
 
     </div>
@@ -118,10 +118,15 @@ export const getOrderStatusEmailTemplate = ({
   };
 };
 
-const getStatusEmoji = (status) => {
+const getStatusLabel = (status) => {
   const map = {
-    PLACED: "✅", CONFIRMED: "🎉", PACKED: "📦",
-    SHIPPED: "🚚", OUT_FOR_DELIVERY: "🏠", DELIVERED: "🎁", CANCELLED: "❌",
+    PLACED: "Placed",
+    CONFIRMED: "Confirmed",
+    PACKED: "Packed",
+    SHIPPED: "Shipped",
+    OUT_FOR_DELIVERY: "Out for Delivery",
+    DELIVERED: "Delivered",
+    CANCELLED: "Cancelled",
   };
-  return map[status] || "📦";
+  return map[status] || "Updated";
 };

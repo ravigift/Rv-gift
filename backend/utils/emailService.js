@@ -13,7 +13,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
  */
 export const sendEmail = async ({ to, subject, html, label = "", attachments = [] }) => {
     if (!to) {
-        console.log(`📧 [${label}] skipped — no email`);
+        console.log(`[${label}] skipped — no email`);
         return;
     }
 
@@ -28,13 +28,13 @@ export const sendEmail = async ({ to, subject, html, label = "", attachments = [
         if (attachments.length > 0) {
             payload.attachments = attachments.map(a => ({
                 filename: a.filename,
-                content: a.content, // Buffer
+                content: a.content,
             }));
         }
 
         await resend.emails.send(payload);
-        console.log(`✅ [${label}] Email sent → ${to}${attachments.length ? ` (+${attachments.length} attachment)` : ""}`);
+        console.log(`[${label}] Email sent → ${to}${attachments.length ? ` (+${attachments.length} attachment)` : ""}`);
     } catch (error) {
-        console.error(`❌ [${label}] Email failed`, error.message);
+        console.error(`[${label}] Email failed`, error.message);
     }
 };

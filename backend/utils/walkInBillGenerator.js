@@ -6,9 +6,9 @@ export const SHOP = {
     tagline: process.env.SHOP_TAGLINE || "Unique Gifts for Every Occasion",
     address: process.env.SHOP_ADDRESS || "Gadhi Chowk, Dostpur Chauraha, Akbarpur",
     city: process.env.SHOP_CITY || "Ambedkar Nagar - 224122, Uttar Pradesh",
-    phone: process.env.SHOP_PHONE || "8808485840",
-    email: process.env.SHOP_EMAIL || "shrivinayakgiftcentreindore@gmail.com",
-    website: process.env.SHOP_WEBSITE || "rv-gift.vercel.app",
+    phone: process.env.SHOP_PHONE || "8299519532",
+    email: process.env.SHOP_EMAIL || "officialrvgift@gmail.com",
+    website: process.env.SHOP_WEBSITE || "rvgift.com",
     gstin: process.env.SHOP_GSTIN || "09AOHPV4034Q3Z3",
 };
 

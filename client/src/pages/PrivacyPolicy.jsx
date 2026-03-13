@@ -14,7 +14,7 @@ export default function PrivacyPolicy() {
                     <h1 className="text-4xl font-bold text-gray-900" style={{ fontFamily: "'Playfair Display', serif" }}>
                         Privacy Policy
                     </h1>
-                    <p className="mt-3 text-gray-500 text-sm">Last updated: June 2025</p>
+                    <p className="mt-3 text-gray-500 text-sm">Last updated: March 2026</p>
                 </div>
             </div>
 
@@ -37,7 +37,7 @@ export default function PrivacyPolicy() {
                         <p>We use the information we collect to:</p>
                         <ul>
                             <li>Process and fulfill your orders</li>
-                            <li>Send order confirmations and shipping updates</li>
+                            <li>Send order confirmations and delivery updates</li>
                             <li>Respond to your queries and customer support requests</li>
                             <li>Improve our website and services</li>
                             <li>Send promotional emails (only with your consent)</li>
@@ -49,7 +49,7 @@ export default function PrivacyPolicy() {
                         <p>We do not sell, trade, or rent your personal information to third parties. We may share your information with:</p>
                         <ul>
                             <li><strong>Payment Processors:</strong> Razorpay, for secure payment processing</li>
-                            <li><strong>Delivery Partners:</strong> Courier services to fulfill your order</li>
+                            <li><strong>Delivery Partners:</strong> Local transport services engaged to deliver your order to your address</li>
                             <li><strong>Legal Authorities:</strong> When required by law or to protect our rights</li>
                         </ul>
                     </Section>
@@ -110,7 +110,7 @@ function ContactBox() {
             <p><strong>RV Gift and Printing</strong></p>
             <p>Email: officialrvgift@gmail.com</p>
             <p>Phone: +91 82995 19532</p>
-            <p>Gadri chowk Dostpur chauraha, Akbarpur</p>
+            <p>Gandhi Chowk, Dostpur Chauraha, Akbarpur</p>
             <p>Ambedkar Nagar – 224122, Uttar Pradesh, India</p>
             <p>GSTIN: 09AOHPV4034Q3Z3</p>
         </div>
