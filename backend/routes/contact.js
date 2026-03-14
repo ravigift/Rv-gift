@@ -1,10 +1,15 @@
 import express from "express";
 import { Resend } from "resend";
 import Contact from "../models/Contact.js";
+import { protect, adminOnly } from "../middlewares/authMiddleware.js"; // ✅ apne middleware ke hisaab se adjust karo
 
 const router = express.Router();
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+/* ==============================================
+   POST /api/contact
+   User se contact form submit
+============================================== */
 router.post("/", async (req, res) => {
     const { name, email, phone, subject, message } = req.body;
 
@@ -45,6 +50,35 @@ router.post("/", async (req, res) => {
         res.status(200).json({ success: true });
     } catch (err) {
         console.error("Contact route error:", err);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
+/* ==============================================
+   GET /api/contact
+   Admin — sabhi queries fetch karo
+============================================== */
+router.get("/", protect, adminOnly, async (req, res) => {
+    try {
+        const queries = await Contact.find()
+            .sort({ createdAt: -1 }) // latest pehle
+            .limit(50);
+        res.json(queries);
+    } catch (err) {
+        console.error("GET CONTACTS ERROR:", err);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
+/* ==============================================
+   PATCH /api/contact/:id/read
+   Admin — query ko read mark karo
+============================================== */
+router.patch("/:id/read", protect, adminOnly, async (req, res) => {
+    try {
+        await Contact.findByIdAndUpdate(req.params.id, { isRead: true });
+        res.json({ success: true });
+    } catch (err) {
         res.status(500).json({ error: "Server error" });
     }
 });

@@ -5,6 +5,7 @@ import {
     FaBox, FaClipboardList, FaPlus, FaRupeeSign,
     FaShoppingBag, FaTruck, FaCheckCircle, FaClock,
     FaArrowRight, FaFire, FaMapMarkerAlt, FaCashRegister,
+    FaEnvelope, FaEnvelopeOpen, FaPhone, FaTag,
 } from "react-icons/fa";
 import SecuritySection from "../pages/SecuritySection";
 
@@ -20,17 +21,22 @@ const AdminDashboard = () => {
     const [fetchError, setFetchError] = useState(null);
     const [posStats, setPosStats] = useState(null);
 
+    // ── Queries State ──
+    const [queries, setQueries] = useState([]);
+    const [queriesLoading, setQueriesLoading] = useState(true);
+    const [expandedQuery, setExpandedQuery] = useState(null);
+
     useEffect(() => {
         const fetchData = async () => {
             try {
                 setFetchError(null);
 
-                // ✅ Sab API calls ek saath — Promise.allSettled se ek fail hone pe baki block nahi hoti
-                const [ordersRes, productsRes, usersRes, posRes] = await Promise.allSettled([
+                const [ordersRes, productsRes, usersRes, posRes, queriesRes] = await Promise.allSettled([
                     api.get("/orders"),
                     api.get("/products"),
                     api.get("/auth/users"),
                     api.get("/walkin/stats"),
+                    api.get("/contact"),  // ✅ Queries fetch
                 ]);
 
                 const list = ordersRes.status === "fulfilled" && Array.isArray(ordersRes.value?.data)
@@ -43,6 +49,11 @@ const AdminDashboard = () => {
                 if (posRes.status === "fulfilled" && posRes.value?.data) {
                     setPosStats(posRes.value.data);
                 }
+
+                if (queriesRes.status === "fulfilled" && Array.isArray(queriesRes.value?.data)) {
+                    setQueries(queriesRes.value.data);
+                }
+                setQueriesLoading(false);
 
                 const delivered = list.filter(o => o.orderStatus === "DELIVERED");
                 const pending = list.filter(o => o.orderStatus === "PLACED");
@@ -82,6 +93,15 @@ const AdminDashboard = () => {
         };
         fetchData();
     }, []);
+
+    const markAsRead = async (id) => {
+        try {
+            await api.patch(`/contact/${id}/read`);
+            setQueries(prev => prev.map(q => q._id === id ? { ...q, isRead: true } : q));
+        } catch { }
+    };
+
+    const unreadCount = queries.filter(q => !q.isRead).length;
 
     const STATUS_CFG = {
         PLACED: { label: "Placed", color: "bg-yellow-100 text-yellow-700", dot: "bg-yellow-400" },
@@ -391,6 +411,158 @@ const AdminDashboard = () => {
                             </div>
                         </Link>
                     ))}
+                </div>
+
+                {/* ── Customer Queries ── */}
+                <div style={{
+                    background: "#fff", borderRadius: 16, border: "1px solid #E2E8F0",
+                    overflow: "hidden", boxShadow: "0 1px 6px rgba(0,0,0,0.04)", marginBottom: 20,
+                }}>
+                    <div style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "14px 20px", borderBottom: "1px solid #F1F5F9",
+                    }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <FaEnvelope size={13} color="#8B5CF6" />
+                            <span style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 14, color: "#0F172A" }}>
+                                Customer Queries
+                            </span>
+                            {unreadCount > 0 && (
+                                <span style={{
+                                    background: "#EF4444", color: "#fff",
+                                    fontSize: 10, fontWeight: 800,
+                                    padding: "2px 7px", borderRadius: 20,
+                                }}>
+                                    {unreadCount} new
+                                </span>
+                            )}
+                        </div>
+                        <span style={{ fontSize: 11, color: "#94A3B8" }}>{queries.length} total</span>
+                    </div>
+
+                    {queriesLoading ? (
+                        <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+                            {[0, 1, 2].map(i => (
+                                <div key={i} style={{ height: 56, borderRadius: 10, background: "#F1F5F9", animation: "pulse 1.5s infinite" }} />
+                            ))}
+                        </div>
+                    ) : queries.length === 0 ? (
+                        <div style={{ padding: "40px 0", textAlign: "center" }}>
+                            <FaEnvelope size={26} style={{ margin: "0 auto 8px", color: "#CBD5E1", display: "block" }} />
+                            <p style={{ fontSize: 13, color: "#94A3B8" }}>No queries yet</p>
+                        </div>
+                    ) : (
+                        queries.slice(0, 10).map(query => {
+                            const isExpanded = expandedQuery === query._id;
+                            return (
+                                <div key={query._id} style={{
+                                    borderBottom: "1px solid #F8FAFC",
+                                    background: query.isRead ? "transparent" : "#FDFAF6",
+                                    transition: "background 0.15s",
+                                }}>
+                                    {/* Row */}
+                                    <div
+                                        onClick={() => {
+                                            setExpandedQuery(isExpanded ? null : query._id);
+                                            if (!query.isRead) markAsRead(query._id);
+                                        }}
+                                        style={{
+                                            display: "flex", alignItems: "center", gap: 12,
+                                            padding: "12px 20px", cursor: "pointer",
+                                        }}
+                                        onMouseEnter={e => e.currentTarget.style.background = "#F8FAFC"}
+                                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                                    >
+                                        {/* Icon */}
+                                        <div style={{
+                                            width: 36, height: 36, borderRadius: "50%", shrink: 0,
+                                            background: query.isRead ? "#F1F5F9" : "#EDE9FE",
+                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                            flexShrink: 0,
+                                        }}>
+                                            {query.isRead
+                                                ? <FaEnvelopeOpen size={13} color="#94A3B8" />
+                                                : <FaEnvelope size={13} color="#8B5CF6" />
+                                            }
+                                        </div>
+
+                                        {/* Info */}
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                                                <span style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{query.name}</span>
+                                                {!query.isRead && (
+                                                    <span style={{
+                                                        width: 7, height: 7, borderRadius: "50%",
+                                                        background: "#8B5CF6", display: "inline-block",
+                                                    }} />
+                                                )}
+                                                {query.subject && (
+                                                    <span style={{
+                                                        fontSize: 10, fontWeight: 700, color: "#F59E0B",
+                                                        background: "#FFFBEB", border: "1px solid #FDE68A",
+                                                        padding: "1px 7px", borderRadius: 20,
+                                                        display: "flex", alignItems: "center", gap: 3,
+                                                    }}>
+                                                        <FaTag size={7} /> {query.subject}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p style={{
+                                                fontSize: 11, color: "#64748B", marginTop: 2,
+                                                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                                                maxWidth: 400,
+                                            }}>
+                                                {query.message}
+                                            </p>
+                                        </div>
+
+                                        {/* Right */}
+                                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                                            <div style={{ fontSize: 10, color: "#94A3B8" }}>
+                                                {new Date(query.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                                            </div>
+                                            <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 2 }}>
+                                                {new Date(query.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Expanded Details */}
+                                    {isExpanded && (
+                                        <div style={{
+                                            margin: "0 20px 14px",
+                                            background: "#F8FAFC", border: "1px solid #E2E8F0",
+                                            borderRadius: 12, padding: "14px 16px",
+                                        }}>
+                                            <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 12 }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569" }}>
+                                                    <FaEnvelope size={10} color="#8B5CF6" />
+                                                    <a href={`mailto:${query.email}`} style={{ color: "#8B5CF6", fontWeight: 600, textDecoration: "none" }}>
+                                                        {query.email}
+                                                    </a>
+                                                </div>
+                                                {query.phone && (
+                                                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569" }}>
+                                                        <FaPhone size={10} color="#10B981" />
+                                                        <a href={`tel:${query.phone}`} style={{ color: "#10B981", fontWeight: 600, textDecoration: "none" }}>
+                                                            {query.phone}
+                                                        </a>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <p style={{
+                                                fontSize: 13, color: "#334155", lineHeight: 1.6,
+                                                background: "#fff", padding: "10px 12px", borderRadius: 8,
+                                                border: "1px solid #E2E8F0",
+                                            }}>
+                                                {query.message}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })
+                    )}
                 </div>
 
                 {/* ── Recent Orders ── */}
