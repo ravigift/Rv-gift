@@ -48,8 +48,6 @@ const Toast = ({ toast }) => {
 };
 
 // ── UPI Payment Confirmation Modal ─────────────────────────────
-// ✅ Dikhta hai sirf UPI select hone aur Generate Invoice press karne pe
-// Admin ko confirm karna hoga ki payment mili — tabhi bill banega
 const UPIConfirmModal = ({ amount, onConfirm, onCancel }) => (
     <div style={{
         position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)",
@@ -270,7 +268,7 @@ const AdminPOS = () => {
     const [submitting, setSubmitting] = useState(false);
     const [successBill, setSuccessBill] = useState(null);
     const [toast, setToast] = useState(null);
-    const [showUPIConfirm, setShowUPIConfirm] = useState(false); // ✅ UPI confirm gate
+    const [showUPIConfirm, setShowUPIConfirm] = useState(false);
 
     const [tab, setTab] = useState("new");
     const [bills, setBills] = useState([]);
@@ -319,20 +317,17 @@ const AdminPOS = () => {
     const addItem = () => setItems(prev => [...prev, emptyItem()]);
     const removeItem = (idx) => setItems(prev => prev.filter((_, i) => i !== idx));
 
-    // ✅ Step 1: Validate
-    // ✅ Step 2: UPI → show confirm modal | CASH → seedha submit
     const handleGenerateClick = () => {
         if (items.some(i => !i.name.trim())) return showToast("error", "All item names are required");
         if (items.some(i => !i.price || Number(i.price) < 0)) return showToast("error", "All item prices are required");
         if (grandTotal <= 0) return showToast("error", "Bill amount must be greater than ₹0");
         if (paymentMode === "UPI") {
-            setShowUPIConfirm(true); // ← admin confirms payment received
+            setShowUPIConfirm(true);
         } else {
-            doSubmit(); // ← CASH: no confirmation needed
+            doSubmit();
         }
     };
 
-    // ✅ Step 3: Actual API call — runs only after confirmation
     const doSubmit = async () => {
         setShowUPIConfirm(false);
         setSubmitting(true);
@@ -452,7 +447,6 @@ const AdminPOS = () => {
             <style>{styles}</style>
             <Toast toast={toast} />
 
-            {/* ✅ UPI payment must be confirmed before bill is created */}
             {showUPIConfirm && <UPIConfirmModal amount={grandTotal} onConfirm={doSubmit} onCancel={() => setShowUPIConfirm(false)} />}
 
             {emailBill && <EmailModal bill={emailBill} onClose={() => setEmailBill(null)} onSent={(to) => { setEmailBill(null); showToast("success", `Invoice sent to ${to} ✉️`); }} />}
@@ -528,35 +522,67 @@ const AdminPOS = () => {
                                         <FaPlus size={9} /> Add Item
                                     </button>
                                 </div>
-                                <div className="grid gap-2 mt-4 mb-1 px-1" style={{ gridTemplateColumns: "1fr 56px 80px 68px 72px 24px" }}>
-                                    {["Item Name", "Qty", "Rate (₹)", "GST %", "Total", ""].map(h => (
-                                        <p key={h} className="text-[9px] font-black text-sky-400 uppercase tracking-wider">{h}</p>
-                                    ))}
-                                </div>
-                                <div className="space-y-2">
+
+                                {/* ✅ MOBILE-FRIENDLY ITEMS LIST — card layout instead of fixed grid */}
+                                <div className="space-y-3 mt-4">
                                     {items.map((item, idx) => {
                                         const lineTotal = (Number(item.price) || 0) * (Number(item.qty) || 0);
                                         const lineGST = lineTotal * (Number(item.gstPercent) || 0) / 100;
                                         return (
-                                            <div key={idx} className="grid gap-2 items-center rounded-xl px-3 py-2"
-                                                style={{ gridTemplateColumns: "1fr 56px 80px 68px 72px 24px", background: "#f0f9ff", border: "1px solid #bae6fd" }}>
-                                                <input className="bg-white border border-sky-100 rounded-lg px-2.5 py-2 text-sm font-medium text-zinc-800 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition-all"
-                                                    placeholder="Item name" value={item.name} onChange={e => updateItem(idx, "name", e.target.value)} />
-                                                <input type="number" min={1}
-                                                    className="bg-white border border-sky-100 rounded-lg px-2 py-2 text-sm font-bold text-zinc-800 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition-all text-center"
-                                                    value={item.qty} onChange={e => updateItem(idx, "qty", e.target.value)} />
-                                                <input type="number" min={0}
-                                                    className="bg-white border border-sky-100 rounded-lg px-2.5 py-2 text-sm font-medium text-zinc-800 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition-all"
-                                                    placeholder="0" value={item.price} onChange={e => updateItem(idx, "price", e.target.value)} />
-                                                <select className="bg-white border border-sky-100 rounded-lg px-2 py-2 text-sm font-medium text-zinc-800 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition-all"
-                                                    value={item.gstPercent} onChange={e => updateItem(idx, "gstPercent", e.target.value)}>
-                                                    {GST_RATES.map(r => <option key={r} value={r}>{r === 0 ? "No GST" : `${r}%`}</option>)}
-                                                </select>
-                                                <p className="text-xs font-black text-sky-600 text-right pr-1">₹{(lineTotal + lineGST).toLocaleString("en-IN")}</p>
-                                                <div className="flex justify-center">
+                                            <div key={idx} className="rounded-xl p-3 space-y-2"
+                                                style={{ background: "#f0f9ff", border: "1px solid #bae6fd" }}>
+
+                                                {/* Item Name — full width */}
+                                                <input
+                                                    className="w-full bg-white border border-sky-100 rounded-lg px-2.5 py-2 text-sm font-medium text-zinc-800 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition-all"
+                                                    placeholder="Item name"
+                                                    value={item.name}
+                                                    onChange={e => updateItem(idx, "name", e.target.value)}
+                                                />
+
+                                                {/* Qty | Rate | GST — 3 equal columns */}
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    <div>
+                                                        <p className="text-[9px] font-black text-sky-400 uppercase tracking-wider mb-1">Qty</p>
+                                                        <input type="number" min={1}
+                                                            className="w-full bg-white border border-sky-100 rounded-lg px-2 py-2 text-sm font-bold text-zinc-800 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition-all text-center"
+                                                            value={item.qty}
+                                                            onChange={e => updateItem(idx, "qty", e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[9px] font-black text-sky-400 uppercase tracking-wider mb-1">Rate (₹)</p>
+                                                        <input type="number" min={0}
+                                                            className="w-full bg-white border border-sky-100 rounded-lg px-2 py-2 text-sm font-medium text-zinc-800 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition-all"
+                                                            placeholder="0"
+                                                            value={item.price}
+                                                            onChange={e => updateItem(idx, "price", e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[9px] font-black text-sky-400 uppercase tracking-wider mb-1">GST %</p>
+                                                        <select
+                                                            className="w-full bg-white border border-sky-100 rounded-lg px-2 py-2 text-sm font-medium text-zinc-800 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition-all"
+                                                            value={item.gstPercent}
+                                                            onChange={e => updateItem(idx, "gstPercent", e.target.value)}
+                                                        >
+                                                            {GST_RATES.map(r => <option key={r} value={r}>{r === 0 ? "No GST" : `${r}%`}</option>)}
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                {/* Total + Delete row */}
+                                                <div className="flex items-center justify-between pt-0.5">
+                                                    <p className="text-xs font-black text-sky-600">
+                                                        ₹{(lineTotal + lineGST).toLocaleString("en-IN")}
+                                                    </p>
                                                     {items.length > 1
-                                                        ? <button onClick={() => removeItem(idx)} className="w-6 h-6 rounded-lg bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 flex items-center justify-center transition cursor-pointer"><FaTrash size={9} /></button>
-                                                        : <div className="w-6" />}
+                                                        ? <button onClick={() => removeItem(idx)}
+                                                            className="w-7 h-7 rounded-lg bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 flex items-center justify-center transition cursor-pointer">
+                                                            <FaTrash size={9} />
+                                                        </button>
+                                                        : <div className="w-7" />
+                                                    }
                                                 </div>
                                             </div>
                                         );
@@ -612,7 +638,6 @@ const AdminPOS = () => {
                                     </div>
                                 </div>
 
-                                {/* ✅ Generate Invoice button — UPI → confirm modal, CASH → direct */}
                                 <button onClick={handleGenerateClick}
                                     disabled={submitting || items.every(i => !i.name.trim())}
                                     className="mt-4 w-full flex items-center justify-center gap-2 py-3.5 text-white rounded-xl font-black text-sm active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"

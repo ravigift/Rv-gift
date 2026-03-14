@@ -10,32 +10,12 @@ const escapeRegex = (str) =>
 
 /* ─────────────────────────────────────────────
    CLOUDINARY HELPERS
-   All product images are stored in the
-   "rv-gifts/products" folder with:
-   - q_auto  → auto quality (no manual quality loss)
-   - f_auto  → WebP / AVIF served to modern browsers
-   - w_800   → max 800px wide (enough for product detail)
-   Thumbnails are derived on the fly by the frontend
-   using the optimizeImage() utility (w_400, w_200 etc.)
-   — no need to store multiple sizes in DB.
 ───────────────────────────────────────────── */
-
-/**
- * Build an optimized delivery URL from a stored Cloudinary URL.
- * Inserts transformation parameters after /upload/.
- * @param {string} url        - Raw Cloudinary URL from DB
- * @param {number} width      - Max display width (default 800)
- * @returns {string}
- */
 const optimizeUrl = (url, width = 800) => {
     if (!url || !url.includes("cloudinary.com")) return url ?? "";
     return url.replace("/upload/", `/upload/q_auto,f_auto,w_${width}/`);
 };
 
-/**
- * Delete a Cloudinary asset safely — never throws.
- * @param {string} publicId
- */
 const safeDestroy = async (publicId) => {
     if (!publicId) return;
     try {
@@ -46,12 +26,25 @@ const safeDestroy = async (publicId) => {
 };
 
 /* ─────────────────────────────────────────────
+   PARSE MRP — safely extract numeric MRP
+   Returns null if invalid / less than price
+───────────────────────────────────────────── */
+const parseMrp = (mrpRaw, price) => {
+    if (mrpRaw === undefined || mrpRaw === null || mrpRaw === "") return null;
+    const n = Number(mrpRaw);
+    if (isNaN(n) || n <= 0) return null;
+    // MRP must be >= selling price to make sense
+    if (price && n < Number(price)) return null;
+    return n;
+};
+
+/* ─────────────────────────────────────────────
    CREATE PRODUCT (ADMIN)
 ───────────────────────────────────────────── */
 export const createProduct = async (req, res) => {
     try {
         const {
-            name, description, price, category,
+            name, description, price, mrp, category,
             isCustomizable, tags, sizes, highlights, stock,
         } = req.body;
 
@@ -64,9 +57,6 @@ export const createProduct = async (req, res) => {
         if (!req.files || req.files.length === 0)
             return res.status(400).json({ message: "At least one image is required" });
 
-        // Multer-Cloudinary already uploaded the files.
-        // file.path = raw Cloudinary URL, file.filename = public_id.
-        // We optimizeUrl here so the stored URL already serves WebP/compressed.
         const images = req.files.map((file) => ({
             url: optimizeUrl(file.path, 800),
             public_id: file.filename,
@@ -83,11 +73,14 @@ export const createProduct = async (req, res) => {
         }
 
         const stockQty = Math.max(0, Number(stock) || 0);
+        // ✅ Parse MRP
+        const mrpValue = parseMrp(mrp, price);
 
         const product = await Product.create({
             name: name.trim(),
             description: description?.trim() || "",
             price: Number(price),
+            mrp: mrpValue,                          // ✅ stored
             category: normalizeCategory(category),
             images,
             isCustomizable: isCustomizable === true || isCustomizable === "true",
@@ -126,7 +119,9 @@ export const getAllProducts = async (req, res) => {
             ];
         }
 
+        // ✅ Select only fields needed for listing — faster response
         const products = await Product.find(query)
+            .select("name description price mrp category images tags rating numReviews isCustomizable stock inStock createdAt")
             .sort({ createdAt: -1 })
             .lean();
 
@@ -169,6 +164,11 @@ export const updateProduct = async (req, res) => {
         if (updateData.price)
             updateData.price = Number(updateData.price);
 
+        // ✅ Parse MRP on update
+        if (updateData.mrp !== undefined) {
+            updateData.mrp = parseMrp(updateData.mrp, updateData.price ?? product.price);
+        }
+
         if (updateData.tags)
             updateData.tags = updateData.tags.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
 
@@ -188,7 +188,6 @@ export const updateProduct = async (req, res) => {
             updateData.inStock = updateData.stock > 0;
         }
 
-        // New images uploaded — delete old ones from Cloudinary, store optimized URLs
         if (req.files && req.files.length > 0) {
             for (const img of product.images) {
                 await safeDestroy(img.public_id);
@@ -217,14 +216,18 @@ export const updateProduct = async (req, res) => {
 ───────────────────────────────────────────── */
 export const getRelatedProducts = async (req, res) => {
     try {
-        const product = await Product.findById(req.params.id).lean();
+        const product = await Product.findById(req.params.id)
+            .select("category")
+            .lean();
         if (!product)
             return res.status(404).json({ message: "Product not found" });
 
         const related = await Product.find({
             _id: { $ne: product._id },
             category: product.category,
+            inStock: true,                  // ✅ only show in-stock related products
         })
+            .select("name price mrp category images rating numReviews isCustomizable stock inStock")
             .limit(10)
             .lean();
 

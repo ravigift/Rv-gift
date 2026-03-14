@@ -12,7 +12,6 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
     const [addedFlash, setAddedFlash] = useState(false);
     const [imgLoaded, setImgLoaded] = useState(false);
 
-    // ✅ Optimized: 400px card size, WebP/AVIF auto format, auto quality
     const imageUrl = imgUrl.card(
         product?.images?.[0]?.url || product?.image || ""
     );
@@ -22,6 +21,12 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
     const stockNum = Number(product.stock ?? 0);
     const isOutOfStock = product.inStock === false || stockNum === 0;
     const isLowStock = !isOutOfStock && stockNum > 0 && stockNum <= 5;
+
+    // ✅ Discount calculation
+    const hasDiscount = product.mrp && Number(product.mrp) > Number(product.price);
+    const discountPct = hasDiscount
+        ? Math.round(((Number(product.mrp) - Number(product.price)) / Number(product.mrp)) * 100)
+        : null;
 
     const handleAddToCart = (e) => {
         e.stopPropagation();
@@ -129,7 +134,6 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
 
                 {/* ── IMAGE ── */}
                 <div className="pcard-img-wrap">
-                    {/* Skeleton shimmer while image loads */}
                     {!imgLoaded && <div className="absolute inset-0 bg-stone-100 animate-pulse" />}
 
                     <img
@@ -162,9 +166,25 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                         )}
                     </div>
 
-                    {/* Rating pill */}
-                    {numReviews > 0 && (
+                    {/* ✅ Discount badge — top right corner */}
+                    {hasDiscount && !isOutOfStock && (
                         <div className="absolute top-2.5 right-2.5 z-10">
+                            <span className="bg-green-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">
+                                {discountPct}% off
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Rating pill — move down if discount badge present */}
+                    {numReviews > 0 && !hasDiscount && (
+                        <div className="absolute top-2.5 right-2.5 z-10">
+                            <span className={`flex items-center gap-0.5 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm ${rating >= 4 ? "bg-emerald-500" : rating >= 3 ? "bg-amber-400" : "bg-red-400"}`}>
+                                {rating.toFixed(1)} <FaStar size={7} />
+                            </span>
+                        </div>
+                    )}
+                    {numReviews > 0 && hasDiscount && (
+                        <div className="absolute bottom-2.5 right-2.5 z-10">
                             <span className={`flex items-center gap-0.5 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm ${rating >= 4 ? "bg-emerald-500" : rating >= 3 ? "bg-amber-400" : "bg-red-400"}`}>
                                 {rating.toFixed(1)} <FaStar size={7} />
                             </span>
@@ -211,9 +231,24 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                         )}
                     </div>
 
-                    <p className={`text-[18px] font-black leading-none mb-3 ${isOutOfStock ? "text-zinc-400" : "text-zinc-900"}`}>
-                        ₹{product.price.toLocaleString("en-IN")}
-                    </p>
+                    {/* ✅ Price display — offer + MRP strikethrough */}
+                    <div className="mb-3">
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                            <span className={`text-[18px] font-black leading-none ${isOutOfStock ? "text-zinc-400" : "text-zinc-900"}`}>
+                                ₹{Number(product.price).toLocaleString("en-IN")}
+                            </span>
+                            {hasDiscount && !isOutOfStock && (
+                                <span className="text-[12px] font-medium text-zinc-400 line-through leading-none">
+                                    ₹{Number(product.mrp).toLocaleString("en-IN")}
+                                </span>
+                            )}
+                        </div>
+                        {hasDiscount && !isOutOfStock && (
+                            <p className="text-[10px] text-green-600 font-bold mt-0.5">
+                                Save ₹{(Number(product.mrp) - Number(product.price)).toLocaleString("en-IN")}
+                            </p>
+                        )}
+                    </div>
 
                     <div className="flex gap-1.5 mt-auto">
                         <button

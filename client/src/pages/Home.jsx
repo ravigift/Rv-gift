@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useCart } from "../hooks/useCart";
 import { imgUrl } from "../utils/imageUrl";
-import { FaStar, FaRegStar, FaSearch, FaFire, FaArrowRight, FaShoppingCart } from "react-icons/fa";
+import { FaStar, FaRegStar, FaSearch, FaFire, FaArrowRight, FaShoppingCart, FaPencilAlt } from "react-icons/fa";
 
 /* ── Skeleton Card ── */
 const SkeletonCard = () => (
@@ -27,11 +27,17 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
     const { cartItems } = useCart();
     const inCart = cartItems.some(i => i._id === product._id);
 
-    // ✅ Optimized 400px card image — WebP auto format
     const imageUrl = imgUrl.card(product.images?.[0]?.url || "");
     const rating = product.rating || 0;
     const numReviews = product.numReviews || 0;
     const [imgLoaded, setImgLoaded] = useState(false);
+
+    // ✅ Offer price logic
+    const hasDiscount = product.mrp && Number(product.mrp) > Number(product.price);
+    const discountPct = hasDiscount
+        ? Math.round(((Number(product.mrp) - Number(product.price)) / Number(product.mrp)) * 100)
+        : null;
+    const isOutOfStock = product.inStock === false;
 
     return (
         <div onClick={() => navigate(`/products/${product._id}`)}
@@ -49,14 +55,23 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                     onError={e => { e.target.src = "https://via.placeholder.com/400x400?text=No+Image"; setImgLoaded(true); }}
                     className={`w-full h-full object-contain p-3 group-hover:scale-110 transition-transform duration-500 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
                 />
+                {/* Left badges */}
                 <div className="absolute top-2 left-2 flex flex-col gap-1">
-                    {product.isCustomizable && (
+                    {product.isCustomizable && !isOutOfStock && (
                         <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">✏️ Custom</span>
                     )}
-                    {product.inStock === false && (
+                    {isOutOfStock && (
                         <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Out of Stock</span>
                     )}
                 </div>
+                {/* ✅ Discount badge top-right */}
+                {hasDiscount && !isOutOfStock && (
+                    <div className="absolute top-2 right-2">
+                        <span className="bg-green-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">
+                            {discountPct}% off
+                        </span>
+                    </div>
+                )}
                 <div className="absolute inset-0 bg-zinc-900/0 group-hover:bg-zinc-900/5 transition-all duration-300" />
             </div>
             <div className="p-4 flex flex-col flex-1">
@@ -78,17 +93,34 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                 </div>
                 <p className="text-zinc-400 text-xs line-clamp-2 leading-relaxed mb-3">{product.description}</p>
                 <div className="mt-auto">
-                    <p className="text-zinc-900 text-xl font-black mb-3">₹{product.price.toLocaleString("en-IN")}</p>
+                    {/* ✅ Price with MRP strikethrough */}
+                    <div className="mb-3">
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                            <span className="text-zinc-900 text-xl font-black leading-none">
+                                ₹{Number(product.price).toLocaleString("en-IN")}
+                            </span>
+                            {hasDiscount && !isOutOfStock && (
+                                <span className="text-xs font-medium text-zinc-400 line-through leading-none">
+                                    ₹{Number(product.mrp).toLocaleString("en-IN")}
+                                </span>
+                            )}
+                        </div>
+                        {hasDiscount && !isOutOfStock && (
+                            <p className="text-[10px] text-green-600 font-bold mt-0.5">
+                                Save ₹{(Number(product.mrp) - Number(product.price)).toLocaleString("en-IN")}
+                            </p>
+                        )}
+                    </div>
                     <div className="flex gap-2">
                         <button
                             onClick={e => { e.stopPropagation(); if (!inCart) onAddToCart(product); }}
-                            disabled={inCart || product.inStock === false}
-                            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer ${inCart ? "bg-emerald-50 text-emerald-600 border border-emerald-200 cursor-default" : product.inStock === false ? "bg-stone-100 text-stone-400 cursor-not-allowed" : "bg-zinc-900 text-white hover:bg-zinc-700 hover:shadow-md shadow-sm"}`}>
+                            disabled={inCart || isOutOfStock}
+                            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer ${inCart ? "bg-emerald-50 text-emerald-600 border border-emerald-200 cursor-default" : isOutOfStock ? "bg-stone-100 text-stone-400 cursor-not-allowed" : "bg-zinc-900 text-white hover:bg-zinc-700 hover:shadow-md shadow-sm"}`}>
                             {inCart ? <>✔ In Cart</> : <><FaShoppingCart size={10} /> Add</>}
                         </button>
                         <button
                             onClick={e => { e.stopPropagation(); onBuyNow(product); }}
-                            disabled={product.inStock === false}
+                            disabled={isOutOfStock}
                             className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 active:scale-95 hover:shadow-md shadow-sm shadow-amber-100 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
                             Buy Now
                         </button>
@@ -107,15 +139,15 @@ const Home = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const searchQuery = searchParams.get("search") || "";
     const activeCategory = searchParams.get("category") || "";
+    // ✅ New: customizable filter flag
+    const showCustomizable = searchParams.get("customizable") === "true";
     const { addItem } = useCart();
 
-    // ✅ Single source of truth — fetch ALL products ONCE
     const [allProducts, setAllProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
     useEffect(() => {
-        // Only fetch if not already loaded
         if (allProducts.length > 0) return;
         const fetchProducts = async () => {
             try {
@@ -130,13 +162,16 @@ const Home = () => {
             }
         };
         fetchProducts();
-    }, []); // ✅ Empty deps — fetch once, never again
+    }, []);
 
-    // ✅ Client-side filtering — no extra API calls
+    // ✅ Filtering — now includes customizable filter
     const products = useMemo(() => {
         let filtered = allProducts;
 
-        if (activeCategory) {
+        // Customizable filter — takes priority over category
+        if (showCustomizable) {
+            filtered = filtered.filter(p => p.isCustomizable === true);
+        } else if (activeCategory) {
             filtered = filtered.filter(p =>
                 p.category?.toLowerCase() === activeCategory.toLowerCase()
             );
@@ -152,9 +187,14 @@ const Home = () => {
         }
 
         return filtered;
-    }, [allProducts, searchQuery, activeCategory]);
+    }, [allProducts, searchQuery, activeCategory, showCustomizable]);
 
-    // ✅ Categories derived from allProducts — no extra call
+    // ✅ Customizable products count for hero badge
+    const customizableCount = useMemo(
+        () => allProducts.filter(p => p.isCustomizable).length,
+        [allProducts]
+    );
+
     const categories = useMemo(() =>
         [...new Set(allProducts.map(p => p.category).filter(Boolean))],
         [allProducts]
@@ -165,6 +205,7 @@ const Home = () => {
         navigate("/checkout", { state: { buyNowItem: { ...product, quantity: 1 } } });
     }, [navigate]);
 
+    // ✅ Set category pill
     const setCategory = (cat) => {
         const params = {};
         if (searchQuery) params.search = searchQuery;
@@ -172,8 +213,20 @@ const Home = () => {
         setSearchParams(params);
     };
 
+    // ✅ Set customizable filter
+    const setCustomizableFilter = () => {
+        const params = {};
+        if (searchQuery) params.search = searchQuery;
+        params.customizable = "true";
+        setSearchParams(params);
+    };
+
     const clearFilters = () => setSearchParams({});
+
     const formatCat = (cat) => cat.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+
+    // Active state for "All" pill — none of the special filters active
+    const isAllActive = !activeCategory && !showCustomizable;
 
     return (
         <div className="min-h-screen bg-stone-100">
@@ -206,8 +259,8 @@ const Home = () => {
                 .btn-hover:active { transform: scale(0.97); }
             `}</style>
 
-            {/* ── HERO ── */}
-            {!searchQuery && !activeCategory && (
+            {/* ── HERO — only show when no search/filter active ── */}
+            {!searchQuery && !activeCategory && !showCustomizable && (
                 <div className="body-font animated-bg relative w-full overflow-hidden" style={{ minHeight: "500px" }}>
                     <div className="absolute top-[-80px] right-[-80px] w-[500px] h-[500px] rounded-full pointer-events-none"
                         style={{ background: "radial-gradient(circle, rgba(245,158,11,0.12) 0%, transparent 65%)" }} />
@@ -242,8 +295,12 @@ const Home = () => {
                                         Shop Now
                                         <FaArrowRight size={11} className="group-hover/btn:translate-x-1 transition-transform duration-200" />
                                     </button>
+                                    {/* ✅ Now uses customizable filter — shows ALL customizable products */}
                                     <button
-                                        onClick={() => setCategory("custom-tshirt")}
+                                        onClick={() => {
+                                            setCustomizableFilter();
+                                            setTimeout(() => document.getElementById("products-section")?.scrollIntoView({ behavior: "smooth" }), 100);
+                                        }}
                                         className="btn-hover flex items-center justify-center gap-2 font-bold px-8 py-3.5 rounded-2xl text-sm text-white cursor-pointer glass-card hover:border-amber-500/40 transition-all duration-200">
                                         Customize 🎨
                                     </button>
@@ -295,13 +352,27 @@ const Home = () => {
             {/* ── Products Section ── */}
             <div id="products-section" className="body-font max-w-7xl mx-auto px-4 py-8">
 
-                {/* Category Pills */}
+                {/* ✅ Category Pills — includes Customizable pill */}
                 {categories.length > 0 && (
                     <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
-                        <button onClick={() => setCategory("")}
-                            className={`shrink-0 px-4 py-2 rounded-full text-xs font-bold border transition-all duration-200 cursor-pointer active:scale-95 ${!activeCategory ? "bg-zinc-900 text-white border-zinc-900 shadow-sm" : "bg-white text-zinc-600 border-stone-200 hover:border-zinc-400 hover:bg-stone-50"}`}>
+                        {/* All */}
+                        <button onClick={clearFilters}
+                            className={`shrink-0 px-4 py-2 rounded-full text-xs font-bold border transition-all duration-200 cursor-pointer active:scale-95 ${isAllActive ? "bg-zinc-900 text-white border-zinc-900 shadow-sm" : "bg-white text-zinc-600 border-stone-200 hover:border-zinc-400 hover:bg-stone-50"}`}>
                             All
                         </button>
+
+                        {/* ✅ Customizable pill — shows all isCustomizable products */}
+                        {customizableCount > 0 && (
+                            <button onClick={setCustomizableFilter}
+                                className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold border transition-all duration-200 cursor-pointer active:scale-95 whitespace-nowrap ${showCustomizable ? "bg-emerald-500 text-white border-emerald-500 shadow-sm shadow-emerald-200" : "bg-white text-emerald-700 border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50"}`}>
+                                ✏️ Customizable
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${showCustomizable ? "bg-white/25 text-white" : "bg-emerald-100 text-emerald-700"}`}>
+                                    {customizableCount}
+                                </span>
+                            </button>
+                        )}
+
+                        {/* Regular category pills */}
                         {categories.map(cat => (
                             <button key={cat} onClick={() => setCategory(cat)}
                                 className={`shrink-0 px-4 py-2 rounded-full text-xs font-bold border transition-all duration-200 whitespace-nowrap cursor-pointer active:scale-95 ${activeCategory === cat ? "bg-amber-500 text-white border-amber-500 shadow-sm shadow-amber-200" : "bg-white text-zinc-600 border-stone-200 hover:border-amber-400 hover:text-amber-600 hover:bg-amber-50"}`}>
@@ -317,6 +388,8 @@ const Home = () => {
                         <h2 className="text-xl font-black text-zinc-900 flex items-center gap-2">
                             {searchQuery ? (
                                 <><FaSearch size={16} className="text-amber-500" /> Results for "{searchQuery}"</>
+                            ) : showCustomizable ? (
+                                <><FaPencilAlt size={16} className="text-emerald-500" /> Customizable Products</>
                             ) : activeCategory ? (
                                 <><FaFire size={16} className="text-amber-500" /> {formatCat(activeCategory)}</>
                             ) : (
@@ -326,10 +399,11 @@ const Home = () => {
                         {!loading && (
                             <p className="text-zinc-400 text-xs mt-0.5">
                                 {products.length} product{products.length !== 1 ? "s" : ""} found
+                                {showCustomizable && <span className="ml-1 text-emerald-500 font-semibold">· Personalize these!</span>}
                             </p>
                         )}
                     </div>
-                    {(searchQuery || activeCategory) && (
+                    {(searchQuery || activeCategory || showCustomizable) && (
                         <button onClick={clearFilters}
                             className="text-xs text-amber-600 font-bold hover:text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer active:scale-95">
                             Clear ✕
@@ -358,9 +432,11 @@ const Home = () => {
                 {/* Empty */}
                 {!loading && !error && products.length === 0 && (
                     <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-stone-300">
-                        <p className="text-5xl mb-3">🎁</p>
+                        <p className="text-5xl mb-3">{showCustomizable ? "✏️" : "🎁"}</p>
                         <p className="text-zinc-600 font-bold mb-1">No products found</p>
-                        <p className="text-zinc-400 text-sm mb-5">Try a different search or category</p>
+                        <p className="text-zinc-400 text-sm mb-5">
+                            {showCustomizable ? "No customizable products available right now" : "Try a different search or category"}
+                        </p>
                         <button onClick={clearFilters}
                             className="text-amber-600 font-bold hover:text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-100 px-5 py-2 rounded-xl text-sm transition-all duration-200 cursor-pointer active:scale-95">
                             Browse All Products

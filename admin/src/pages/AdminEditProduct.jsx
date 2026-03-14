@@ -17,7 +17,7 @@ const AdminEditProduct = () => {
     const navigate = useNavigate();
 
     const [form, setForm] = useState({
-        name: "", description: "", price: "",
+        name: "", description: "", price: "", mrp: "",
         category: "", isCustomizable: false, tags: "", stock: "",
     });
 
@@ -46,15 +46,14 @@ const AdminEditProduct = () => {
                     name: data.name || "",
                     description: data.description || "",
                     price: data.price?.toString() || "",
+                    mrp: data.mrp?.toString() || "",
                     category: data.category || "",
                     isCustomizable: Boolean(data.isCustomizable),
                     tags: data.tags?.join(", ") || "",
                     stock: data.stock?.toString() ?? "0",
                 });
                 setCurrentImages(data.images || []);
-
                 if (data.sizes?.length > 0) setSelectedSizes(data.sizes);
-
                 if (data.highlights && Object.keys(data.highlights).length > 0) {
                     const entries = data.highlights instanceof Map
                         ? [...data.highlights.entries()]
@@ -106,12 +105,18 @@ const AdminEditProduct = () => {
         setPreviewImages(prev => prev.filter((_, i) => i !== idx));
     };
 
+    // ✅ Live discount preview
+    const discountPct = form.mrp && form.price && Number(form.mrp) > Number(form.price)
+        ? Math.round(((Number(form.mrp) - Number(form.price)) / Number(form.mrp)) * 100)
+        : null;
+
     /* ── Submit ── */
     const submitHandler = async (e) => {
         e.preventDefault();
         if (!form.name.trim()) return setError("Product name is required");
         if (!form.price || Number(form.price) <= 0) return setError("Enter a valid price");
         if (!form.category) return setError("Please select a category");
+        if (form.mrp && Number(form.mrp) < Number(form.price)) return setError("MRP cannot be less than selling price");
         if (form.stock === "" || Number(form.stock) < 0) return setError("Enter a valid stock quantity (0 or more)");
 
         try {
@@ -122,6 +127,8 @@ const AdminEditProduct = () => {
             formData.append("name", form.name.trim());
             formData.append("description", form.description.trim());
             formData.append("price", Number(form.price));
+            if (form.mrp && Number(form.mrp) > 0) formData.append("mrp", Number(form.mrp));
+            else formData.append("mrp", "");
             formData.append("category", form.category);
             formData.append("isCustomizable", form.isCustomizable ? "true" : "false");
             formData.append("stock", Number(form.stock));
@@ -145,7 +152,6 @@ const AdminEditProduct = () => {
         }
     };
 
-    /* ── Stock status indicator ── */
     const stockNum = Number(form.stock);
     const stockStatus = form.stock === ""
         ? null
@@ -171,7 +177,6 @@ const AdminEditProduct = () => {
                 }
             `}</style>
 
-            {/* TOAST */}
             {toast && (
                 <div style={{
                     position: "fixed", top: 24, right: 24, zIndex: 9999,
@@ -192,7 +197,6 @@ const AdminEditProduct = () => {
 
             <div className="max-w-3xl mx-auto px-4 py-8">
 
-                {/* Header */}
                 <div className="flex items-center gap-3 mb-6">
                     <button onClick={() => navigate("/admin/products")}
                         className="w-9 h-9 rounded-full bg-white border border-stone-200 flex items-center justify-center text-zinc-500 hover:text-zinc-800 transition-all cursor-pointer">
@@ -224,10 +228,10 @@ const AdminEditProduct = () => {
                                 className={`${inputClass} resize-none`} />
                         </div>
 
-                        {/* Price + Category */}
+                        {/* ✅ Price + MRP */}
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1.5 block">Price (₹) *</label>
+                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1.5 block">Selling Price (₹) *</label>
                                 <div className="relative">
                                     <FaRupeeSign size={12} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
                                     <input type="number" name="price" value={form.price} onChange={handleChange}
@@ -235,36 +239,51 @@ const AdminEditProduct = () => {
                                 </div>
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1.5 block">Category *</label>
+                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1.5 block">
+                                    MRP / Original Price (₹)
+                                    <span className="text-zinc-400 font-normal normal-case ml-1">(optional)</span>
+                                </label>
                                 <div className="relative">
-                                    <FaList size={11} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
-                                    <select name="category" value={form.category} onChange={handleChange}
-                                        className={`${inputClass} pl-9 appearance-none cursor-pointer`}>
-                                        <option value="">Select category</option>
-                                        {CATEGORIES.map(cat => (
-                                            <option key={cat.value} value={cat.value}>{cat.name}</option>
-                                        ))}
-                                    </select>
+                                    <FaRupeeSign size={12} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                                    <input type="number" name="mrp" value={form.mrp} onChange={handleChange}
+                                        placeholder="0" min="1" className={`${inputClass} pl-9`} />
                                 </div>
                             </div>
                         </div>
 
-                        {/* ✅ STOCK QUANTITY */}
+                        {/* ✅ Live discount preview */}
+                        {discountPct && (
+                            <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5">
+                                <span className="text-emerald-700 font-black text-sm">🏷️ {discountPct}% off</span>
+                                <span className="text-zinc-400 text-xs">·</span>
+                                <span className="text-emerald-600 text-xs font-semibold">
+                                    Customer saves ₹{(Number(form.mrp) - Number(form.price)).toLocaleString("en-IN")}
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Category */}
                         <div>
-                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1.5 block">
-                                Stock Quantity *
-                            </label>
+                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1.5 block">Category *</label>
+                            <div className="relative">
+                                <FaList size={11} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                                <select name="category" value={form.category} onChange={handleChange}
+                                    className={`${inputClass} pl-9 appearance-none cursor-pointer`}>
+                                    <option value="">Select category</option>
+                                    {CATEGORIES.map(cat => (
+                                        <option key={cat.value} value={cat.value}>{cat.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Stock */}
+                        <div>
+                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1.5 block">Stock Quantity *</label>
                             <div className="relative">
                                 <FaBoxes size={12} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
-                                <input
-                                    type="number"
-                                    name="stock"
-                                    value={form.stock}
-                                    onChange={handleChange}
-                                    placeholder="e.g. 10"
-                                    min="0"
-                                    className={`${inputClass} pl-9`}
-                                />
+                                <input type="number" name="stock" value={form.stock} onChange={handleChange}
+                                    placeholder="e.g. 10" min="0" className={`${inputClass} pl-9`} />
                             </div>
                             {stockStatus && (
                                 <div className={`mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-bold ${stockStatus.color}`}>
@@ -371,7 +390,6 @@ const AdminEditProduct = () => {
                                 <p className="text-xs text-zinc-400 mt-0.5">PNG, JPG, WEBP · Max 5MB each</p>
                                 <input type="file" multiple accept="image/*" onChange={handleImageChange} className="hidden" />
                             </label>
-
                             {previewImages.length > 0 && (
                                 <div className="grid grid-cols-4 gap-3 mt-3">
                                     {previewImages.map((img, i) => (
@@ -410,14 +428,12 @@ const AdminEditProduct = () => {
                             </button>
                         </div>
 
-                        {/* Error */}
                         {error && (
                             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm font-medium">
                                 ⚠️ {error}
                             </div>
                         )}
 
-                        {/* Buttons */}
                         <div className="flex gap-3 pt-2">
                             <button type="button" onClick={() => navigate("/admin/products")}
                                 className="flex-1 py-3 rounded-xl border border-stone-200 text-zinc-600 font-semibold text-sm hover:bg-stone-50 transition-all cursor-pointer">

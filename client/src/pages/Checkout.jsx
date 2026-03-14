@@ -9,16 +9,16 @@ import {
     FaPencilAlt, FaCreditCard, FaLock, FaRedo, FaMoneyBillWave,
     FaImage, FaLocationArrow, FaSpinner, FaTimesCircle,
     FaBookmark, FaPlus, FaEdit, FaTrash,
-    FaHome, FaBriefcase,
-    // FaShippingFast, // TODO: Re-enable when Shiprocket integration is active
+    FaHome, FaBriefcase, FaTag,
 } from "react-icons/fa";
 
 /* ─────────────────────────────────────
    CONSTANTS
 ───────────────────────────────────── */
-const PLATFORM_FEE = 0;
-const FREE_DELIVERY_ABOVE = 0;
-const DEFAULT_DELIVERY = 0;
+const PLATFORM_FEE = 11;                // ✅ Rs.11 platform fee on all orders
+const FREE_DELIVERY_ABOVE = 1000;       // ✅ Free delivery for online pay above ₹1000
+const COD_DELIVERY_CHARGE = 70;         // ✅ COD always Rs.70
+const ONLINE_DELIVERY_CHARGE = 70;     // ✅ Online below ₹1000 also Rs.70
 
 const LABEL_ICONS = {
     Home: <FaHome size={10} />,
@@ -225,71 +225,31 @@ const Checkout = () => {
     const checkoutItems = buyNowItem ? [buyNowItem] : cartItems;
     const itemsTotal = buyNowItem ? buyNowItem.price * (buyNowItem.quantity || 1) : totalPrice;
 
-    /*
-     * ─────────────────────────────────────────────────────────────
-     * TODO (3 months): Re-enable dynamic Shiprocket shipping rates.
-     * When active, fetchShippingRate() calls POST /shipping/rate
-     * with deliveryPincode + weight + cod flag to get real courier
-     * rates (shippingRate, shippingCourier, shippingEtd).
-     * shippingFetched ref prevents duplicate calls on re-renders.
-     * ─────────────────────────────────────────────────────────────
-     *
-     * const [shippingRate, setShippingRate] = useState(itemsTotal >= FREE_DELIVERY_ABOVE ? 0 : DEFAULT_DELIVERY);
-     * const [shippingCourier, setShippingCourier] = useState("");
-     * const [shippingEtd, setShippingEtd] = useState("");
-     * const [shippingLoading, setShippingLoading] = useState(false);
-     * const shippingFetched = useRef(false);
-     *
-     * const fetchShippingRate = useCallback(async (pincode, isCod = false) => {
-     *     if (!pincode || !/^\d{6}$/.test(pincode)) return;
-     *     if (itemsTotal >= FREE_DELIVERY_ABOVE) { setShippingRate(0); return; }
-     *     try {
-     *         setShippingLoading(true);
-     *         const { data } = await api.post("/shipping/rate", {
-     *             deliveryPincode: pincode,
-     *             weight: checkoutItems.reduce((sum, i) => sum + 500 * (i.quantity || i.qty || 1), 0),
-     *             cod: isCod,
-     *         });
-     *         if (data.rate !== undefined) {
-     *             setShippingRate(data.rate);
-     *             setShippingCourier(data.courier || "");
-     *             setShippingEtd(data.etd || "");
-     *         }
-     *     } catch {
-     *         // Keep DEFAULT_DELIVERY on error
-     *     } finally { setShippingLoading(false); }
-     * }, [checkoutItems, itemsTotal]);
-     *
-     * // Auto-fetch when address selected (only once per address)
-     * useEffect(() => {
-     *     if (selectedAddress?.pincode && !shippingFetched.current) {
-     *         shippingFetched.current = true;
-     *         fetchShippingRate(selectedAddress.pincode, paymentMethod === "cod");
-     *     }
-     * }, [selectedAddress]);
-     *
-     * // Re-fetch on payment method change (COD may carry higher rate)
-     * useEffect(() => {
-     *     if (selectedAddress?.pincode && paymentMethod) {
-     *         fetchShippingRate(selectedAddress.pincode, paymentMethod === "cod");
-     *     }
-     * }, [paymentMethod]);
-     */
+    const [paymentMethod, setPaymentMethod] = useState("");
 
-    // Shipping is free for all orders until Shiprocket is live
-    const shippingRate = 0;
-    const shippingLoading = false;
-    // const shippingCourier = ""; // TODO: Re-enable with Shiprocket
-    // const shippingEtd = "";     // TODO: Re-enable with Shiprocket
+    // ✅ Delivery charge logic:
+    // COD → always Rs.70
+    // Online pay + order >= ₹1000 → FREE
+    // Online pay + order < ₹1000 → Rs.70
+    const deliveryCharge = paymentMethod === "cod"
+        ? COD_DELIVERY_CHARGE
+        : itemsTotal >= FREE_DELIVERY_ABOVE
+            ? 0
+            : ONLINE_DELIVERY_CHARGE;
 
-    const deliveryCharge = itemsTotal >= FREE_DELIVERY_ABOVE ? 0 : shippingRate;
+    const isFreeDelivery = deliveryCharge === 0;
+
+    // ✅ Amount needed for free delivery (online only)
+    const amountForFreeDelivery = paymentMethod !== "cod" && itemsTotal < FREE_DELIVERY_ABOVE
+        ? FREE_DELIVERY_ABOVE - itemsTotal
+        : 0;
+
     const finalTotal = itemsTotal + PLATFORM_FEE + deliveryCharge;
 
     const [step, setStep] = useState(1);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [payState, setPayState] = useState("idle");
-    const [paymentMethod, setPaymentMethod] = useState("");
 
     const [contact, setContact] = useState({ name: user?.name || "", phone: "", email: user?.email || "" });
 
@@ -329,9 +289,6 @@ const Checkout = () => {
             const newAddr = data.addresses[data.addresses.length - 1];
             setSelectedAddrId(newAddr._id);
             setShowAddForm(false);
-            // TODO (3 months): Re-enable after Shiprocket is live
-            // shippingFetched.current = false;
-            // fetchShippingRate(form.pincode, paymentMethod === "cod");
         } catch (err) { alert(err.response?.data?.message || "Failed to save address"); }
         finally { setSavingAddr(false); }
     };
@@ -342,11 +299,6 @@ const Checkout = () => {
             const { data } = await api.put(`/addresses/${editingAddr._id}`, form);
             setSavedAddresses(data.addresses);
             setEditingAddr(null);
-            // TODO (3 months): Re-enable after Shiprocket is live
-            // if (editingAddr._id === selectedAddrId) {
-            //     shippingFetched.current = false;
-            //     fetchShippingRate(form.pincode, paymentMethod === "cod");
-            // }
         } catch (err) { alert(err.response?.data?.message || "Failed to update address"); }
         finally { setSavingAddr(false); }
     };
@@ -384,11 +336,7 @@ const Checkout = () => {
 
     const handleAddressContinue = () => {
         if (!selectedAddress) return setError("Please select or add a delivery address");
-        setError("");
-        // TODO (3 months): Re-enable after Shiprocket is live
-        // shippingFetched.current = false;
-        // fetchShippingRate(selectedAddress.pincode, paymentMethod === "cod");
-        setStep(3);
+        setError(""); setStep(3);
     };
 
     const handleCOD = async () => {
@@ -710,18 +658,6 @@ const Checkout = () => {
                                         <p className="font-bold text-zinc-800 text-sm">{selectedAddress.name}</p>
                                         <p className="text-zinc-500 text-xs mt-0.5">{selectedAddress.phone}</p>
                                         <p className="text-zinc-600 text-xs mt-1.5 leading-relaxed">{getAddress()}</p>
-
-                                        {/*
-                                         * TODO (3 months): Re-enable courier/ETD info when Shiprocket is live.
-                                         * {itemsTotal < FREE_DELIVERY_ABOVE && (shippingCourier || shippingLoading) && (
-                                         *     <div className="mt-3 flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2">
-                                         *         <FaShippingFast size={12} className="text-indigo-500 shrink-0" />
-                                         *         {shippingLoading
-                                         *             ? <p className="text-xs text-indigo-600 font-medium">Calculating shipping rate…</p>
-                                         *             : <p className="text-xs text-indigo-700 font-medium">{shippingCourier} · {shippingEtd}</p>}
-                                         *     </div>
-                                         * )}
-                                         */}
                                     </div>
                                 )}
 
@@ -730,30 +666,55 @@ const Checkout = () => {
                                     <h2 className="font-bold text-zinc-800 text-base mb-4 flex items-center gap-2">
                                         <FaCreditCard className="text-amber-500" size={14} /> Choose Payment Method
                                     </h2>
+
+                                    {/* ✅ Free delivery nudge — shown only when online pay selected and below threshold */}
+                                    {paymentMethod === "online" && amountForFreeDelivery > 0 && (
+                                        <div className="mb-4 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                                            <FaTag size={11} className="text-amber-500 shrink-0" />
+                                            <p className="text-xs text-amber-700 font-semibold">
+                                                Add items worth <span className="font-black">Rs.{amountForFreeDelivery.toLocaleString("en-IN")}</span> more to get FREE delivery!
+                                            </p>
+                                        </div>
+                                    )}
+
                                     <div className="space-y-3 mb-5">
+                                        {/* Online Pay */}
                                         <button onClick={() => { setPaymentMethod("online"); setError(""); setPayState("idle"); }}
                                             className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all cursor-pointer ${paymentMethod === "online" ? "border-amber-400 bg-amber-50" : "border-stone-200 hover:border-stone-300"}`}>
                                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${paymentMethod === "online" ? "bg-amber-500" : "bg-stone-100"}`}>
                                                 <FaLock size={16} className={paymentMethod === "online" ? "text-white" : "text-zinc-400"} />
                                             </div>
                                             <div className="flex-1 text-left">
-                                                <p className={`font-bold text-sm ${paymentMethod === "online" ? "text-zinc-800" : "text-zinc-600"}`}>Pay Online</p>
-                                                <p className="text-xs text-zinc-400 mt-0.5">UPI, Cards, Net Banking, Wallets, EMI</p>
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <p className={`font-bold text-sm ${paymentMethod === "online" ? "text-zinc-800" : "text-zinc-600"}`}>Pay Online</p>
+                                                    {/* ✅ Free delivery badge for online pay above ₹1000 */}
+                                                    {itemsTotal >= FREE_DELIVERY_ABOVE && (
+                                                        <span className="text-[10px] font-black px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">🚚 FREE Delivery</span>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-zinc-400 mt-0.5">
+                                                    UPI, Cards, Net Banking, Wallets, EMI
+                                                    {itemsTotal < FREE_DELIVERY_ABOVE && (
+                                                        <span className="ml-1 text-zinc-500">· +Rs.70 delivery</span>
+                                                    )}
+                                                </p>
                                             </div>
                                             {paymentMethod === "online" && <FaCheckCircle className="text-amber-500 shrink-0" size={18} />}
                                         </button>
 
+                                        {/* COD */}
                                         <button onClick={() => { setPaymentMethod("cod"); setError(""); setPayState("idle"); }}
                                             className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all cursor-pointer ${paymentMethod === "cod" ? "border-emerald-400 bg-emerald-50" : "border-stone-200 hover:border-stone-300"}`}>
                                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${paymentMethod === "cod" ? "bg-emerald-500" : "bg-stone-100"}`}>
                                                 <FaMoneyBillWave size={16} className={paymentMethod === "cod" ? "text-white" : "text-zinc-400"} />
                                             </div>
                                             <div className="flex-1 text-left">
-                                                <p className={`font-bold text-sm ${paymentMethod === "cod" ? "text-zinc-800" : "text-zinc-600"}`}>
-                                                    Cash on Delivery
-                                                    <span className="ml-2 text-[10px] font-black px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">COD</span>
-                                                </p>
-                                                <p className="text-xs text-zinc-400 mt-0.5">Pay when your order arrives</p>
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <p className={`font-bold text-sm ${paymentMethod === "cod" ? "text-zinc-800" : "text-zinc-600"}`}>Cash on Delivery</p>
+                                                    <span className="text-[10px] font-black px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">COD</span>
+                                                </div>
+                                                {/* ✅ COD delivery charge always shown */}
+                                                <p className="text-xs text-zinc-400 mt-0.5">Pay when your order arrives · +Rs.70 delivery charge</p>
                                             </div>
                                             {paymentMethod === "cod" && <FaCheckCircle className="text-emerald-500 shrink-0" size={18} />}
                                         </button>
@@ -800,27 +761,69 @@ const Checkout = () => {
                                         <span className="text-zinc-600">Price ({checkoutItems.length} item{checkoutItems.length > 1 ? "s" : ""})</span>
                                         <span className="font-semibold text-zinc-800">Rs.{itemsTotal.toLocaleString("en-IN")}</span>
                                     </div>
+
+                                    {/* ✅ Dynamic delivery charge row */}
                                     <div className="flex justify-between text-sm">
                                         <span className="text-zinc-600 flex items-center gap-1.5">
                                             <FaTruck size={11} className="text-zinc-400" /> Delivery
+                                            {paymentMethod === "cod" && (
+                                                <span className="text-[10px] font-bold text-zinc-400">(COD)</span>
+                                            )}
                                         </span>
-                                        {/* Always FREE until Shiprocket is live — TODO (3 months): wire up dynamic shippingRate here */}
-                                        <span className="font-semibold text-emerald-600">FREE</span>
+                                        {isFreeDelivery ? (
+                                            <span className="font-semibold text-emerald-600">FREE</span>
+                                        ) : (
+                                            <span className="font-semibold text-zinc-700">Rs.{deliveryCharge}</span>
+                                        )}
                                     </div>
+
+                                    {/* ✅ Platform fee row */}
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-zinc-600 flex items-center gap-1.5"><FaShieldAlt size={11} className="text-zinc-400" /> Platform Fee</span>
-                                        <span className="font-semibold">Rs.{PLATFORM_FEE}</span>
+                                        <span className="text-zinc-600 flex items-center gap-1.5">
+                                            <FaShieldAlt size={11} className="text-zinc-400" /> Platform Fee
+                                        </span>
+                                        <span className="font-semibold text-zinc-700">Rs.{PLATFORM_FEE}</span>
                                     </div>
+
                                     <div className="border-t border-dashed border-stone-200 pt-3 flex justify-between">
                                         <span className="font-bold text-zinc-800">Total Amount</span>
                                         <span className="font-black text-zinc-900 text-lg">Rs.{finalTotal.toLocaleString("en-IN")}</span>
                                     </div>
-                                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center gap-2">
-                                        <FaCheckCircle className="text-emerald-500" size={12} />
-                                        <p className="text-emerald-700 text-xs font-medium">FREE delivery on this order!</p>
-                                    </div>
+
+                                    {/* ✅ Context-aware delivery info banner */}
+                                    {!paymentMethod && (
+                                        <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                                            <FaTruck className="text-amber-500 shrink-0" size={12} />
+                                            <p className="text-amber-700 text-xs font-medium">
+                                                {itemsTotal >= FREE_DELIVERY_ABOVE
+                                                    ? "Free delivery on online payment!"
+                                                    : `Free delivery on orders ₹${FREE_DELIVERY_ABOVE}+ (online pay)`}
+                                            </p>
+                                        </div>
+                                    )}
+                                    {paymentMethod === "online" && isFreeDelivery && (
+                                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                                            <FaCheckCircle className="text-emerald-500 shrink-0" size={12} />
+                                            <p className="text-emerald-700 text-xs font-medium">🎉 FREE delivery on this order!</p>
+                                        </div>
+                                    )}
+                                    {paymentMethod === "online" && !isFreeDelivery && (
+                                        <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                                            <FaTag className="text-amber-500 shrink-0" size={11} />
+                                            <p className="text-amber-700 text-xs font-medium">
+                                                Add Rs.{amountForFreeDelivery.toLocaleString("en-IN")} more for FREE delivery
+                                            </p>
+                                        </div>
+                                    )}
+                                    {paymentMethod === "cod" && (
+                                        <div className="bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                                            <FaMoneyBillWave className="text-zinc-400 shrink-0" size={11} />
+                                            <p className="text-zinc-500 text-xs font-medium">Rs.70 delivery applies on COD orders</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
+
                             <div className="bg-white rounded-2xl border border-stone-200 shadow-sm px-5 py-4 space-y-3">
                                 <div className="flex items-center gap-3 text-xs text-zinc-500"><FaShieldAlt className="text-amber-500 shrink-0" size={14} /><span>Safe and Secure Payment</span></div>
                                 <div className="flex items-center gap-3 text-xs text-zinc-500"><FaTruck className="text-amber-500 shrink-0" size={14} /><span>Fast Delivery across India</span></div>

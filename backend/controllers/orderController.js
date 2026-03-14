@@ -3,6 +3,7 @@
  * ✅ Refund via Razorpay API
  * ✅ Payment logs on every event
  * ✅ Fraud detection
+ * ✅ MRP saved in items for invoice discount display
  * ❌ No return system
  * ⏸️ Shiprocket — commented, enable when needed
  */
@@ -105,6 +106,7 @@ export const createOrder = async (req, res) => {
             productId: item.productId || item._id,
             name: String(item.name || "Product").slice(0, 200),
             price: Math.max(0, Number(item.price || 0)),
+            mrp: item.mrp ? Number(item.mrp) : null,          // ✅ save MRP for invoice discount display
             qty: Math.min(Math.max(1, Number(item.qty || item.quantity || 1)), 100),
             image: typeof item.image === "string" ? item.image : item.images?.[0]?.url || "",
             customization: {
@@ -130,7 +132,7 @@ export const createOrder = async (req, res) => {
             latitude: latitude ? Number(latitude) : undefined,
             longitude: longitude ? Number(longitude) : undefined,
             totalAmount: Number(totalAmount),
-            platformFee: Number(platformFee || 9),
+            platformFee: Number(platformFee || 11),           // ✅ updated default to 11
             deliveryCharge: Number(deliveryCharge || 0),
             payment: {
                 method,
@@ -296,7 +298,6 @@ export const updateOrderStatus = async (req, res) => {
                 try {
                     const wt = await calcTotalWeight(order.items);
                     const srResult = await createShiprocketOrder({ order, totalWeight: wt });
-
                     if (srResult.success) {
                         await Order.findByIdAndUpdate(order._id, {
                             $set: {
@@ -312,7 +313,6 @@ export const updateOrderStatus = async (req, res) => {
                             },
                         });
                         console.log(`[Shiprocket AUTO] PACKED → AWB: ${srResult.awb_code} ${srResult.mock ? "(MOCK)" : ""}`);
-
                         if (order.email && !order.email.includes("@rvgifts.com")) {
                             const tMail = getOrderStatusEmailTemplate({
                                 customerName: order.customerName, orderId: order._id,
@@ -391,7 +391,12 @@ export const requestRefund = async (req, res) => {
 
         res.json({ success: true, message: "Refund request submitted", refund: order.refund });
 
-        sendEmail({ to: process.env.ADMIN_EMAIL, subject: `💰 Refund Request #${order._id.toString().slice(-6).toUpperCase()} — ₹${order.totalAmount}`, html: `<p>Refund requested by ${order.customerName} for order #${order._id.toString().slice(-8).toUpperCase()}. Amount: ₹${order.totalAmount}</p>`, label: "Admin/RefundRequest" });
+        sendEmail({
+            to: process.env.ADMIN_EMAIL,
+            subject: `💰 Refund Request #${order._id.toString().slice(-6).toUpperCase()} — ₹${order.totalAmount}`,
+            html: `<p>Refund requested by ${order.customerName} for order #${order._id.toString().slice(-8).toUpperCase()}. Amount: ₹${order.totalAmount}</p>`,
+            label: "Admin/RefundRequest",
+        });
 
     } catch (err) {
         console.error("REQUEST REFUND:", err);

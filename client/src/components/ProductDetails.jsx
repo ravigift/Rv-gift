@@ -9,7 +9,7 @@ import {
     FaStar, FaRegStar, FaShoppingCart, FaBolt,
     FaTrash, FaCheckCircle, FaArrowLeft,
     FaUpload, FaTimes, FaPencilAlt, FaStickyNote,
-    FaRuler, FaBell,
+    FaRuler, FaBell, FaTag,
 } from "react-icons/fa";
 
 const StarRow = ({ value }) => (
@@ -21,6 +21,40 @@ const StarRow = ({ value }) => (
         )}
     </div>
 );
+
+// ✅ Safely extract MRP — supports mrp, originalPrice, comparePrice, compareAtPrice
+const getMrp = (product) => {
+    const val = product?.mrp ?? product?.originalPrice ?? product?.comparePrice ?? product?.compareAtPrice ?? null;
+    if (val === null || val === undefined || val === "") return null;
+    const n = Number(val);
+    return n > 0 ? n : null;
+};
+
+// ✅ Price display component
+const PriceDisplay = ({ price, mrp }) => {
+    const hasDiscount = mrp && Number(mrp) > Number(price);
+    const discountPct = hasDiscount
+        ? Math.round(((Number(mrp) - Number(price)) / Number(mrp)) * 100)
+        : null;
+
+    return (
+        <div className="flex flex-wrap items-end gap-3 mb-1">
+            <span className="text-4xl font-black text-zinc-900 leading-none">
+                ₹{Number(price).toLocaleString("en-IN")}
+            </span>
+            {hasDiscount && (
+                <>
+                    <span className="text-xl font-semibold text-zinc-400 line-through leading-none mb-0.5">
+                        ₹{Number(mrp).toLocaleString("en-IN")}
+                    </span>
+                    <span className="flex items-center gap-1 bg-green-500 text-white text-xs font-black px-2.5 py-1 rounded-lg leading-none mb-0.5">
+                        <FaTag size={9} /> {discountPct}% off
+                    </span>
+                </>
+            )}
+        </div>
+    );
+};
 
 const ProductDetails = () => {
     const { id } = useParams();
@@ -73,6 +107,13 @@ const ProductDetails = () => {
                     api.get(`/products/${id}`),
                     api.get(`/products/${id}/related`),
                 ]);
+                // ✅ Debug log — browser console mein dekho kya field naam aa raha hai
+                console.log("[ProductDetails] price fields:", {
+                    price: prod.price,
+                    mrp: prod.mrp,
+                    originalPrice: prod.originalPrice,
+                    comparePrice: prod.comparePrice,
+                });
                 setProduct(prod);
                 setRelatedProducts(related);
                 await fetchReviews();
@@ -198,9 +239,8 @@ const ProductDetails = () => {
         </div>
     );
 
-    // ✅ Optimized image URLs — different sizes for different uses
-    const heroImageUrl = imgUrl.detail(product.images?.[0]?.url || "");   // 800px for hero
-    const zoomImageUrl = imgUrl.zoom(product.images?.[0]?.url || "");     // 1200px for lightbox
+    const heroImageUrl = imgUrl.detail(product.images?.[0]?.url || "");
+    const zoomImageUrl = imgUrl.zoom(product.images?.[0]?.url || "");
 
     const highlightEntries = product.highlights
         ? (product.highlights instanceof Map ? [...product.highlights.entries()] : Object.entries(product.highlights))
@@ -212,6 +252,12 @@ const ProductDetails = () => {
         count: reviews.filter(r => r.rating === star).length,
         pct: reviews.length ? Math.round((reviews.filter(r => r.rating === star).length / reviews.length) * 100) : 0,
     }));
+
+    // ✅ Safely get MRP
+    const mrpValue = getMrp(product);
+    const hasDiscount = mrpValue && mrpValue > Number(product.price);
+    const savedAmount = hasDiscount ? mrpValue - Number(product.price) : 0;
+    const discountPct = hasDiscount ? Math.round((savedAmount / mrpValue) * 100) : null;
 
     return (
         <div className="min-h-screen bg-stone-100 py-6 px-4" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -246,7 +292,6 @@ const ProductDetails = () => {
                             {heroImageUrl ? (
                                 <div className="w-full h-full flex items-center justify-center p-8 overflow-hidden cursor-zoom-in"
                                     onClick={() => setImgZoomed(true)}>
-                                    {/* ✅ 800px optimized hero — eager load (above the fold) */}
                                     <img
                                         src={heroImageUrl}
                                         alt={product.name}
@@ -269,6 +314,11 @@ const ProductDetails = () => {
                                 {!product.inStock && (
                                     <span className="bg-red-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full">
                                         Sold Out
+                                    </span>
+                                )}
+                                {hasDiscount && discountPct && (
+                                    <span className="bg-green-500 text-white text-[11px] font-black px-2.5 py-1 rounded-full shadow-sm">
+                                        {discountPct}% OFF
                                     </span>
                                 )}
                             </div>
@@ -294,11 +344,19 @@ const ProductDetails = () => {
                                 <span className="text-xs text-zinc-400">{reviews.length} reviews</span>
                             </div>
 
-                            <div className="flex items-baseline gap-2 mb-3 pb-4 border-b border-stone-100">
-                                <p className="text-4xl font-black text-zinc-900">₹{product.price?.toLocaleString("en-IN")}</p>
-                                <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
-                                    Free Delivery ₹499+
-                                </span>
+                            {/* ✅ Price section */}
+                            <div className="mb-3 pb-4 border-b border-stone-100">
+                                <PriceDisplay price={product.price} mrp={mrpValue} />
+                                <div className="flex flex-wrap items-center gap-2 mt-2">
+                                    <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
+                                        Free Delivery ₹499+
+                                    </span>
+                                    {hasDiscount && savedAmount > 0 && (
+                                        <span className="text-xs text-green-700 font-bold bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+                                            You save ₹{savedAmount.toLocaleString("en-IN")}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Stock Indicator */}
@@ -372,14 +430,8 @@ const ProductDetails = () => {
                                             </label>
                                         ) : (
                                             <div className="relative inline-block">
-                                                {/* ✅ Customer upload preview — lazy load, small size */}
-                                                <img
-                                                    src={customImagePreview}
-                                                    alt="custom"
-                                                    loading="lazy"
-                                                    decoding="async"
-                                                    className="h-20 w-20 object-cover rounded-xl border-2 border-amber-300"
-                                                />
+                                                <img src={customImagePreview} alt="custom" loading="lazy" decoding="async"
+                                                    className="h-20 w-20 object-cover rounded-xl border-2 border-amber-300" />
                                                 <button onClick={removeCustomImage} className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center cursor-pointer">
                                                     <FaTimes size={9} />
                                                 </button>
@@ -398,7 +450,6 @@ const ProductDetails = () => {
                                 </div>
                             )}
 
-                            {/* ── BUTTONS ── */}
                             {product.inStock ? (
                                 <div className="flex gap-3 mt-auto">
                                     <button onClick={handleAddToCart}
@@ -498,7 +549,6 @@ const ProductDetails = () => {
                     </div>
                 )}
 
-                {/* ── Reviews ── */}
                 <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6">
                     <h2 className="font-black text-zinc-900 text-lg mb-5 flex items-center gap-2">
                         <span className="w-1 h-5 bg-amber-500 rounded-full" />Ratings & Reviews
@@ -602,18 +652,11 @@ const ProductDetails = () => {
                 )}
             </div>
 
-            {/* ── Lightbox ── */}
             {imgZoomed && (
                 <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-zoom-out"
                     onClick={() => setImgZoomed(false)}>
-                    {/* ✅ 1200px for lightbox — full quality zoom */}
-                    <img
-                        src={zoomImageUrl}
-                        alt={product.name}
-                        loading="eager"
-                        decoding="async"
-                        className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl"
-                    />
+                    <img src={zoomImageUrl} alt={product.name} loading="eager" decoding="async"
+                        className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl" />
                     <button className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-all cursor-pointer">
                         <FaTimes size={16} />
                     </button>

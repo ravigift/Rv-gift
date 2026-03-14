@@ -6,14 +6,23 @@ const productSchema = new mongoose.Schema(
             type: String,
             required: true,
             trim: true,
+            maxlength: 300,
         },
         description: {
             type: String,
             trim: true,
+            maxlength: 5000,
         },
         price: {
             type: Number,
             required: true,
+            min: 0,
+        },
+        // ✅ MRP / Original price — for discount display
+        mrp: {
+            type: Number,
+            default: null,
+            min: 0,
         },
         category: {
             type: String,
@@ -41,19 +50,36 @@ const productSchema = new mongoose.Schema(
         // ── Shipping ──
         weight: {
             type: Number,
-            default: 500,      // grams — default 500g
+            default: 500,
             min: [1, "Weight must be at least 1g"],
             max: [30000, "Weight cannot exceed 30kg"],
         },
         dimensions: {
-            length: { type: Number, default: 10 }, // cm
+            length: { type: Number, default: 10 },
             breadth: { type: Number, default: 10 },
             height: { type: Number, default: 10 },
         },
     },
-    { timestamps: true }
+    {
+        timestamps: true,
+        // ✅ Faster reads — Map converted to plain object in JSON
+        toJSON: { virtuals: true },
+        toObject: { virtuals: true },
+    }
 );
 
+// ✅ Text search index
 productSchema.index({ name: "text", description: "text", tags: "text" });
+
+// ✅ Compound index for category + stock listing (common query pattern)
+productSchema.index({ category: 1, inStock: 1, createdAt: -1 });
+
+// ✅ Virtual: discount percentage — auto-calculated, not stored
+productSchema.virtual("discountPercent").get(function () {
+    if (this.mrp && this.mrp > this.price) {
+        return Math.round(((this.mrp - this.price) / this.mrp) * 100);
+    }
+    return null;
+});
 
 export default mongoose.model("Product", productSchema);
