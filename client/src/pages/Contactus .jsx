@@ -16,8 +16,7 @@ export default function ContactUs() {
         setStatus("loading");
 
         try {
-            // Replace with your actual backend endpoint
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/contact`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/contact`, { // ✅ Fixed: removed extra /api
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(form),
@@ -62,13 +61,13 @@ export default function ContactUs() {
                         <InfoCard
                             icon="📞"
                             title="Call Us"
-                            line1="+91 82995 19532"
+                            line1="+91 82995 19532 / +91 97927 70976"
                             line2="Mon–Sat, 10am – 6pm"
                         />
                         <InfoCard
                             icon="📍"
                             title="Our Address"
-                            line1="Gadri chowk Dostpur chauraha, Akbarpur"
+                            line1="Gadhi Chowk, Dost Pur Road, Shahzadpur, Akbarpur"
                             line2="Ambedkar Nagar – 224122, UP, India"
                         />
                         <InfoCard

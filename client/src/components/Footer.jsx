@@ -268,7 +268,7 @@ const Footer = () => {
                                         <FaMapMarkerAlt size={11} color="#c9973a" />
                                     </div>
                                     <span>
-                                        Gadri Chowk, Dostpur Chauraha,<br />
+                                        Gadhi Chowk, Dost Pur Road, Shahzadpur,<br />
                                         Akbarpur, Ambedkar Nagar<br />
                                         UP – 224122
                                     </span>
@@ -277,7 +277,7 @@ const Footer = () => {
                                     <div className="ftr-contact-icon">
                                         <FaPhoneAlt size={11} color="#c9973a" />
                                     </div>
-                                    +91 82995 19532
+                                    +91 82995 19532, +91 97927 70976
                                 </a>
                                 <a href="mailto:officialrvgift@gmail.com" className="ftr-contact-row">
                                     <div className="ftr-contact-icon">

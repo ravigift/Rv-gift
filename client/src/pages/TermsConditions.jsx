@@ -102,8 +102,8 @@ function ContactBox() {
             <p><strong>RV Gift and Printing</strong></p>
             <p>Owner: Ravi Verma</p>
             <p>Email: officialrvgift@gmail.com</p>
-            <p>Phone: +91 82995 19532</p>
-            <p>Gandhi Chowk, Dostpur Chauraha, Akbarpur</p>
+            <p>Phone: +91 82995 19532, +91 97927 70976</p>
+            <p>Gadhi Chowk, Dost Pur Road, Shahzadpur, Akbarpur</p>
             <p>Ambedkar Nagar – 224122, Uttar Pradesh, India</p>
             <p>GSTIN: 09AOHPV4034Q3Z3</p>
         </div>

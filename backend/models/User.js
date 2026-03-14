@@ -45,10 +45,10 @@ const userSchema = new mongoose.Schema(
             minlength: [6, "Password must be at least 6 characters"],
         },
 
-        /* ── Mobile Number ── */
+        /* ── Mobile Number ── ✅ optional (users registered without phone) */
         phone: {
             type: String,
-            required: [true, "Mobile number is required"],
+            required: false,
             trim: true,
             match: [/^[6-9]\d{9}$/, "Please enter a valid 10-digit Indian mobile number"],
         },

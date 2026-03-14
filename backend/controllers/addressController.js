@@ -64,7 +64,7 @@ export const addAddress = async (req, res) => {
             isDefault: makeDefault,
         });
 
-        await user.save();
+        await user.save({ validateModifiedOnly: true }); // ✅ Fix: sirf modified fields validate karega
         res.status(201).json({
             success: true,
             message: "Address saved successfully",
@@ -116,7 +116,7 @@ export const updateAddress = async (req, res) => {
             address.isDefault = true;
         }
 
-        await user.save();
+        await user.save({ validateModifiedOnly: true }); // ✅ Fix
         res.json({ success: true, message: "Address updated", addresses: user.addresses });
     } catch (err) {
         console.error("UPDATE ADDRESS ERROR:", err);
@@ -146,7 +146,7 @@ export const deleteAddress = async (req, res) => {
             user.addresses[0].isDefault = true;
         }
 
-        await user.save();
+        await user.save({ validateModifiedOnly: true }); // ✅ Fix
         res.json({ success: true, message: "Address deleted", addresses: user.addresses });
     } catch (err) {
         console.error("DELETE ADDRESS ERROR:", err);
@@ -169,7 +169,7 @@ export const setDefaultAddress = async (req, res) => {
         user.addresses.forEach(a => { a.isDefault = false; });
         address.isDefault = true;
 
-        await user.save();
+        await user.save({ validateModifiedOnly: true }); // ✅ Fix
         res.json({ success: true, message: "Default address updated", addresses: user.addresses });
     } catch (err) {
         console.error("SET DEFAULT ERROR:", err);
@@ -211,7 +211,7 @@ export const verifyPincode = async (req, res) => {
             state: po.State,
             country: po.Country,
             pincode: pin,
-            serviceable: true, // All India delivery
+            serviceable: true,
         };
 
         // Cache it
@@ -220,7 +220,6 @@ export const verifyPincode = async (req, res) => {
         res.json(result);
     } catch (err) {
         console.error("PINCODE VERIFY ERROR:", err.message);
-        // Timeout or network error — still let user proceed
         res.status(503).json({ message: "Pincode service temporarily unavailable", serviceable: null });
     }
 };

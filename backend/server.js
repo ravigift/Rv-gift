@@ -15,6 +15,7 @@ import uploadRoutes from "./routes/uploadRoutes.js";
 import addressRoutes from "./routes/addressRoutes.js";
 import walkInRoutes from "./routes/walkInRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes .js";
+import contactRoute from "./routes/contact.js";
 // TODO (3 months): Re-enable when Shiprocket integration is active
 // import shiprocketRoutes from "./routes/shiprocketRoutes.js";
 import invoiceRoutes from "./routes/Invoiceroutes.js";
@@ -124,6 +125,7 @@ app.use("/api/uploads", uploadRoutes);
 app.use("/api/addresses", addressRoutes);
 app.use("/api/walkin", walkInRoutes);
 app.use("/api/payment", paymentRoutes);
+app.use("/api/contact", contactRoute);
 // TODO (3 months): Re-enable when Shiprocket integration is active
 // app.use("/api/shipping", shiprocketRoutes);
 app.use("/api/invoice", invoiceRoutes);
