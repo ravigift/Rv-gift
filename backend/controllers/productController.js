@@ -2,15 +2,52 @@ import Product from "../models/Product.js";
 import cloudinary from "../config/cloudinary.js";
 import { normalizeCategory } from "../utils/normalizeCategory.js";
 
-/* =========================
-   ✅ SAFE REGEX HELPER
-========================= */
+/* ─────────────────────────────────────────────
+   SAFE REGEX HELPER
+───────────────────────────────────────────── */
 const escapeRegex = (str) =>
     str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/* =========================
+/* ─────────────────────────────────────────────
+   CLOUDINARY HELPERS
+   All product images are stored in the
+   "rv-gifts/products" folder with:
+   - q_auto  → auto quality (no manual quality loss)
+   - f_auto  → WebP / AVIF served to modern browsers
+   - w_800   → max 800px wide (enough for product detail)
+   Thumbnails are derived on the fly by the frontend
+   using the optimizeImage() utility (w_400, w_200 etc.)
+   — no need to store multiple sizes in DB.
+───────────────────────────────────────────── */
+
+/**
+ * Build an optimized delivery URL from a stored Cloudinary URL.
+ * Inserts transformation parameters after /upload/.
+ * @param {string} url        - Raw Cloudinary URL from DB
+ * @param {number} width      - Max display width (default 800)
+ * @returns {string}
+ */
+const optimizeUrl = (url, width = 800) => {
+    if (!url || !url.includes("cloudinary.com")) return url ?? "";
+    return url.replace("/upload/", `/upload/q_auto,f_auto,w_${width}/`);
+};
+
+/**
+ * Delete a Cloudinary asset safely — never throws.
+ * @param {string} publicId
+ */
+const safeDestroy = async (publicId) => {
+    if (!publicId) return;
+    try {
+        await cloudinary.uploader.destroy(publicId);
+    } catch (e) {
+        console.warn("[Cloudinary] Delete failed:", publicId, e.message);
+    }
+};
+
+/* ─────────────────────────────────────────────
    CREATE PRODUCT (ADMIN)
-========================= */
+───────────────────────────────────────────── */
 export const createProduct = async (req, res) => {
     try {
         const {
@@ -27,8 +64,11 @@ export const createProduct = async (req, res) => {
         if (!req.files || req.files.length === 0)
             return res.status(400).json({ message: "At least one image is required" });
 
+        // Multer-Cloudinary already uploaded the files.
+        // file.path = raw Cloudinary URL, file.filename = public_id.
+        // We optimizeUrl here so the stored URL already serves WebP/compressed.
         const images = req.files.map((file) => ({
-            url: file.path,
+            url: optimizeUrl(file.path, 800),
             public_id: file.filename,
         }));
 
@@ -65,9 +105,9 @@ export const createProduct = async (req, res) => {
     }
 };
 
-/* =========================
+/* ─────────────────────────────────────────────
    GET ALL PRODUCTS
-========================= */
+───────────────────────────────────────────── */
 export const getAllProducts = async (req, res) => {
     try {
         const { search, category } = req.query;
@@ -89,6 +129,7 @@ export const getAllProducts = async (req, res) => {
         const products = await Product.find(query)
             .sort({ createdAt: -1 })
             .lean();
+
         res.json(products);
     } catch (error) {
         console.error("GET PRODUCTS ERROR:", error);
@@ -96,9 +137,9 @@ export const getAllProducts = async (req, res) => {
     }
 };
 
-/* =========================
+/* ─────────────────────────────────────────────
    GET SINGLE PRODUCT
-========================= */
+───────────────────────────────────────────── */
 export const getSingleProduct = async (req, res) => {
     try {
         const product = await Product.findById(req.params.id).lean();
@@ -111,9 +152,9 @@ export const getSingleProduct = async (req, res) => {
     }
 };
 
-/* =========================
+/* ─────────────────────────────────────────────
    UPDATE PRODUCT (ADMIN)
-========================= */
+───────────────────────────────────────────── */
 export const updateProduct = async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
@@ -142,22 +183,18 @@ export const updateProduct = async (req, res) => {
         if (updateData.isCustomizable !== undefined)
             updateData.isCustomizable = updateData.isCustomizable === true || updateData.isCustomizable === "true";
 
-        // ✅ Stock update — auto set inStock
         if (updateData.stock !== undefined) {
             updateData.stock = Math.max(0, Number(updateData.stock) || 0);
             updateData.inStock = updateData.stock > 0;
         }
 
+        // New images uploaded — delete old ones from Cloudinary, store optimized URLs
         if (req.files && req.files.length > 0) {
             for (const img of product.images) {
-                try {
-                    await cloudinary.uploader.destroy(img.public_id);
-                } catch (e) {
-                    console.warn("Cloudinary delete failed:", e.message);
-                }
+                await safeDestroy(img.public_id);
             }
             updateData.images = req.files.map((file) => ({
-                url: file.path,
+                url: optimizeUrl(file.path, 800),
                 public_id: file.filename,
             }));
         }
@@ -175,9 +212,9 @@ export const updateProduct = async (req, res) => {
     }
 };
 
-/* =========================
+/* ─────────────────────────────────────────────
    GET RELATED PRODUCTS
-========================= */
+───────────────────────────────────────────── */
 export const getRelatedProducts = async (req, res) => {
     try {
         const product = await Product.findById(req.params.id).lean();
@@ -198,9 +235,9 @@ export const getRelatedProducts = async (req, res) => {
     }
 };
 
-/* =========================
+/* ─────────────────────────────────────────────
    DELETE PRODUCT (ADMIN)
-========================= */
+───────────────────────────────────────────── */
 export const deleteProduct = async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
@@ -208,11 +245,7 @@ export const deleteProduct = async (req, res) => {
             return res.status(404).json({ message: "Product not found" });
 
         for (const img of product.images) {
-            try {
-                await cloudinary.uploader.destroy(img.public_id);
-            } catch (e) {
-                console.warn("Cloudinary delete failed:", e.message);
-            }
+            await safeDestroy(img.public_id);
         }
 
         await product.deleteOne();

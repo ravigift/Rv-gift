@@ -3,10 +3,10 @@ import dotenv from "dotenv";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import compression from "compression";          // ← npm install compression
 import connectDB from "./config/db.js";
 
 // Routes
-
 import authRoutes from "./routes/authRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
@@ -14,10 +14,10 @@ import reviewRoutes from "./routes/reviewRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import addressRoutes from "./routes/addressRoutes.js";
 import walkInRoutes from "./routes/walkInRoutes.js";
-import paymentRoutes from "./routes/paymentRoutes .js";        // FIX 1: space removed
-// import shiprocketRoutes from "./routes/shiprocketRoutes.js";  // future use, currently not used
+import paymentRoutes from "./routes/paymentRoutes .js";
+// TODO (3 months): Re-enable when Shiprocket integration is active
+// import shiprocketRoutes from "./routes/shiprocketRoutes.js";
 import invoiceRoutes from "./routes/Invoiceroutes.js";
-
 
 dotenv.config();
 connectDB();
@@ -37,7 +37,7 @@ const allowedOrigins = [
     // Vercel preview
     "https://rv-gift.vercel.app",
     "https://rv-gift-admin.vercel.app",
-    "https://rv-gift-gules.vercel.app",  // user frontend preview
+    "https://rv-gift-gules.vercel.app",
 
     // Production
     "https://rvgift.com",
@@ -70,6 +70,13 @@ app.use(
    SECURITY
 ───────────────────────────── */
 app.use(helmet());
+
+/* ─────────────────────────────
+   GZIP COMPRESSION
+   Compresses all JSON/HTML responses — typically 60-80% smaller,
+   which means faster API responses and page loads.
+───────────────────────────── */
+app.use(compression());
 
 /* ─────────────────────────────
    RATE LIMIT
@@ -117,6 +124,7 @@ app.use("/api/uploads", uploadRoutes);
 app.use("/api/addresses", addressRoutes);
 app.use("/api/walkin", walkInRoutes);
 app.use("/api/payment", paymentRoutes);
+// TODO (3 months): Re-enable when Shiprocket integration is active
 // app.use("/api/shipping", shiprocketRoutes);
 app.use("/api/invoice", invoiceRoutes);
 

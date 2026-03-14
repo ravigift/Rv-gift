@@ -5,251 +5,8 @@ import {
     FaBox, FaClipboardList, FaPlus, FaRupeeSign,
     FaShoppingBag, FaTruck, FaCheckCircle, FaClock,
     FaArrowRight, FaFire, FaMapMarkerAlt, FaCashRegister,
-    FaShieldAlt, FaKey, FaEnvelope, FaPaperPlane, FaLock, FaRedo,
 } from "react-icons/fa";
-
-// ══════════════════════════════════════════════
-// SECURITY SECTION (inline — same pages folder)
-// ══════════════════════════════════════════════
-const STEPS = { IDLE: "idle", OTP_SENT: "otp_sent", SUCCESS: "success" };
-
-const SecuritySection = () => {
-    const [step, setStep] = useState(STEPS.IDLE);
-    const [sendingOtp, setSendingOtp] = useState(false);
-    const [otp, setOtp] = useState("");
-    const [newPin, setNewPin] = useState("");
-    const [confirmPin, setConfirmPin] = useState("");
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
-    const [info, setInfo] = useState("");
-
-    const resetState = () => {
-        setOtp(""); setNewPin(""); setConfirmPin("");
-        setError(""); setInfo(""); setStep(STEPS.IDLE);
-    };
-
-    const handleSendOtp = async () => {
-        setSendingOtp(true); setError(""); setInfo("");
-        try {
-            await api.post("/walkin/delete-pin/send-otp");
-            setStep(STEPS.OTP_SENT);
-            setInfo("OTP admin email pe bhej diya gaya ✉️");
-        } catch (err) {
-            setError(err.response?.data?.message || "OTP send karne mein error aaya");
-        } finally { setSendingOtp(false); }
-    };
-
-    const handleSavePin = async () => {
-        setError("");
-        if (!otp.trim()) return setError("OTP required hai");
-        if (newPin.length < 4) return setError("PIN kam se kam 4 digits ka hona chahiye");
-        if (newPin !== confirmPin) return setError("PINs match nahi kar rahe");
-        setSaving(true);
-        try {
-            await api.post("/walkin/delete-pin/reset", { otp: Number(otp), newPin });
-            setStep(STEPS.SUCCESS);
-        } catch (err) {
-            setError(err.response?.data?.message || "PIN reset mein error aaya");
-        } finally { setSaving(false); }
-    };
-
-    const inputStyle = {
-        width: "100%", padding: "10px 12px",
-        border: "1px solid #E2E8F0", borderRadius: 10,
-        fontSize: 13, fontWeight: 600, color: "#0F172A",
-        outline: "none", fontFamily: "'DM Sans', sans-serif",
-        boxSizing: "border-box",
-    };
-    const labelStyle = { fontSize: 11, fontWeight: 700, color: "#64748B", marginBottom: 6, display: "block", textTransform: "uppercase", letterSpacing: "0.05em" };
-
-    return (
-        <div style={{
-            background: "#fff", borderRadius: 16,
-            border: "1px solid #E2E8F0",
-            overflow: "hidden",
-            boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
-        }}>
-            {/* Header */}
-            <div style={{
-                padding: "14px 18px", borderBottom: "1px solid #F1F5F9",
-                display: "flex", alignItems: "center", gap: 10,
-                background: "linear-gradient(135deg,#1E1B4B,#312E81)",
-            }}>
-                <div style={{
-                    width: 30, height: 30, borderRadius: 8,
-                    background: "rgba(167,139,250,0.2)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                    <FaShieldAlt size={13} color="#A78BFA" />
-                </div>
-                <div>
-                    <div style={{ fontWeight: 800, fontSize: 13, color: "#fff" }}>Security</div>
-                    <div style={{ fontSize: 10, color: "#A78BFA" }}>Delete PIN manage karo</div>
-                </div>
-            </div>
-
-            <div style={{ padding: "16px 18px" }}>
-
-                {/* ── SUCCESS ── */}
-                {step === STEPS.SUCCESS && (
-                    <div style={{
-                        background: "#ECFDF5", border: "1px solid #A7F3D0",
-                        borderRadius: 12, padding: "20px 16px", textAlign: "center",
-                    }}>
-                        <FaCheckCircle size={26} color="#10B981" style={{ margin: "0 auto 10px" }} />
-                        <div style={{ fontWeight: 800, fontSize: 14, color: "#065F46", marginBottom: 4 }}>
-                            PIN successfully set ho gaya!
-                        </div>
-                        <div style={{ fontSize: 11, color: "#059669", marginBottom: 14 }}>
-                            Ab bill delete karte waqt yeh naya PIN use karo.
-                        </div>
-                        <button onClick={resetState} style={{
-                            padding: "8px 20px", borderRadius: 8,
-                            background: "#10B981", color: "#fff",
-                            fontWeight: 700, fontSize: 12, border: "none", cursor: "pointer",
-                            fontFamily: "'DM Sans', sans-serif",
-                        }}>Done</button>
-                    </div>
-                )}
-
-                {/* ── IDLE ── */}
-                {step === STEPS.IDLE && (
-                    <>
-                        <div style={{
-                            background: "#F5F3FF", border: "1px solid #DDD6FE",
-                            borderRadius: 10, padding: "12px 14px", marginBottom: 14,
-                            display: "flex", gap: 10, alignItems: "flex-start",
-                        }}>
-                            <FaKey size={12} color="#7C3AED" style={{ marginTop: 2, flexShrink: 0 }} />
-                            <div style={{ fontSize: 12, color: "#5B21B6", lineHeight: 1.6 }}>
-                                Admin email pe OTP aayega → verify karo → naya Delete PIN set karo.
-                                Yeh PIN bill delete karte waqt maanga jaayega.
-                            </div>
-                        </div>
-
-                        {error && (
-                            <div style={{ fontSize: 12, color: "#DC2626", fontWeight: 600, marginBottom: 10 }}>
-                                ⚠ {error}
-                            </div>
-                        )}
-
-                        <button onClick={handleSendOtp} disabled={sendingOtp} style={{
-                            width: "100%", padding: "11px 0",
-                            background: "linear-gradient(135deg,#7C3AED,#6D28D9)",
-                            color: "#fff", border: "none", borderRadius: 10,
-                            fontWeight: 800, fontSize: 13, cursor: "pointer",
-                            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                            fontFamily: "'DM Sans', sans-serif",
-                            boxShadow: "0 4px 14px rgba(109,40,217,0.25)",
-                            opacity: sendingOtp ? 0.7 : 1,
-                        }}>
-                            {sendingOtp ? (
-                                <><div style={{
-                                    width: 14, height: 14, border: "2px solid rgba(255,255,255,0.4)",
-                                    borderTop: "2px solid #fff", borderRadius: "50%",
-                                    animation: "spin 0.8s linear infinite",
-                                }} /> OTP bhej rahe hain...</>
-                            ) : (
-                                <><FaEnvelope size={12} /> OTP Email Bhejo</>
-                            )}
-                        </button>
-                    </>
-                )}
-
-                {/* ── OTP SENT ── */}
-                {step === STEPS.OTP_SENT && (
-                    <>
-                        {info && (
-                            <div style={{
-                                background: "#EFF6FF", border: "1px solid #BFDBFE",
-                                borderRadius: 10, padding: "10px 12px", marginBottom: 14,
-                                display: "flex", alignItems: "center", gap: 8,
-                                fontSize: 12, fontWeight: 600, color: "#1D4ED8",
-                            }}>
-                                <FaPaperPlane size={10} /> {info}
-                            </div>
-                        )}
-
-                        <div style={{ marginBottom: 12 }}>
-                            <label style={labelStyle}>Email OTP</label>
-                            <input type="number" value={otp} placeholder="6-digit OTP"
-                                onChange={e => { setOtp(e.target.value); setError(""); }}
-                                style={{ ...inputStyle, letterSpacing: "0.2em", fontFamily: "monospace" }} />
-                        </div>
-
-                        <div style={{ marginBottom: 12 }}>
-                            <label style={labelStyle}>Naya Delete PIN</label>
-                            <div style={{ position: "relative" }}>
-                                <FaLock size={10} style={{ position: "absolute", left: 12, top: 12, color: "#94A3B8" }} />
-                                <input type="password" value={newPin} placeholder="Min 4 digits"
-                                    inputMode="numeric"
-                                    onChange={e => { setNewPin(e.target.value); setError(""); }}
-                                    style={{ ...inputStyle, paddingLeft: 32, letterSpacing: "0.15em" }} />
-                            </div>
-                        </div>
-
-                        <div style={{ marginBottom: 14 }}>
-                            <label style={labelStyle}>PIN Confirm Karo</label>
-                            <div style={{ position: "relative" }}>
-                                <FaLock size={10} style={{ position: "absolute", left: 12, top: 12, color: "#94A3B8" }} />
-                                <input type="password" value={confirmPin} placeholder="Same PIN dobara"
-                                    inputMode="numeric"
-                                    onChange={e => { setConfirmPin(e.target.value); setError(""); }}
-                                    style={{ ...inputStyle, paddingLeft: 32, letterSpacing: "0.15em" }} />
-                            </div>
-                        </div>
-
-                        {error && (
-                            <div style={{ fontSize: 12, color: "#DC2626", fontWeight: 600, marginBottom: 10 }}>
-                                ⚠ {error}
-                            </div>
-                        )}
-
-                        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                            <button onClick={handleSendOtp} disabled={sendingOtp} style={{
-                                padding: "10px 14px", borderRadius: 10,
-                                border: "1px solid #E2E8F0", background: "#fff",
-                                fontSize: 12, fontWeight: 700, color: "#64748B",
-                                cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-                                fontFamily: "'DM Sans', sans-serif",
-                                opacity: sendingOtp ? 0.6 : 1,
-                            }}>
-                                <FaRedo size={9} /> {sendingOtp ? "..." : "Resend"}
-                            </button>
-                            <button onClick={handleSavePin} disabled={saving} style={{
-                                flex: 1, padding: "10px 0",
-                                background: "linear-gradient(135deg,#7C3AED,#6D28D9)",
-                                color: "#fff", border: "none", borderRadius: 10,
-                                fontWeight: 800, fontSize: 13, cursor: "pointer",
-                                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                                fontFamily: "'DM Sans', sans-serif",
-                                opacity: saving ? 0.7 : 1,
-                                boxShadow: "0 4px 14px rgba(109,40,217,0.25)",
-                            }}>
-                                {saving ? (
-                                    <><div style={{
-                                        width: 13, height: 13, border: "2px solid rgba(255,255,255,0.4)",
-                                        borderTop: "2px solid #fff", borderRadius: "50%",
-                                        animation: "spin 0.8s linear infinite",
-                                    }} /> Saving...</>
-                                ) : (
-                                    <><FaCheckCircle size={11} /> Set PIN</>
-                                )}
-                            </button>
-                        </div>
-
-                        <button onClick={resetState} style={{
-                            width: "100%", padding: "6px 0",
-                            background: "none", border: "none",
-                            fontSize: 12, color: "#94A3B8", cursor: "pointer",
-                            fontFamily: "'DM Sans', sans-serif",
-                        }}>Cancel</button>
-                    </>
-                )}
-            </div>
-        </div>
-    );
-};
+import SecuritySection from "../pages/SecuritySection";
 
 // ══════════════════════════════════════════════
 // MAIN DASHBOARD
@@ -267,18 +24,25 @@ const AdminDashboard = () => {
         const fetchData = async () => {
             try {
                 setFetchError(null);
-                const [ordersRes, productsRes] = await Promise.all([
-                    api.get("/orders").catch(() => ({ data: [] })),
-                    api.get("/products").catch(() => ({ data: [] })),
+
+                // ✅ Sab API calls ek saath — Promise.allSettled se ek fail hone pe baki block nahi hoti
+                const [ordersRes, productsRes, usersRes, posRes] = await Promise.allSettled([
+                    api.get("/orders"),
+                    api.get("/products"),
+                    api.get("/auth/users"),
+                    api.get("/walkin/stats"),
                 ]);
-                const usersRes = await api.get("/auth/users").catch(() => ({ data: [] }));
-                const posRes = await api.get("/walkin/stats").catch(() => ({ data: null }));
 
-                const list = Array.isArray(ordersRes.data) ? ordersRes.data : [];
-                const prodList = Array.isArray(productsRes.data) ? productsRes.data : [];
-                const userList = Array.isArray(usersRes.data) ? usersRes.data : [];
+                const list = ordersRes.status === "fulfilled" && Array.isArray(ordersRes.value?.data)
+                    ? ordersRes.value.data : [];
+                const prodList = productsRes.status === "fulfilled" && Array.isArray(productsRes.value?.data)
+                    ? productsRes.value.data : [];
+                const userList = usersRes.status === "fulfilled" && Array.isArray(usersRes.value?.data)
+                    ? usersRes.value.data : [];
 
-                if (posRes.data) setPosStats(posRes.data);
+                if (posRes.status === "fulfilled" && posRes.value?.data) {
+                    setPosStats(posRes.value.data);
+                }
 
                 const delivered = list.filter(o => o.orderStatus === "DELIVERED");
                 const pending = list.filter(o => o.orderStatus === "PLACED");
@@ -503,7 +267,13 @@ const AdminDashboard = () => {
                             <span style={{ marginLeft: "auto", fontSize: 11, color: "#94A3B8" }}>{customerLocations.length} tracked</span>
                         </div>
                         <div style={{ padding: "16px 18px" }}>
-                            {cityStats.length === 0 ? (
+                            {loading ? (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                                    {[0, 1, 2, 3].map(i => (
+                                        <div key={i} style={{ height: 28, borderRadius: 8, background: "#F1F5F9", animation: "pulse 1.5s infinite" }} />
+                                    ))}
+                                </div>
+                            ) : cityStats.length === 0 ? (
                                 <div style={{ textAlign: "center", padding: "28px 0" }}>
                                     <FaMapMarkerAlt size={26} style={{ margin: "0 auto 8px", color: "#CBD5E1", display: "block" }} />
                                     <p style={{ fontSize: 13, color: "#94A3B8" }}>No location data yet</p>
@@ -633,7 +403,7 @@ const AdminDashboard = () => {
                     </div>
                     {loading ? (
                         <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
-                            {[0, 1, 2].map(i => <div key={i} style={{ height: 48, borderRadius: 10, background: "#F1F5F9" }} />)}
+                            {[0, 1, 2].map(i => <div key={i} style={{ height: 48, borderRadius: 10, background: "#F1F5F9", animation: "pulse 1.5s infinite" }} />)}
                         </div>
                     ) : recentOrders.length === 0 ? (
                         <div style={{ padding: "40px 0", textAlign: "center" }}>

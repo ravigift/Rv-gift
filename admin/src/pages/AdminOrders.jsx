@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "../api/adminApi";
+import { imgUrl } from "../utils/imageUrl"; // ✅ Cloudinary optimization
 import {
     FaSync, FaUser, FaPhone, FaMapMarkerAlt,
     FaBox, FaChevronRight, FaWhatsapp, FaBoxOpen,
@@ -320,6 +321,8 @@ const RefundCard = ({ order, onRefundUpdate }) => {
 /* ════════════════════════════════════════
    MAIN COMPONENT
 ════════════════════════════════════════ */
+const PAGE_SIZE = 20; // ✅ 20 orders per page
+
 const AdminOrders = () => {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -329,6 +332,7 @@ const AdminOrders = () => {
     const [filterStatus, setFilterStatus] = useState("ALL");
     const [expandedId, setExpandedId] = useState(null);
     const [downloadingId, setDownloadingId] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1); // ✅ Pagination
 
     const fetchOrders = useCallback(async () => {
         try {
@@ -389,6 +393,17 @@ const AdminOrders = () => {
     const filtered = filterStatus === "ALL" ? orders
         : filterStatus === "REFUND_PENDING" ? orders.filter(o => o.refund?.status === "REQUESTED")
             : orders.filter(o => o.orderStatus === filterStatus);
+
+    // ✅ Pagination — sirf 20 orders render hoti hain ek baar
+    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+    const paginatedOrders = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+    // ✅ Filter change hone pe page 1 pe reset
+    const handleFilterChange = (key) => {
+        setFilterStatus(key);
+        setCurrentPage(1);
+        setExpandedId(null);
+    };
 
     const stats = {
         total: orders.length,
@@ -459,7 +474,7 @@ const AdminOrders = () => {
                         { key: "CANCELLED", label: "Cancelled", count: stats.cancelled, dot: STATUS_CONFIG.CANCELLED.dot },
                         { key: "REFUND_PENDING", label: "🔄 Refunds", count: pendingRefunds },
                     ].map(({ key, label, count, dot }) => (
-                        <button key={key} onClick={() => setFilterStatus(key)}
+                        <button key={key} onClick={() => handleFilterChange(key)}
                             className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all duration-200 cursor-pointer ${filterStatus === key
                                 ? key === "REFUND_PENDING" ? "bg-orange-500 text-white border-orange-500" : "bg-zinc-900 text-white border-zinc-900"
                                 : key === "REFUND_PENDING" && count > 0 ? "bg-orange-50 text-orange-600 border-orange-200"
@@ -479,7 +494,7 @@ const AdminOrders = () => {
                 )}
 
                 <div className="space-y-4">
-                    {filtered.map(order => {
+                    {paginatedOrders.map(order => {
                         const cfg = STATUS_CONFIG[order.orderStatus] || STATUS_CONFIG.PLACED;
                         const isCancelled = order.orderStatus === "CANCELLED";
                         const nextStatus = isCancelled ? null : FLOW[order.orderStatus];
@@ -650,7 +665,7 @@ const AdminOrders = () => {
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-12 h-12 rounded-lg bg-white border border-stone-200 overflow-hidden flex items-center justify-center shrink-0">
                                                                 {item.image
-                                                                    ? <img src={item.image} alt={item.name} className="w-full h-full object-contain p-1" onError={e => { e.target.style.display = "none"; }} />
+                                                                    ? <img src={imgUrl.thumbnail(item.image)} alt={item.name} loading="lazy" decoding="async" className="w-full h-full object-contain p-1" onError={e => { e.target.style.display = "none"; }} />
                                                                     : <FaBoxOpen size={16} className="text-stone-400" />}
                                                             </div>
                                                             <div className="flex-1 min-w-0">
@@ -681,6 +696,47 @@ const AdminOrders = () => {
                         );
                     })}
                 </div>
+
+                {/* ✅ Pagination */}
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-stone-200">
+                        <p className="text-sm text-zinc-400 font-medium">
+                            Showing <span className="font-bold text-zinc-600">{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)}</span> of <span className="font-bold text-zinc-600">{filtered.length}</span> orders
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => { setCurrentPage(p => p - 1); setExpandedId(null); window.scrollTo(0, 0); }}
+                                disabled={currentPage === 1}
+                                className="px-4 py-2 text-sm font-bold bg-white border border-stone-200 text-zinc-600 rounded-xl hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer">
+                                ← Prev
+                            </button>
+                            <div className="flex items-center gap-1">
+                                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                    .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                                    .reduce((acc, p, i, arr) => {
+                                        if (i > 0 && p - arr[i - 1] > 1) acc.push("...");
+                                        acc.push(p);
+                                        return acc;
+                                    }, [])
+                                    .map((p, i) => p === "..." ? (
+                                        <span key={`dot-${i}`} className="px-2 text-zinc-400 text-sm">...</span>
+                                    ) : (
+                                        <button key={p} onClick={() => { setCurrentPage(p); setExpandedId(null); window.scrollTo(0, 0); }}
+                                            className={`w-9 h-9 rounded-xl text-sm font-bold transition-all cursor-pointer ${currentPage === p ? "bg-zinc-900 text-white" : "bg-white border border-stone-200 text-zinc-600 hover:bg-stone-50"}`}>
+                                            {p}
+                                        </button>
+                                    ))}
+                            </div>
+                            <button
+                                onClick={() => { setCurrentPage(p => p + 1); setExpandedId(null); window.scrollTo(0, 0); }}
+                                disabled={currentPage === totalPages}
+                                className="px-4 py-2 text-sm font-bold bg-white border border-stone-200 text-zinc-600 rounded-xl hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer">
+                                Next →
+                            </button>
+                        </div>
+                    </div>
+                )}
+
             </div>
         </div>
     );

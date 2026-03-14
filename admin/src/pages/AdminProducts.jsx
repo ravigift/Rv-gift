@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/adminApi";
+import { imgUrl } from "../utils/imageUrl"; // ✅ Cloudinary optimization
 import {
     FaPlus, FaSync, FaEdit, FaTrash, FaSearch,
     FaBoxOpen, FaBoxes,
@@ -247,7 +248,9 @@ const AdminProducts = () => {
                             </div>
                             <div>
                                 {filtered.map((product, idx) => {
-                                    const img = product.images?.[0]?.url || product.image || null;
+                                    // ✅ Optimized: 200px thumbnail — lazy load
+                                    const rawImg = product.images?.[0]?.url || product.image || null;
+                                    const img = rawImg ? imgUrl.thumbnail(rawImg) : null;
                                     const sb = stockBadge(product);
                                     const isES = editingStockId === product._id;
                                     const isIC = confirmId === product._id;
@@ -265,7 +268,8 @@ const AdminProducts = () => {
                                         >
                                             <div style={{ fontSize: 11, color: "#CBD5E1", fontWeight: 600 }}>{idx + 1}</div>
                                             <div style={{ width: 36, height: 36, borderRadius: 8, background: "#F1F5F9", border: "1px solid #E2E8F0", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                                {img ? <img src={img} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "contain", padding: 3 }} />
+                                                {img
+                                                    ? <img src={img} alt={product.name} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "contain", padding: 3 }} />
                                                     : <FaBoxOpen size={13} style={{ color: "#CBD5E1" }} />}
                                             </div>
                                             <div style={{ minWidth: 0 }}>
@@ -336,8 +340,10 @@ const AdminProducts = () => {
 
                         {/* ── MOBILE CARDS ── */}
                         <div className="md:hidden">
-                            {filtered.map((product, idx) => {
-                                const img = product.images?.[0]?.url || product.image || null;
+                            {filtered.map((product) => {
+                                // ✅ Optimized: 200px thumbnail — lazy load
+                                const rawImg = product.images?.[0]?.url || product.image || null;
+                                const img = rawImg ? imgUrl.thumbnail(rawImg) : null;
                                 const sb = stockBadge(product);
                                 const isES = editingStockId === product._id;
                                 const isIC = confirmId === product._id;
@@ -347,7 +353,6 @@ const AdminProducts = () => {
                                         borderBottom: "1px solid #F1F5F9",
                                         opacity: deletingId === product._id ? 0.5 : 1
                                     }}>
-                                        {/* Top row: image + info + price */}
                                         <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                                             <div style={{
                                                 width: 48, height: 48, borderRadius: 10,
@@ -356,7 +361,7 @@ const AdminProducts = () => {
                                                 display: "flex", alignItems: "center", justifyContent: "center"
                                             }}>
                                                 {img
-                                                    ? <img src={img} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "contain", padding: 4 }} />
+                                                    ? <img src={img} alt={product.name} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "contain", padding: 4 }} />
                                                     : <FaBoxOpen size={16} style={{ color: "#CBD5E1" }} />}
                                             </div>
                                             <div style={{ flex: 1, minWidth: 0 }}>
@@ -368,7 +373,6 @@ const AdminProducts = () => {
                                                         ₹{Number(product.price || 0).toLocaleString("en-IN")}
                                                     </p>
                                                 </div>
-                                                {/* Category + Stock in one row */}
                                                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
                                                     <span style={{ background: "#FFFBEB", border: "1px solid #FDE68A", color: "#92400E", fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 20 }}>
                                                         {formatCat(product.category)}
@@ -398,7 +402,6 @@ const AdminProducts = () => {
                                             </div>
                                         </div>
 
-                                        {/* Action buttons — compact */}
                                         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                                             <Link to={`/admin/products/${product._id}/edit`} style={{
                                                 flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
