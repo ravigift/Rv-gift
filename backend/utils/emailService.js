@@ -11,7 +11,6 @@ const resend = new Resend(process.env.RESEND_API_KEY);
  * @param {string}   [opts.label]
  * @param {Array}    [opts.attachments]  — [{ filename, content (Buffer) }]
  */
-
 export const sendEmail = async ({ to, subject, html, label = "", attachments = [] }) => {
     if (!to) {
         console.log(`[${label}] skipped — no email`);
@@ -24,9 +23,7 @@ export const sendEmail = async ({ to, subject, html, label = "", attachments = [
             to,
             subject,
             html,
-
-            // ✅ customer reply yaha aayega
-            reply_to: "officialrvgift@gmail.com"
+            replyTo: "officialrvgift@gmail.com", // ✅ camelCase — Resend SDK ka sahi format
         };
 
         if (attachments.length > 0) {
@@ -37,7 +34,6 @@ export const sendEmail = async ({ to, subject, html, label = "", attachments = [
         }
 
         await resend.emails.send(payload);
-
         console.log(`[${label}] Email sent → ${to}${attachments.length ? ` (+${attachments.length} attachment)` : ""}`);
 
     } catch (error) {
