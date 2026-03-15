@@ -2,9 +2,10 @@ import axios from "axios";
 
 const adminApi = axios.create({
     baseURL: import.meta.env.VITE_API_URL || "http://localhost:9000/api",
-    timeout: 60000, // ✅ 60 sec — Render cold start
+    timeout: 60000, // 60s — Render cold start handle karta hai
 });
 
+// ── Request: admin token attach ──────────────────────────────
 adminApi.interceptors.request.use(
     (config) => {
         try {
@@ -15,8 +16,7 @@ adminApi.interceptors.request.use(
                     config.headers.Authorization = `Bearer ${parsed.token}`;
                 }
             }
-        } catch (err) {
-            console.warn("Invalid adminAuth storage");
+        } catch {
             localStorage.removeItem("adminAuth");
         }
         return config;
@@ -24,23 +24,16 @@ adminApi.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-let consecutiveUnauthorized = 0;
-
+// ── Response: error handling ─────────────────────────────────
 adminApi.interceptors.response.use(
-    (response) => {
-        consecutiveUnauthorized = 0;
-        return response;
-    },
+    (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            consecutiveUnauthorized++;
-
-            const adminAuth = localStorage.getItem("adminAuth");
             const isLoginEndpoint = error.config?.url?.includes("/auth/login");
 
-            if (adminAuth && !isLoginEndpoint && consecutiveUnauthorized >= 2) {
-                console.warn("Admin token expired — logging out");
-                consecutiveUnauthorized = 0;
+            // Login endpoint ki 401 ignore karo — wrong password ka case hai
+            // Baaki sab 401 = token expire/invalid → clean logout
+            if (!isLoginEndpoint) {
                 localStorage.removeItem("adminAuth");
                 if (!window.location.pathname.includes("/admin/login")) {
                     window.location.replace("/admin/login");

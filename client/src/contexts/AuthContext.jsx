@@ -1,11 +1,11 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import api from "../api/axios";
+import { store } from "../app/store";       // ✅ Redux store
+import { clearCart } from "../features/cart/cartSlice"; // ✅ clearCart action
 
 const AuthContext = createContext(null);
 
-/* =========================
-   GET LOCATION HELPER
-========================= */
+/* ── Location helper ── */
 const requestLocation = () => {
     return new Promise((resolve) => {
         if (!navigator.geolocation) return resolve(null);
@@ -25,9 +25,7 @@ const requestLocation = () => {
                         "Unknown";
                     const state = data.address?.state || "";
                     resolve({ latitude, longitude, city, state });
-                } catch {
-                    resolve(null);
-                }
+                } catch { resolve(null); }
             },
             () => resolve(null),
             { timeout: 5000 }
@@ -67,23 +65,8 @@ export const AuthProvider = ({ children }) => {
         if (location) {
             try {
                 await api.post("/auth/save-location", { userId, ...location });
-            } catch {
-                // silent fail
-            }
+            } catch { /* silent fail */ }
         }
-    };
-
-    /* ── Login (email + password) ── */
-    const login = async (email, password) => {
-        const { data } = await api.post("/auth/login", { email, password });
-        _saveAuth(data);
-        saveUserLocation(data._id);
-    };
-
-    /* ── Login with data directly (after OTP verify) ── */
-    const loginWithData = (data) => {
-        _saveAuth(data);
-        saveUserLocation(data._id);
     };
 
     /* ── Internal: save to localStorage + state ── */
@@ -101,16 +84,35 @@ export const AuthProvider = ({ children }) => {
         setUser(authData.user);
     };
 
-    /* ── Register — now just calls API, no auto login ── */
-    // Register.jsx handles OTP flow itself
-    const register = async (name, email, password) => {
-        await api.post("/auth/register", { name, email, password });
-        // No auto login — OTP verification required
+    /* ── Login ── */
+    const login = async (email, password) => {
+        const { data } = await api.post("/auth/login", { email, password });
+        _saveAuth(data);
+        saveUserLocation(data._id);
     };
 
-    /* ── Logout ── */
+    /* ── Login with data (after OTP verify) ── */
+    const loginWithData = (data) => {
+        _saveAuth(data);
+        saveUserLocation(data._id);
+    };
+
+    /* ── Register ── */
+    const register = async (name, email, password) => {
+        await api.post("/auth/register", { name, email, password });
+    };
+
+    /* ── Logout — cart bhi clear karo ── */
     const logout = () => {
+        // ✅ Redux cart clear karo — doosre user ko nahi dikhega
+        store.dispatch(clearCart());
+
+        // ✅ localStorage se auth + cart data hatao
+        const userId = user?._id || "guest";
         localStorage.removeItem("auth");
+        localStorage.removeItem(`persist:cart_${userId}`); // user-specific cart key
+        localStorage.removeItem("cartItems");               // CartContext ka bhi (agar use ho)
+
         setUser(null);
         setLocationAsked(false);
     };

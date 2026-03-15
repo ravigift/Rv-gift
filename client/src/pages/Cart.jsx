@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../hooks/useCart";
 import { FaArrowRight, FaShoppingBag, FaTag, FaShoppingCart, FaMinus, FaPlus, FaTrash } from "react-icons/fa";
 
+// ✅ No @import — fonts loaded in index.html
 const PLATFORM_FEE = 9;
 const FREE_DELIVERY_ABOVE = 499;
 const DELIVERY_CHARGE = 49;
@@ -20,7 +21,6 @@ const Cart = () => {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center px-4"
                 style={{ fontFamily: "'DM Sans', sans-serif", background: "#f8f7f5" }}>
-                <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');`}</style>
                 <div className="text-center">
                     <div className="w-28 h-28 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner"
                         style={{ background: "linear-gradient(135deg, #fef9f0, #fef3c7)" }}>
@@ -43,16 +43,15 @@ const Cart = () => {
     return (
         <div className="min-h-screen py-8 px-4" style={{ fontFamily: "'DM Sans', sans-serif", background: "#f8f7f5" }}>
             <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
                 @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-                .fade-up { animation: fadeUp 0.3s ease forwards; }
-                .item-card { transition: all 0.2s ease; }
+                .fade-up     { animation: fadeUp 0.3s ease forwards; }
+                .item-card   { transition: all 0.2s ease; }
                 .item-card:hover { transform: translateY(-1px); }
-                .qty-btn { transition: all 0.15s ease; }
-                .qty-btn:hover { transform: scale(1.1); }
+                .qty-btn     { transition: all 0.15s ease; }
+                .qty-btn:hover  { transform: scale(1.1); }
                 .qty-btn:active { transform: scale(0.92); }
-                .checkout-btn { transition: all 0.2s ease; }
-                .checkout-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(245,158,11,0.45); }
+                .checkout-btn   { transition: all 0.2s ease; }
+                .checkout-btn:hover  { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(245,158,11,0.45); }
                 .checkout-btn:active { transform: scale(0.97); }
             `}</style>
 
@@ -62,7 +61,9 @@ const Cart = () => {
                 <div className="flex items-center justify-between mb-7">
                     <div>
                         <h1 className="text-2xl font-black text-zinc-900">My Cart</h1>
-                        <p className="text-zinc-400 text-sm mt-0.5 font-medium">{totalItems} item{totalItems !== 1 ? "s" : ""} added</p>
+                        <p className="text-zinc-400 text-sm mt-0.5 font-medium">
+                            {totalItems} item{totalItems !== 1 ? "s" : ""} added
+                        </p>
                     </div>
                     <button onClick={clear}
                         className="flex items-center gap-1.5 text-xs text-zinc-400 font-bold hover:text-red-500 px-3 py-2 rounded-xl hover:bg-red-50 transition-all duration-200 cursor-pointer border border-transparent hover:border-red-100">
@@ -72,7 +73,7 @@ const Cart = () => {
 
                 <div className="flex flex-col lg:flex-row gap-5 items-start">
 
-                    {/* ── Cart Items ── */}
+                    {/* Cart Items */}
                     <div className="flex-1 min-w-0 w-full space-y-3">
                         {cartItems.map((item, index) => {
                             const imageUrl = item.images?.[0]?.url || item.image || null;
@@ -115,12 +116,9 @@ const Cart = () => {
 
                                         {/* Right side */}
                                         <div className="flex flex-col items-end gap-3 shrink-0">
-                                            {/* Price */}
                                             <p className="font-black text-zinc-900 text-base">
                                                 ₹{(item.price * item.quantity).toLocaleString("en-IN")}
                                             </p>
-
-                                            {/* Qty Controls */}
                                             <div className="flex items-center gap-1 rounded-xl p-0.5"
                                                 style={{ background: "#f1f0ee" }}>
                                                 <button onClick={() => decQty(item._id)}
@@ -134,8 +132,6 @@ const Cart = () => {
                                                     <FaPlus size={9} />
                                                 </button>
                                             </div>
-
-                                            {/* Remove */}
                                             <button onClick={() => removeItem(item._id)}
                                                 className="flex items-center gap-1 text-[11px] text-zinc-300 hover:text-red-500 font-semibold transition-colors duration-150 cursor-pointer hover:underline underline-offset-2">
                                                 <FaTrash size={9} /> Remove
@@ -147,10 +143,9 @@ const Cart = () => {
                         })}
                     </div>
 
-                    {/* ── Price Summary ── */}
+                    {/* Price Summary */}
                     <div className="w-full lg:w-[360px] shrink-0">
                         <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-5 sticky top-24">
-
                             <h2 className="font-black text-zinc-800 text-sm mb-5 flex items-center gap-2 pb-4 border-b border-stone-100">
                                 <span className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center">
                                     <FaTag size={10} className="text-amber-600" />

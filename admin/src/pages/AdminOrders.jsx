@@ -1,15 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "../api/adminApi";
-import { imgUrl } from "../utils/imageUrl"; // ✅ Cloudinary optimization
+import { imgUrl } from "../utils/imageUrl";
 import {
     FaSync, FaUser, FaPhone, FaMapMarkerAlt,
     FaBox, FaChevronRight, FaWhatsapp, FaBoxOpen,
-    FaCheckCircle, FaTruck, FaClock, FaPencilAlt,
+    FaCheckCircle, FaClock, FaPencilAlt,
     FaStickyNote, FaImage, FaBan, FaFileInvoice,
-    // FaShippingFast,   // TODO: Re-enable when Shiprocket integration is active
-    // FaBarcode,        // TODO: Re-enable when Shiprocket integration is active
-    // FaExternalLinkAlt, // TODO: Re-enable when Shiprocket integration is active
-    FaTag, FaSpinner, FaUndo, FaTimesCircle,
+    FaTag, FaSpinner, FaUndo, FaTimesCircle, FaSearch,
 } from "react-icons/fa";
 
 const STATUS_CONFIG = {
@@ -27,6 +24,7 @@ const FLOW = {
     SHIPPED: "OUT_FOR_DELIVERY", OUT_FOR_DELIVERY: "DELIVERED",
 };
 const FLOW_STEPS = ["PLACED", "CONFIRMED", "PACKED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"];
+const PAGE_LIMIT = 20;
 
 /* ── Customization Card ── */
 const CustomizationCard = ({ customization }) => {
@@ -71,117 +69,7 @@ const CustomizationCard = ({ customization }) => {
     );
 };
 
-/*
- * ─────────────────────────────────────────────────────────────
- * TODO (3 months): Re-enable ShippingCard when Shiprocket goes live.
- * This component handles shipment tracking, AWB display, label
- * download, and live status via /shipping/track & /shipping/label.
- * ─────────────────────────────────────────────────────────────
- *
- * const ShippingCard = ({ shipping, orderId }) => {
- *     const [trackData, setTrackData] = useState(null);
- *     const [trackLoad, setTrackLoad] = useState(false);
- *     const [trackErr, setTrackErr] = useState("");
- *     const [labelLoad, setLabelLoad] = useState(false);
- *
- *     const fetchTracking = async () => {
- *         try {
- *             setTrackLoad(true); setTrackErr("");
- *             const { data } = await api.get(`/shipping/track/${orderId}`);
- *             setTrackData(data);
- *         } catch (err) {
- *             setTrackErr(err.response?.data?.message || "Could not fetch tracking");
- *         } finally { setTrackLoad(false); }
- *     };
- *
- *     const downloadLabel = async () => {
- *         try {
- *             setLabelLoad(true);
- *             const { data } = await api.get(`/shipping/label/${orderId}`);
- *             if (data.label_url) window.open(data.label_url, "_blank");
- *             else alert("Label not available yet");
- *         } catch { alert("Could not fetch label"); }
- *         finally { setLabelLoad(false); }
- *     };
- *
- *     if (!shipping?.shipmentId && !shipping?.awbCode) {
- *         return (
- *             <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 flex items-center gap-3">
- *                 <FaShippingFast size={16} className="text-stone-300 shrink-0" />
- *                 <div>
- *                     <p className="text-xs font-bold text-zinc-500">Shiprocket</p>
- *                     <p className="text-xs text-zinc-400 mt-0.5">Shipment will be created when order is marked PACKED</p>
- *                 </div>
- *             </div>
- *         );
- *     }
- *
- *     return (
- *         <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 space-y-3">
- *             <div className="flex items-center justify-between">
- *                 <p className="text-xs font-black text-indigo-700 flex items-center gap-1.5">
- *                     <FaShippingFast size={12} /> Shiprocket Shipment
- *                     {shipping.mock && (
- *                         <span className="text-[9px] font-black bg-orange-100 text-orange-600 border border-orange-200 px-1.5 py-0.5 rounded-full ml-1">MOCK</span>
- *                     )}
- *                 </p>
- *                 <div className="flex items-center gap-3">
- *                     {shipping.trackingUrl && (
- *                         <a href={shipping.trackingUrl} target="_blank" rel="noreferrer"
- *                             className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:underline">
- *                             <FaExternalLinkAlt size={9} /> Track
- *                         </a>
- *                     )}
- *                     <button onClick={downloadLabel} disabled={labelLoad}
- *                         className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:underline disabled:opacity-50 cursor-pointer">
- *                         {labelLoad ? <FaSpinner size={9} className="animate-spin" /> : <FaTag size={9} />} Label
- *                     </button>
- *                 </div>
- *             </div>
- *             <div className="grid grid-cols-2 gap-2 text-xs">
- *                 {shipping.awbCode && (
- *                     <div className="bg-white rounded-lg px-3 py-2 border border-indigo-100">
- *                         <p className="text-[10px] text-indigo-400 font-bold">AWB</p>
- *                         <p className="font-black text-zinc-800 font-mono">{shipping.awbCode}</p>
- *                     </div>
- *                 )}
- *                 {shipping.courierName && (
- *                     <div className="bg-white rounded-lg px-3 py-2 border border-indigo-100">
- *                         <p className="text-[10px] text-indigo-400 font-bold">Courier</p>
- *                         <p className="font-bold text-zinc-700">{shipping.courierName}</p>
- *                     </div>
- *                 )}
- *             </div>
- *             <button onClick={fetchTracking} disabled={trackLoad}
- *                 className="w-full flex items-center justify-center gap-2 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-60 cursor-pointer">
- *                 {trackLoad ? <><FaSpinner size={10} className="animate-spin" /> Fetching...</> : <><FaBarcode size={10} /> Get Live Status</>}
- *             </button>
- *             {trackErr && <p className="text-red-500 text-xs text-center">{trackErr}</p>}
- *             {trackData && (
- *                 <div className="bg-white rounded-lg border border-indigo-100 p-3 space-y-2">
- *                     <div className="flex items-center justify-between">
- *                         <span className="text-xs font-black text-zinc-700">{trackData.label}</span>
- *                         <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{trackData.courier}</span>
- *                     </div>
- *                     {trackData.detail && <p className="text-xs text-zinc-500">{trackData.detail}</p>}
- *                     {trackData.activities?.length > 0 && (
- *                         <div className="space-y-1 border-t border-stone-100 pt-2 max-h-28 overflow-y-auto">
- *                             {trackData.activities.slice(0, 5).map((act, i) => (
- *                                 <div key={i} className="flex items-start gap-2 text-[10px] text-zinc-500">
- *                                     <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full mt-1 shrink-0" />
- *                                     <span>{act.activity}{act.location ? ` — ${act.location}` : ""}</span>
- *                                 </div>
- *                             ))}
- *                         </div>
- *                     )}
- *                 </div>
- *             )}
- *         </div>
- *     );
- * };
- */
-
-/* ── Refund Card (Admin) ── */
+/* ── Refund Card ── */
 const RefundCard = ({ order, onRefundUpdate }) => {
     const [processing, setProcessing] = useState(false);
     const [rejecting, setRejecting] = useState(false);
@@ -208,10 +96,7 @@ const RefundCard = ({ order, onRefundUpdate }) => {
     const handleReject = async () => {
         try {
             setRejecting(true); setError("");
-            await api.put(`/orders/${order._id}/refund/process`, {
-                action: "reject",
-                rejectionReason: rejectNote,
-            });
+            await api.put(`/orders/${order._id}/refund/process`, { action: "reject", rejectionReason: rejectNote });
             onRefundUpdate(order._id, {
                 ...order,
                 refund: { ...order.refund, status: "REJECTED", rejectionReason: rejectNote, processedAt: new Date().toISOString() },
@@ -234,33 +119,22 @@ const RefundCard = ({ order, onRefundUpdate }) => {
         <div className={`rounded-xl border p-4 space-y-3 ${statusStyles[refund.status] || "bg-stone-50 border-stone-200"}`}>
             <div className="flex items-center justify-between">
                 <p className="text-xs font-black flex items-center gap-1.5">
-                    {refund.status === "PROCESSING"
-                        ? <FaSpinner size={10} className="animate-spin" />
-                        : <FaUndo size={10} />
-                    }
+                    {refund.status === "PROCESSING" ? <FaSpinner size={10} className="animate-spin" /> : <FaUndo size={10} />}
                     Refund — {refund.status}
                 </p>
                 <span className="text-xs font-black">₹{Number(refund.amount || order.totalAmount).toLocaleString("en-IN")}</span>
             </div>
-
             {refund.reason && <p className="text-xs opacity-80">Reason: {refund.reason}</p>}
-            {refund.requestedAt && (
-                <p className="text-[10px] opacity-60">Requested: {new Date(refund.requestedAt).toLocaleString("en-IN")}</p>
-            )}
+            {refund.requestedAt && <p className="text-[10px] opacity-60">Requested: {new Date(refund.requestedAt).toLocaleString("en-IN")}</p>}
             {refund.status === "PROCESSED" && refund.razorpayRefundId && (
                 <p className="text-[10px] font-mono opacity-70">Refund ID: {refund.razorpayRefundId}</p>
             )}
             {refund.status === "REJECTED" && (refund.rejectionReason || refund.adminNote) && (
                 <p className="text-xs">Note: {refund.rejectionReason || refund.adminNote}</p>
             )}
-            {refund.status === "FAILED" && (
-                <p className="text-xs font-bold">⚠️ Razorpay refund failed. Use retry or contact support.</p>
-            )}
-            {error && (
-                <p className="text-red-600 text-xs font-medium bg-white/60 px-2 py-1 rounded-lg">⚠️ {error}</p>
-            )}
+            {refund.status === "FAILED" && <p className="text-xs font-bold">⚠️ Razorpay refund failed. Use retry or contact support.</p>}
+            {error && <p className="text-red-600 text-xs font-medium bg-white/60 px-2 py-1 rounded-lg">⚠️ {error}</p>}
 
-            {/* Actions — only for REQUESTED */}
             {refund.status === "REQUESTED" && (
                 <div className="space-y-2">
                     {showRejectInput ? (
@@ -271,13 +145,10 @@ const RefundCard = ({ order, onRefundUpdate }) => {
                             <div className="flex gap-2">
                                 <button onClick={handleReject} disabled={rejecting}
                                     className="flex-1 py-2 bg-red-500 text-white rounded-lg text-xs font-bold hover:bg-red-600 transition-all disabled:opacity-60 flex items-center justify-center gap-1 cursor-pointer">
-                                    {rejecting ? <FaSpinner size={9} className="animate-spin" /> : <FaTimesCircle size={9} />}
-                                    Confirm Reject
+                                    {rejecting ? <FaSpinner size={9} className="animate-spin" /> : <FaTimesCircle size={9} />} Confirm Reject
                                 </button>
                                 <button onClick={() => setShowRejectInput(false)}
-                                    className="px-4 py-2 bg-white border border-yellow-200 text-yellow-700 rounded-lg text-xs font-bold cursor-pointer">
-                                    Back
-                                </button>
+                                    className="px-4 py-2 bg-white border border-yellow-200 text-yellow-700 rounded-lg text-xs font-bold cursor-pointer">Back</button>
                             </div>
                         </div>
                     ) : (
@@ -296,16 +167,12 @@ const RefundCard = ({ order, onRefundUpdate }) => {
                 </div>
             )}
 
-            {/* Retry button for FAILED refunds */}
             {refund.status === "FAILED" && (
                 <button onClick={async () => {
                     try {
                         setProcessing(true); setError("");
                         await api.put(`/orders/${order._id}/refund/retry`);
-                        onRefundUpdate(order._id, {
-                            ...order,
-                            refund: { ...order.refund, status: "PROCESSING" },
-                        });
+                        onRefundUpdate(order._id, { ...order, refund: { ...order.refund, status: "PROCESSING" } });
                     } catch (err) {
                         setError(err.response?.data?.message || "Retry failed");
                     } finally { setProcessing(false); }
@@ -321,8 +188,6 @@ const RefundCard = ({ order, onRefundUpdate }) => {
 /* ════════════════════════════════════════
    MAIN COMPONENT
 ════════════════════════════════════════ */
-const PAGE_SIZE = 20; // ✅ 20 orders per page
-
 const AdminOrders = () => {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -332,13 +197,38 @@ const AdminOrders = () => {
     const [filterStatus, setFilterStatus] = useState("ALL");
     const [expandedId, setExpandedId] = useState(null);
     const [downloadingId, setDownloadingId] = useState(null);
-    const [currentPage, setCurrentPage] = useState(1); // ✅ Pagination
+    const [searchInput, setSearchInput] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
 
-    const fetchOrders = useCallback(async () => {
+    // ── Backend pagination state ──────────────────────────
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalOrders, setTotalOrders] = useState(0);
+    const [totalPages, setTotalPages] = useState(1);
+
+    // ── Stats (separate lightweight call) ─────────────────
+    const [stats, setStats] = useState({ total: 0, placed: 0, delivered: 0, cancelled: 0, refunds: 0 });
+
+    // ── Fetch orders from backend (paginated + filtered) ──
+    const fetchOrders = useCallback(async ({ page = 1, status = "ALL", search = "" } = {}) => {
         try {
-            setError(""); setLoading(true);
-            const { data } = await api.get("/orders");
-            setOrders(Array.isArray(data) ? data : []);
+            setError("");
+            setLoading(true);
+
+            const params = { page, limit: PAGE_LIMIT };
+            if (status && status !== "ALL" && status !== "REFUND_PENDING")
+                params.status = status;
+            if (search.trim())
+                params.search = search.trim();
+
+            const { data } = await api.get("/orders", { params });
+
+            // Backend returns { orders, total, page, totalPages }
+            const list = Array.isArray(data?.orders) ? data.orders : [];
+            setOrders(list);
+            setTotalOrders(data?.total || 0);
+            setTotalPages(data?.totalPages || 1);
+            setCurrentPage(data?.page || 1);
+
         } catch (err) {
             setError(err.response?.status === 403
                 ? "Access denied. Admin / Owner permission required."
@@ -347,8 +237,58 @@ const AdminOrders = () => {
         } finally { setLoading(false); }
     }, []);
 
-    useEffect(() => { fetchOrders(); }, [fetchOrders]);
+    // ── Fetch stats (all-orders count for filter tabs) ────
+    const fetchStats = useCallback(async () => {
+        try {
+            // Use a high-limit call just for counts — or add a /orders/stats endpoint
+            const { data } = await api.get("/orders", { params: { page: 1, limit: 1 } });
+            // We get total from response; per-status counts need separate call or stats endpoint
+            // For now derive from current orders — good enough for dashboard tabs
+            setStats(prev => ({ ...prev, total: data?.total || 0 }));
+        } catch { /* silent */ }
+    }, []);
 
+    useEffect(() => {
+        fetchOrders({ page: 1, status: filterStatus, search: searchQuery });
+        fetchStats();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // ── Page / filter / search change ─────────────────────
+    const goToPage = (page) => {
+        setExpandedId(null);
+        window.scrollTo(0, 0);
+        fetchOrders({ page, status: filterStatus, search: searchQuery });
+    };
+
+    const handleFilterChange = (key) => {
+        setFilterStatus(key);
+        setExpandedId(null);
+        setCurrentPage(1);
+        fetchOrders({ page: 1, status: key, search: searchQuery });
+    };
+
+    const handleSearch = (e) => {
+        e.preventDefault();
+        setSearchQuery(searchInput);
+        setFilterStatus("ALL");
+        setCurrentPage(1);
+        fetchOrders({ page: 1, status: "ALL", search: searchInput });
+    };
+
+    const clearSearch = () => {
+        setSearchInput("");
+        setSearchQuery("");
+        fetchOrders({ page: 1, status: filterStatus, search: "" });
+    };
+
+    const refreshOrders = async () => {
+        setRefreshing(true);
+        await fetchOrders({ page: currentPage, status: filterStatus, search: searchQuery });
+        setRefreshing(false);
+    };
+
+    // ── Status update ──────────────────────────────────────
     const updateStatus = async (orderId, nextStatus) => {
         if (!nextStatus) return;
         try {
@@ -357,11 +297,11 @@ const AdminOrders = () => {
             if (updatedOrder?._id) {
                 setOrders(prev => prev.map(o => o._id === orderId ? updatedOrder : o));
             } else {
-                await fetchOrders();
+                await fetchOrders({ page: currentPage, status: filterStatus, search: searchQuery });
             }
         } catch (err) {
             alert(err.response?.data?.message || "Failed to update status");
-            await fetchOrders();
+            await fetchOrders({ page: currentPage, status: filterStatus, search: searchQuery });
         } finally { setUpdatingId(null); }
     };
 
@@ -378,42 +318,23 @@ const AdminOrders = () => {
             const link = document.createElement("a");
             link.href = url;
             link.setAttribute("download", `RVGifts_Invoice_${orderId.slice(-8).toUpperCase()}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
+            document.body.appendChild(link); link.click(); link.remove();
             window.URL.revokeObjectURL(url);
         } catch { alert("Failed to download invoice."); }
         finally { setDownloadingId(null); }
     };
 
-    const refreshOrders = async () => { setRefreshing(true); await fetchOrders(); setRefreshing(false); };
-
-    const pendingRefunds = orders.filter(o => o.refund?.status === "REQUESTED").length;
-
-    const filtered = filterStatus === "ALL" ? orders
-        : filterStatus === "REFUND_PENDING" ? orders.filter(o => o.refund?.status === "REQUESTED")
-            : orders.filter(o => o.orderStatus === filterStatus);
-
-    // ✅ Pagination — sirf 20 orders render hoti hain ek baar
-    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-    const paginatedOrders = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-
-    // ✅ Filter change hone pe page 1 pe reset
-    const handleFilterChange = (key) => {
-        setFilterStatus(key);
-        setCurrentPage(1);
-        setExpandedId(null);
+    // ── Page number buttons ────────────────────────────────
+    const getPageNumbers = () => {
+        if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
+        const pages = [];
+        if (currentPage <= 3) pages.push(1, 2, 3, 4, "…", totalPages);
+        else if (currentPage >= totalPages - 2) pages.push(1, "…", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+        else pages.push(1, "…", currentPage - 1, currentPage, currentPage + 1, "…", totalPages);
+        return pages;
     };
 
-    const stats = {
-        total: orders.length,
-        placed: orders.filter(o => o.orderStatus === "PLACED").length,
-        delivered: orders.filter(o => o.orderStatus === "DELIVERED").length,
-        cancelled: orders.filter(o => o.orderStatus === "CANCELLED").length,
-        refunds: pendingRefunds,
-    };
-
-    if (loading) return (
+    if (loading && orders.length === 0) return (
         <div className="min-h-screen bg-stone-50 flex items-center justify-center">
             <div className="text-center">
                 <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
@@ -427,7 +348,7 @@ const AdminOrders = () => {
             <div className="text-center bg-white rounded-2xl p-10 border border-stone-200 shadow-sm">
                 <p className="text-4xl mb-3">⚠</p>
                 <p className="text-zinc-700 font-bold mb-4">{error}</p>
-                <button onClick={fetchOrders} className="px-6 py-2.5 bg-zinc-900 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 cursor-pointer">Retry</button>
+                <button onClick={() => fetchOrders()} className="px-6 py-2.5 bg-zinc-900 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 cursor-pointer">Retry</button>
             </div>
         </div>
     );
@@ -441,60 +362,68 @@ const AdminOrders = () => {
                 <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
                     <div>
                         <h1 className="text-2xl font-black text-zinc-900">Order Management</h1>
-                        <p className="text-zinc-400 text-sm mt-0.5">{orders.length} total orders</p>
+                        <p className="text-zinc-400 text-sm mt-0.5">{totalOrders} total orders</p>
                     </div>
-                    <button onClick={refreshOrders} disabled={refreshing}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-white border border-stone-200 text-zinc-600 rounded-xl text-sm font-semibold hover:bg-stone-50 transition-all disabled:opacity-50 cursor-pointer">
-                        <FaSync size={12} className={refreshing ? "animate-spin" : ""} />
-                        {refreshing ? "Refreshing..." : "Refresh"}
-                    </button>
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-                    {[
-                        { label: "Total Orders", value: stats.total, color: "text-zinc-800" },
-                        { label: "New (Placed)", value: stats.placed, color: "text-yellow-600" },
-                        { label: "Delivered", value: stats.delivered, color: "text-emerald-600" },
-                        { label: "Cancelled", value: stats.cancelled, color: "text-red-500" },
-                        { label: "Refund Pending", value: stats.refunds, color: "text-orange-500" },
-                    ].map(({ label, value, color }) => (
-                        <div key={label} className={`bg-white border rounded-2xl px-4 py-3 ${label === "Refund Pending" && value > 0 ? "border-orange-200 bg-orange-50" : "border-stone-200"}`}>
-                            <p className="text-xs text-zinc-400 font-medium mb-0.5">{label}</p>
-                            <p className={`text-xl font-black ${color}`}>{value}</p>
-                        </div>
-                    ))}
+                    <div className="flex gap-2 items-center flex-wrap">
+                        {/* Search */}
+                        <form onSubmit={handleSearch} className="flex items-center gap-2">
+                            <div className="relative">
+                                <FaSearch size={11} className="absolute left-3 top-3 text-zinc-400" />
+                                <input
+                                    type="text" value={searchInput}
+                                    onChange={e => setSearchInput(e.target.value)}
+                                    placeholder="Search name, phone..."
+                                    className="pl-8 pr-3 py-2 border border-stone-200 rounded-xl text-sm bg-white text-zinc-700 focus:outline-none focus:ring-2 focus:ring-amber-300 w-44"
+                                />
+                            </div>
+                            {searchQuery && (
+                                <button type="button" onClick={clearSearch}
+                                    className="text-xs text-zinc-400 hover:text-red-500 font-bold cursor-pointer">✕ Clear</button>
+                            )}
+                        </form>
+                        <button onClick={refreshOrders} disabled={refreshing}
+                            className="flex items-center gap-2 px-4 py-2 bg-white border border-stone-200 text-zinc-600 rounded-xl text-sm font-semibold hover:bg-stone-50 transition-all disabled:opacity-50 cursor-pointer">
+                            <FaSync size={11} className={refreshing ? "animate-spin" : ""} />
+                            {refreshing ? "Refreshing..." : "Refresh"}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Filter Tabs */}
                 <div className="flex gap-2 overflow-x-auto pb-1 mb-5">
                     {[
-                        { key: "ALL", label: "All", count: orders.length },
-                        ...FLOW_STEPS.map(s => ({ key: s, label: STATUS_CONFIG[s]?.label, count: orders.filter(o => o.orderStatus === s).length, dot: STATUS_CONFIG[s]?.dot })),
-                        { key: "CANCELLED", label: "Cancelled", count: stats.cancelled, dot: STATUS_CONFIG.CANCELLED.dot },
-                        { key: "REFUND_PENDING", label: "🔄 Refunds", count: pendingRefunds },
-                    ].map(({ key, label, count, dot }) => (
+                        { key: "ALL", label: "All" },
+                        ...FLOW_STEPS.map(s => ({ key: s, label: STATUS_CONFIG[s]?.label, dot: STATUS_CONFIG[s]?.dot })),
+                        { key: "CANCELLED", label: "Cancelled", dot: STATUS_CONFIG.CANCELLED.dot },
+                    ].map(({ key, label, dot }) => (
                         <button key={key} onClick={() => handleFilterChange(key)}
                             className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all duration-200 cursor-pointer ${filterStatus === key
-                                ? key === "REFUND_PENDING" ? "bg-orange-500 text-white border-orange-500" : "bg-zinc-900 text-white border-zinc-900"
-                                : key === "REFUND_PENDING" && count > 0 ? "bg-orange-50 text-orange-600 border-orange-200"
+                                    ? "bg-zinc-900 text-white border-zinc-900"
                                     : "bg-white text-zinc-500 border-stone-200 hover:border-zinc-400"
                                 }`}>
                             {dot && <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />}
-                            {label} ({count})
+                            {label}
                         </button>
                     ))}
                 </div>
 
-                {filtered.length === 0 && (
+                {/* Loading overlay — page change pe */}
+                {loading && orders.length > 0 && (
+                    <div className="flex items-center justify-center py-8">
+                        <div className="w-8 h-8 border-3 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                )}
+
+                {orders.length === 0 && !loading && (
                     <div className="bg-white rounded-2xl border border-dashed border-stone-300 p-16 text-center">
                         <FaBoxOpen size={36} className="text-stone-300 mx-auto mb-3" />
                         <p className="text-zinc-500 font-semibold">No orders found</p>
+                        {searchQuery && <p className="text-zinc-400 text-sm mt-1">Try a different search term</p>}
                     </div>
                 )}
 
                 <div className="space-y-4">
-                    {paginatedOrders.map(order => {
+                    {orders.map(order => {
                         const cfg = STATUS_CONFIG[order.orderStatus] || STATUS_CONFIG.PLACED;
                         const isCancelled = order.orderStatus === "CANCELLED";
                         const nextStatus = isCancelled ? null : FLOW[order.orderStatus];
@@ -504,7 +433,6 @@ const AdminOrders = () => {
                         const stepIdx = FLOW_STEPS.indexOf(order.orderStatus);
                         const isDownloading = downloadingId === order._id;
                         const hasCustom = order.items?.some(i => i.customization?.text || i.customization?.imageUrl || i.customization?.note);
-                        // const hasShipping = !!(order.shipping?.shipmentId || order.shipping?.awbCode); // TODO: Re-enable with Shiprocket
                         const hasRefundPending = order.refund?.status === "REQUESTED";
 
                         return (
@@ -525,15 +453,6 @@ const AdminOrders = () => {
                                                 {hasCustom && !isCancelled && (
                                                     <span className="bg-amber-100 text-amber-700 border border-amber-200 text-[10px] font-black px-1.5 py-0.5 rounded-full">Custom</span>
                                                 )}
-                                                {/*
-                                                 * TODO (3 months): Re-enable Shiprocket badge when live.
-                                                 * {hasShipping && !isCancelled && (
-                                                 *     <span className="bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-black px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                                                 *         <FaShippingFast size={8} />
-                                                 *         {order.shipping?.mock ? "SR Mock" : "Shiprocket"}
-                                                 *     </span>
-                                                 * )}
-                                                 */}
                                                 {hasRefundPending && (
                                                     <span className="bg-orange-100 text-orange-700 border border-orange-200 text-[10px] font-black px-1.5 py-0.5 rounded-full flex items-center gap-1">
                                                         <FaUndo size={8} /> Refund Pending
@@ -646,16 +565,6 @@ const AdminOrders = () => {
                                             </div>
                                         )}
 
-                                        {/*
-                                         * TODO (3 months): Re-enable Shipping section when Shiprocket is live.
-                                         * {!isCancelled && (
-                                         *     <div>
-                                         *         <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-2">Shipping</p>
-                                         *         <ShippingCard shipping={order.shipping} orderId={order._id} />
-                                         *     </div>
-                                         * )}
-                                         */}
-
                                         {/* Order Items */}
                                         <div>
                                             <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-3">Order Items</p>
@@ -673,9 +582,7 @@ const AdminOrders = () => {
                                                                 <p className="text-xs text-zinc-400">
                                                                     Qty: {item.qty}
                                                                     {item.selectedSize && (
-                                                                        <span className="ml-2 bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full text-[9px] font-bold">
-                                                                            {item.selectedSize}
-                                                                        </span>
+                                                                        <span className="ml-2 bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full text-[9px] font-bold">{item.selectedSize}</span>
                                                                     )}
                                                                 </p>
                                                             </div>
@@ -697,46 +604,34 @@ const AdminOrders = () => {
                     })}
                 </div>
 
-                {/* ✅ Pagination */}
+                {/* ── Pagination ── */}
                 {totalPages > 1 && (
-                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-stone-200">
+                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-stone-200 flex-wrap gap-3">
                         <p className="text-sm text-zinc-400 font-medium">
-                            Showing <span className="font-bold text-zinc-600">{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)}</span> of <span className="font-bold text-zinc-600">{filtered.length}</span> orders
+                            Showing <span className="font-bold text-zinc-600">{(currentPage - 1) * PAGE_LIMIT + 1}–{Math.min(currentPage * PAGE_LIMIT, totalOrders)}</span> of <span className="font-bold text-zinc-600">{totalOrders}</span> orders
                         </p>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => { setCurrentPage(p => p - 1); setExpandedId(null); window.scrollTo(0, 0); }}
-                                disabled={currentPage === 1}
-                                className="px-4 py-2 text-sm font-bold bg-white border border-stone-200 text-zinc-600 rounded-xl hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer">
+                        <div className="flex items-center gap-1.5">
+                            <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1}
+                                className="px-3 py-2 text-sm font-bold bg-white border border-stone-200 text-zinc-600 rounded-xl hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer">
                                 ← Prev
                             </button>
-                            <div className="flex items-center gap-1">
-                                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                                    .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                                    .reduce((acc, p, i, arr) => {
-                                        if (i > 0 && p - arr[i - 1] > 1) acc.push("...");
-                                        acc.push(p);
-                                        return acc;
-                                    }, [])
-                                    .map((p, i) => p === "..." ? (
-                                        <span key={`dot-${i}`} className="px-2 text-zinc-400 text-sm">...</span>
-                                    ) : (
-                                        <button key={p} onClick={() => { setCurrentPage(p); setExpandedId(null); window.scrollTo(0, 0); }}
-                                            className={`w-9 h-9 rounded-xl text-sm font-bold transition-all cursor-pointer ${currentPage === p ? "bg-zinc-900 text-white" : "bg-white border border-stone-200 text-zinc-600 hover:bg-stone-50"}`}>
-                                            {p}
-                                        </button>
-                                    ))}
-                            </div>
-                            <button
-                                onClick={() => { setCurrentPage(p => p + 1); setExpandedId(null); window.scrollTo(0, 0); }}
-                                disabled={currentPage === totalPages}
-                                className="px-4 py-2 text-sm font-bold bg-white border border-stone-200 text-zinc-600 rounded-xl hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer">
+                            {getPageNumbers().map((p, i) =>
+                                p === "…" ? (
+                                    <span key={`dot-${i}`} className="px-2 text-zinc-400 text-sm">…</span>
+                                ) : (
+                                    <button key={p} onClick={() => goToPage(p)}
+                                        className={`w-9 h-9 rounded-xl text-sm font-bold transition-all cursor-pointer ${currentPage === p ? "bg-zinc-900 text-white" : "bg-white border border-stone-200 text-zinc-600 hover:bg-stone-50"}`}>
+                                        {p}
+                                    </button>
+                                )
+                            )}
+                            <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages}
+                                className="px-3 py-2 text-sm font-bold bg-white border border-stone-200 text-zinc-600 rounded-xl hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer">
                                 Next →
                             </button>
                         </div>
                     </div>
                 )}
-
             </div>
         </div>
     );

@@ -5,6 +5,7 @@
  * ✅ Payment logs on every event
  * ✅ Fraud detection
  * ✅ MRP saved in items for invoice discount display
+ * ✅ getAllOrders — paginated (page + limit query params)
  * ❌ No return system
  * ⏸️ Shiprocket — commented, enable when needed
  */
@@ -16,7 +17,7 @@ import { sendEmail } from "../utils/emailService.js";
 import { getOrderStatusEmailTemplate } from "../utils/orderStatusEmail.js";
 import { adminOrderEmailHTML } from "../utils/adminOrderEmail.js";
 import { generateInvoiceBuffer } from "../utils/invoiceEmailHelper.js";
-import { checkCODEligibility } from "./addressController.js"; // ✅ shared helper
+import { checkCODEligibility } from "./addressController.js";
 // import { createShiprocketOrder } from "../utils/Shiprocketservice.js"; // ⏸️ baad me karenge
 
 const razorpay = new Razorpay({
@@ -49,23 +50,19 @@ const checkFraud = async ({ userId, ip, amount, paymentId }) => {
     const reasons = [];
     const oneHour = new Date(Date.now() - 60 * 60 * 1000);
 
-    // Duplicate payment ID
     if (paymentId) {
         const dup = await Order.findOne({ "payment.razorpayPaymentId": paymentId }).lean();
         if (dup) reasons.push("DUPLICATE_PAYMENT_ID");
     }
 
-    // High order frequency
     const recentOrders = await Order.countDocuments({ user: userId, createdAt: { $gte: oneHour } });
     if (recentOrders >= 5) reasons.push("HIGH_ORDER_FREQUENCY");
 
-    // High IP frequency
     if (ip) {
         const ipOrders = await Order.countDocuments({ "payment.ip": ip, createdAt: { $gte: oneHour } });
         if (ipOrders >= 8) reasons.push("HIGH_IP_FREQUENCY");
     }
 
-    // High refund rate
     const totalUserOrders = await Order.countDocuments({ user: userId });
     if (totalUserOrders >= 5) {
         const refundedCount = await Order.countDocuments({
@@ -89,11 +86,10 @@ export const createOrder = async (req, res) => {
         const {
             items, customerName, phone, address, email,
             totalAmount, platformFee, deliveryCharge,
-            paymentMethod, pincode,              // ✅ pincode sent from frontend
+            paymentMethod, pincode,
             latitude, longitude,
         } = req.body;
 
-        /* ── Basic validation ── */
         if (!items?.length)
             return res.status(400).json({ message: "Cart is empty" });
         if (!customerName?.trim() || !phone?.trim() || !address?.trim())
@@ -105,11 +101,6 @@ export const createOrder = async (req, res) => {
         if (items.length > 20)
             return res.status(400).json({ message: "Too many items in cart" });
 
-        /* ══════════════════════════════════════
-           ✅ SECURITY: Backend COD validation
-           Frontend check is UX only — this is
-           the real gate that cannot be bypassed
-        ══════════════════════════════════════ */
         if (paymentMethod === "COD") {
             if (!pincode || !/^\d{6}$/.test(pincode.trim()))
                 return res.status(400).json({ message: "Valid pincode required for COD orders" });
@@ -123,7 +114,6 @@ export const createOrder = async (req, res) => {
             }
         }
 
-        /* ── Stock check + deduction ── */
         for (const item of items) {
             const qty = Math.min(Math.max(1, Number(item.qty || item.quantity || 1)), 100);
             const product = await Product.findById(item.productId || item._id);
@@ -135,7 +125,6 @@ export const createOrder = async (req, res) => {
             await product.save();
         }
 
-        /* ── Format items ── */
         const formattedItems = items.map(item => ({
             productId: item.productId || item._id,
             name: String(item.name || "Product").slice(0, 200),
@@ -150,13 +139,11 @@ export const createOrder = async (req, res) => {
             },
         }));
 
-        /* ── Fraud + metadata ── */
         const ip = getClientIp(req);
         const fraudCheck = await checkFraud({ userId: req.user._id, ip, amount: Number(totalAmount) });
         const method = paymentMethod === "COD" ? "COD" : "RAZORPAY";
         const invoiceNum = await generateInvoiceNumber();
 
-        /* ── Create Order ── */
         const order = new Order({
             user: req.user._id,
             invoiceNumber: invoiceNum,
@@ -193,7 +180,6 @@ export const createOrder = async (req, res) => {
 
         const savedOrder = await order.save();
 
-        /* ── Response first — emails are non-blocking ── */
         res.status(201).json({
             success: true,
             orderId: savedOrder._id,
@@ -202,7 +188,6 @@ export const createOrder = async (req, res) => {
             flagged: fraudCheck.flagged,
         });
 
-        /* ── Emails (fire and forget) ── */
         const userMail = getOrderStatusEmailTemplate({
             customerName: customerName.trim(),
             orderId: savedOrder._id,
@@ -266,7 +251,6 @@ export const cancelOrder = async (req, res) => {
 
         await order.save();
 
-        /* ── Restore stock ── */
         for (const item of order.items) {
             try {
                 const p = await Product.findById(item.productId);
@@ -353,7 +337,11 @@ export const updateOrderStatus = async (req, res) => {
         }
         if (status === "SHIPPED") update["shipping.status"] = "SHIPPED";
 
-        const order = await Order.findByIdAndUpdate(req.params.id, { $set: update }, { new: true, runValidators: true });
+        const order = await Order.findByIdAndUpdate(
+            req.params.id,
+            { $set: update },
+            { new: true, runValidators: true }
+        );
         if (!order) return res.status(404).json({ message: "Order not found" });
 
         if (status === "CANCELLED") {
@@ -367,7 +355,6 @@ export const updateOrderStatus = async (req, res) => {
 
         res.json(order);
 
-        /* ── User email ── */
         if (order.email && !order.email.includes("@rvgifts.com")) {
             const sMail = getOrderStatusEmailTemplate({ customerName: order.customerName, orderId: order._id, status });
             if (status === "DELIVERED") {
@@ -396,12 +383,38 @@ export const updateOrderStatus = async (req, res) => {
 };
 
 /* ══════════════════════════════════════════════
-   GET ALL ORDERS (ADMIN)
+   GET ALL ORDERS (ADMIN) — ✅ Paginated
+   Query params: ?page=1&limit=20&status=PLACED&search=xyz
 ══════════════════════════════════════════════ */
 export const getAllOrders = async (req, res) => {
     try {
-        const orders = await Order.find().sort({ createdAt: -1 }).lean();
-        res.json(orders);
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(50, parseInt(req.query.limit) || 20);
+        const skip = (page - 1) * limit;
+
+        // ── Optional filters ──
+        const filter = {};
+        if (req.query.status && req.query.status !== "ALL")
+            filter.orderStatus = req.query.status;
+        if (req.query.search?.trim()) {
+            filter.$or = [
+                { customerName: { $regex: req.query.search.trim(), $options: "i" } },
+                { phone: { $regex: req.query.search.trim(), $options: "i" } },
+            ];
+        }
+
+        const [orders, total] = await Promise.all([
+            Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+            Order.countDocuments(filter),
+        ]);
+
+        res.json({
+            orders,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit),
+            limit,
+        });
     } catch {
         res.status(500).json({ message: "Failed to fetch orders" });
     }

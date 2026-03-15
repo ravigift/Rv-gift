@@ -1,25 +1,23 @@
+import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import WalkInOrder from "../models/WalkInOrder.js";
-import { generateWalkInBill, generateWalkInBillBuffer, SHOP } from "../utils/walkInBillGenerator.js";
-import nodemailer from "nodemailer";
+import { generateWalkInBillBuffer, SHOP } from "../utils/walkInBillGenerator.js";
+import { sendEmail } from "../utils/emailService.js"; // ✅ resend — nodemailer nahi
 import PosSecurity from "../models/posSecurityModel.js";
 
-const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-});
-
-// ── Bill Number Generator ──
+// ── Helpers ────────────────────────────────────────────────────
 const generateBillNumber = async () => {
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     const count = await WalkInOrder.countDocuments();
     return `RVG-${dateStr}-${String(count + 1).padStart(4, "0")}`;
 };
 
+// SHA-256 hash — OTP ke liye (fast, one-way)
+const hashOtp = (otp) =>
+    crypto.createHash("sha256").update(String(otp)).digest("hex");
+
 // ─────────────────────────────────────────────
-// CREATE
+// CREATE WALK-IN BILL
 // ─────────────────────────────────────────────
 export const createWalkInOrder = async (req, res) => {
     try {
@@ -54,9 +52,7 @@ export const createWalkInOrder = async (req, res) => {
             customerName: customerName?.trim() || "Walk-in Customer",
             phone: phone?.trim() || "",
             items: processedItems,
-            subtotal,
-            totalGST,
-            grandTotal,
+            subtotal, totalGST, grandTotal,
             paymentMode: paymentMode || "CASH",
             note: note?.trim() || "",
             createdBy: req.user._id,
@@ -113,11 +109,10 @@ export const getWalkInOrderById = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────
-// DELETE
+// DELETE — PIN verify karke
 // ─────────────────────────────────────────────
 export const deleteWalkInOrder = async (req, res) => {
     try {
-
         const { pin } = req.body;
 
         if (!pin)
@@ -125,61 +120,71 @@ export const deleteWalkInOrder = async (req, res) => {
 
         const security = await PosSecurity.findOne();
 
-        if (!security || security.deletePin !== pin)
+        if (!security || !security.deletePin)
+            return res.status(400).json({ message: "Delete PIN not set. Please set it first." });
+
+        // ✅ bcrypt compare — plain text never compare karo
+        const isValid = await bcrypt.compare(String(pin), security.deletePin);
+        if (!isValid)
             return res.status(401).json({ message: "Invalid delete PIN" });
 
         const order = await WalkInOrder.findById(req.params.id);
-
         if (!order)
             return res.status(404).json({ message: "Bill not found" });
 
         await order.deleteOne();
-
         res.json({ message: "Bill deleted" });
 
     } catch (err) {
-
         console.error("DELETE WALKIN ERROR:", err);
-
         res.status(500).json({ message: "Failed to delete bill" });
-
     }
 };
 
-// walkInController.js — sirf sendDeletePinResetOtp fix karo, baaki same rahega
-
+// ─────────────────────────────────────────────
+// SEND OTP — PIN reset ke liye
+// ─────────────────────────────────────────────
 export const sendDeletePinResetOtp = async (req, res) => {
     try {
-        const otp = Math.floor(100000 + Math.random() * 900000);
-        const expiry = Date.now() + 10 * 60 * 1000; // 10 min
+        const rawOtp = Math.floor(100000 + Math.random() * 900000); // 6-digit
+        const expiry = Date.now() + 10 * 60 * 1000;                 // 10 min
 
-        // findOne ke baad null check — pehli baar document exist nahi hoga
+        // ✅ OTP hashed store karo — plain text nahi
+        const hashedOtp = hashOtp(rawOtp);
+
         let security = await PosSecurity.findOne();
-
         if (!security) {
-            // First time setup — document create karo placeholder PIN ke saath
             security = new PosSecurity({
-                deletePin: "",   // blank, reset ke baad set hoga
-                resetOtp: otp,
+                deletePin: "",
+                resetOtp: hashedOtp,
                 resetOtpExpire: expiry,
             });
         } else {
-            security.resetOtp = otp;
+            security.resetOtp = hashedOtp;
             security.resetOtpExpire = expiry;
         }
-
         await security.save();
 
-        await transporter.sendMail({
-            from: process.env.EMAIL_USER,
+        // Email mein raw OTP bhejo (jo expire hone ke baad useless hai)
+        await sendEmail({
             to: process.env.ADMIN_EMAIL,
-            subject: "RV Gifts — POS Delete PIN Reset OTP",
+            subject: "RV Gift Shop — POS Delete PIN Reset OTP",
+            label: "POS/ResetOTP",
             html: `
-                <div style="font-family:sans-serif;max-width:400px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
+                <div style="font-family:sans-serif;max-width:400px;margin:auto;padding:24px;
+                            border:1px solid #e5e7eb;border-radius:12px">
                     <h2 style="color:#0f0f0f;margin-bottom:8px">POS Delete PIN Reset</h2>
-                    <p style="color:#6b7280;font-size:14px">Your OTP is:</p>
-                    <div style="font-size:36px;font-weight:900;letter-spacing:8px;color:#d97706;padding:16px 0">${otp}</div>
-                    <p style="color:#6b7280;font-size:12px">This OTP is valid for 10 minutes. Do not share it with anyone.</p>
+                    <p style="color:#6b7280;font-size:14px;margin-bottom:4px">Your one-time OTP is:</p>
+                    <div style="font-size:40px;font-weight:900;letter-spacing:10px;
+                                color:#d97706;padding:20px 0;text-align:center">
+                        ${rawOtp}
+                    </div>
+                    <p style="color:#6b7280;font-size:12px">
+                        Valid for <strong>10 minutes</strong>. Do not share with anyone.
+                    </p>
+                    <p style="color:#9ca3af;font-size:11px;margin-top:16px">
+                        RV Gifts POS Security • Authorized use only
+                    </p>
                 </div>
             `,
         });
@@ -192,29 +197,51 @@ export const sendDeletePinResetOtp = async (req, res) => {
     }
 };
 
-
-export const resetDeletePin = async (req, res) => {
-
-    const { otp, newPin } = req.body;
-
-    const security = await PosSecurity.findOne();
-
-    if (!security)
-        return res.status(400).json({ message: "Security config not found" });
-
-    if (security.resetOtp !== otp || security.resetOtpExpire < Date.now())
-        return res.status(400).json({ message: "Invalid or expired OTP" });
-
-    security.deletePin = newPin;
-    security.resetOtp = null;
-    security.resetOtpExpire = null;
-
-    await security.save();
-
-    res.json({ message: "Delete PIN updated" });
-};
 // ─────────────────────────────────────────────
-// DOWNLOAD PDF  ✅ async with QR
+// RESET PIN — OTP verify + new PIN set
+// ─────────────────────────────────────────────
+export const resetDeletePin = async (req, res) => {
+    try {
+        const { otp, newPin } = req.body;
+
+        if (!otp || !newPin)
+            return res.status(400).json({ message: "OTP and new PIN required" });
+
+        if (String(newPin).length < 4)
+            return res.status(400).json({ message: "PIN must be at least 4 digits" });
+
+        const security = await PosSecurity.findOne();
+        if (!security)
+            return res.status(400).json({ message: "Security config not found" });
+
+        // ✅ OTP: hash karke compare karo
+        const hashedInput = hashOtp(otp);
+        const otpValid = security.resetOtp === hashedInput;
+        const notExpired = security.resetOtpExpire > Date.now();
+
+        if (!otpValid || !notExpired)
+            return res.status(400).json({ message: "Invalid or expired OTP" });
+
+        // ✅ PIN: bcrypt hash karke store karo
+        const hashedPin = await bcrypt.hash(String(newPin), 12);
+        security.deletePin = hashedPin;
+
+        // OTP use hone ke baad clear karo
+        security.resetOtp = null;
+        security.resetOtpExpire = null;
+
+        await security.save();
+
+        res.json({ message: "Delete PIN updated successfully" });
+
+    } catch (err) {
+        console.error("RESET PIN ERROR:", err);
+        res.status(500).json({ message: "Failed to reset PIN" });
+    }
+};
+
+// ─────────────────────────────────────────────
+// DOWNLOAD PDF
 // ─────────────────────────────────────────────
 export const downloadWalkInBill = async (req, res) => {
     try {
@@ -234,7 +261,7 @@ export const downloadWalkInBill = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────
-// EMAIL BILL  ✅ async with QR
+// EMAIL BILL
 // ─────────────────────────────────────────────
 export const emailWalkInBill = async (req, res) => {
     try {
@@ -249,7 +276,6 @@ export const emailWalkInBill = async (req, res) => {
         if (!emailRegex.test(toEmail))
             return res.status(400).json({ message: "Invalid email address" });
 
-        // ✅ use async buffer (with QR)
         const pdfBuffer = await generateWalkInBillBuffer(order);
 
         const dateStr = new Date(order.createdAt).toLocaleDateString("en-IN", {
@@ -268,7 +294,8 @@ export const emailWalkInBill = async (req, res) => {
             </tr>`;
         }).join("");
 
-        const pmColor = order.paymentMode === "CASH" ? "#059669" : order.paymentMode === "UPI" ? "#7c3aed" : "#2563eb";
+        const pmColor = order.paymentMode === "CASH" ? "#059669"
+            : order.paymentMode === "UPI" ? "#7c3aed" : "#2563eb";
 
         const emailHtml = `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"></head>
@@ -328,15 +355,14 @@ export const emailWalkInBill = async (req, res) => {
   </div>
 </body></html>`;
 
-        await transporter.sendMail({
-            from: `"${SHOP.name}" <${process.env.EMAIL_USER}>`,
+        await sendEmail({
             to: toEmail,
             subject: `Your Invoice from ${SHOP.name} — ${order.billNumber}`,
+            label: "WalkIn/Bill",
             html: emailHtml,
             attachments: [{
                 filename: `RVGifts_Bill_${order.billNumber}.pdf`,
                 content: pdfBuffer,
-                contentType: "application/pdf",
             }],
         });
 

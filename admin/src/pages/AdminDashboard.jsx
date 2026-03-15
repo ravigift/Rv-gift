@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import api from "../api/adminApi";
 import {
     FaBox, FaClipboardList, FaPlus, FaRupeeSign,
@@ -10,6 +10,41 @@ import {
 import SecuritySection from "../pages/SecuritySection";
 
 // ══════════════════════════════════════════════
+// MAP HELPERS
+// ══════════════════════════════════════════════
+
+// FIX 1: Proper bounding box tightly scoped to India.
+// Previous version used minLat:8/maxLat:37 which is correct, but SVG transform
+// multipliers (2.45 / 4.1) were hand-tuned magic numbers that drift with viewBox.
+// Now we convert lat/lng → SVG coords using explicit SVG width/height constants
+// so the math is always correct regardless of viewBox changes.
+
+const SVG_W = 400;
+const SVG_H = 450;
+const SVG_PAD = { top: 20, right: 20, bottom: 20, left: 20 }; // inner drawable area
+
+const INDIA_BOUNDS = { minLat: 8.0, maxLat: 37.5, minLng: 68.0, maxLng: 97.5 };
+
+/**
+ * Converts (lat, lng) → { x, y } in SVG pixel space.
+ * Uses a simple equirectangular projection which is accurate enough
+ * for a dashboard overview map.
+ */
+const toMapPos = (lat, lng) => {
+    const drawW = SVG_W - SVG_PAD.left - SVG_PAD.right;
+    const drawH = SVG_H - SVG_PAD.top - SVG_PAD.bottom;
+
+    const x = SVG_PAD.left + ((lng - INDIA_BOUNDS.minLng) / (INDIA_BOUNDS.maxLng - INDIA_BOUNDS.minLng)) * drawW;
+    // Latitude is inverted: higher lat = smaller y (top of map)
+    const y = SVG_PAD.top + ((INDIA_BOUNDS.maxLat - lat) / (INDIA_BOUNDS.maxLat - INDIA_BOUNDS.minLat)) * drawH;
+
+    return { x, y };
+};
+
+const SHOP_LAT = 26.8467;
+const SHOP_LNG = 80.9462;
+
+// ══════════════════════════════════════════════
 // MAIN DASHBOARD
 // ══════════════════════════════════════════════
 const AdminDashboard = () => {
@@ -17,88 +52,136 @@ const AdminDashboard = () => {
     const [recentOrders, setRecentOrders] = useState([]);
     const [customerLocations, setCustomerLocations] = useState([]);
     const [cityStats, setCityStats] = useState([]);
-    const [loading, setLoading] = useState(true);
+
+    // FIX 2: Granular loading states per section so skeleton screens
+    // are accurate — previously a single `loading` flag hid the 401 issue
+    // because everything stayed "loading" when the session expired.
+    const [loadingOrders, setLoadingOrders] = useState(true);
+    const [loadingProducts, setLoadingProducts] = useState(true);
+    const [loadingUsers, setLoadingUsers] = useState(true);
+    const [loadingPos, setLoadingPos] = useState(true);
+
     const [fetchError, setFetchError] = useState(null);
     const [posStats, setPosStats] = useState(null);
+
+    // FIX 3: Track auth/session state explicitly
+    const [sessionExpired, setSessionExpired] = useState(false);
 
     // ── Queries State ──
     const [queries, setQueries] = useState([]);
     const [queriesLoading, setQueriesLoading] = useState(true);
     const [expandedQuery, setExpandedQuery] = useState(null);
 
+    // Prevent stale setState calls if component unmounts during fetch
+    const isMounted = useRef(true);
+    useEffect(() => {
+        isMounted.current = true;
+        return () => { isMounted.current = false; };
+    }, []);
+
     useEffect(() => {
         const fetchData = async () => {
-            try {
-                setFetchError(null);
+            setFetchError(null);
+            setSessionExpired(false);
 
-                const [ordersRes, productsRes, usersRes, posRes, queriesRes] = await Promise.allSettled([
-                    api.get("/orders"),
-                    api.get("/products"),
-                    api.get("/auth/users"),
-                    api.get("/walkin/stats"),
-                    api.get("/contact"),  // ✅ Queries fetch
-                ]);
-
-                const list = ordersRes.status === "fulfilled" && Array.isArray(ordersRes.value?.data)
-                    ? ordersRes.value.data : [];
-                const prodList = productsRes.status === "fulfilled" && Array.isArray(productsRes.value?.data)
-                    ? productsRes.value.data : [];
-                const userList = usersRes.status === "fulfilled" && Array.isArray(usersRes.value?.data)
-                    ? usersRes.value.data : [];
-
-                if (posRes.status === "fulfilled" && posRes.value?.data) {
-                    setPosStats(posRes.value.data);
+            // ── FIX 3: Per-request 401 detection ──
+            // Previously the catch block swallowed 401 globally, leaving the UI
+            // in a perpetual loading skeleton. Now each request is checked
+            // individually; a 401 on any request triggers a session-expired banner
+            // while the rest of the data still loads.
+            // onFinally = optional extra callback (e.g. setQueriesLoading(false))
+            // so loading state is ALWAYS cleared even if the request fails.
+            const safeGet = async (url, onSuccess, setLoading, onFinally) => {
+                try {
+                    const res = await api.get(url);
+                    if (isMounted.current) onSuccess(res?.data);
+                } catch (err) {
+                    if (err?.response?.status === 401) {
+                        // 401 means token expired / not authenticated.
+                        // Show a dedicated banner instead of staying stuck on skeleton.
+                        if (isMounted.current) setSessionExpired(true);
+                    } else if (isMounted.current) {
+                        setFetchError("Kuch data load nahi hua. Refresh karo.");
+                    }
+                } finally {
+                    if (isMounted.current) {
+                        if (setLoading) setLoading(false);
+                        if (onFinally) onFinally(); // ← queriesLoading & other extras
+                    }
                 }
+            };
 
-                if (queriesRes.status === "fulfilled" && Array.isArray(queriesRes.value?.data)) {
-                    setQueries(queriesRes.value.data);
-                }
-                setQueriesLoading(false);
+            // Fire all requests in parallel; each handles its own loading/error state.
+            await Promise.all([
+                safeGet("/orders", (data) => {
+                    const list = Array.isArray(data) ? data : [];
+                    const delivered = list.filter(o => o.orderStatus === "DELIVERED");
+                    const pending = list.filter(o => o.orderStatus === "PLACED");
+                    const revenue = delivered.reduce((s, o) => s + (o.totalAmount || 0), 0);
 
-                const delivered = list.filter(o => o.orderStatus === "DELIVERED");
-                const pending = list.filter(o => o.orderStatus === "PLACED");
-                const revenue = delivered.reduce((s, o) => s + (o.totalAmount || 0), 0);
+                    setStats({
+                        totalOrders: list.length,
+                        revenue,
+                        pending: pending.length,
+                        delivered: delivered.length,
+                        inTransit: list.filter(o => ["SHIPPED", "OUT_FOR_DELIVERY"].includes(o.orderStatus)).length,
+                    });
+                    setRecentOrders(list.slice(0, 5));
+                }, setLoadingOrders),
 
-                setStats({
-                    totalOrders: list.length,
-                    totalProducts: prodList.length,
-                    revenue,
-                    pending: pending.length,
-                    delivered: delivered.length,
-                    inTransit: list.filter(o => ["SHIPPED", "OUT_FOR_DELIVERY"].includes(o.orderStatus)).length,
-                });
+                safeGet("/products", (data) => {
+                    const prodList = Array.isArray(data) ? data : [];
+                    setStats(prev => prev ? { ...prev, totalProducts: prodList.length } : { totalProducts: prodList.length });
+                }, setLoadingProducts),
 
-                setRecentOrders(list.slice(0, 5));
+                safeGet("/auth/users", (data) => {
+                    const userList = Array.isArray(data) ? data : [];
+                    const withLocation = userList.filter(u => u.location?.latitude && u.location?.city);
+                    setCustomerLocations(withLocation);
 
-                const withLocation = userList.filter(u => u.location?.latitude && u.location?.city);
-                setCustomerLocations(withLocation);
+                    const cityMap = {};
+                    withLocation.forEach(u => {
+                        const city = u.location.city;
+                        cityMap[city] = (cityMap[city] || 0) + 1;
+                    });
+                    setCityStats(
+                        Object.entries(cityMap)
+                            .map(([city, count]) => ({ city, count }))
+                            .sort((a, b) => b.count - a.count)
+                            .slice(0, 8)
+                    );
+                }, setLoadingUsers),
 
-                const cityMap = {};
-                withLocation.forEach(u => {
-                    const city = u.location.city;
-                    cityMap[city] = (cityMap[city] || 0) + 1;
-                });
-                setCityStats(
-                    Object.entries(cityMap)
-                        .map(([city, count]) => ({ city, count }))
-                        .sort((a, b) => b.count - a.count)
-                        .slice(0, 8)
-                );
-            } catch (err) {
-                if (err.response?.status !== 401)
-                    setFetchError("Data load karne mein problem. Refresh karo.");
-            } finally {
-                setLoading(false);
-            }
+                safeGet("/walkin/stats", (data) => {
+                    if (data) setPosStats(data);
+                }, setLoadingPos),
+
+                safeGet("/contact", (data) => {
+                    if (Array.isArray(data)) setQueries(data);
+                }, null, () => setQueriesLoading(false)), // always cleared via finally
+            ]);
         };
+
         fetchData();
     }, []);
 
+    // Combined loading flag for sections that depend on orders + products
+    const loading = loadingOrders || loadingProducts || loadingUsers;
+
     const markAsRead = async (id) => {
+        // Guard: already read hai toh API call skip karo (race condition fix)
+        const query = queries.find(q => q._id === id);
+        if (!query || query.isRead) return;
+
+        // Optimistic update: UI turant respond kare, API ka wait nahi
+        setQueries(prev => prev.map(q => q._id === id ? { ...q, isRead: true } : q));
+
         try {
             await api.patch(`/contact/${id}/read`);
-            setQueries(prev => prev.map(q => q._id === id ? { ...q, isRead: true } : q));
-        } catch { }
+        } catch {
+            // Rollback: API fail hui toh wapas unread karo
+            setQueries(prev => prev.map(q => q._id === id ? { ...q, isRead: false } : q));
+        }
     };
 
     const unreadCount = queries.filter(q => !q.isRead).length;
@@ -113,22 +196,28 @@ const AdminDashboard = () => {
     };
 
     const maxCount = cityStats[0]?.count || 1;
-    const SHOP_LAT = 26.8467, SHOP_LNG = 80.9462;
-
-    const toMapPos = (lat, lng) => {
-        const B = { minLat: 8, maxLat: 37, minLng: 68, maxLng: 97 };
-        return {
-            x: ((lng - B.minLng) / (B.maxLng - B.minLng)) * 100,
-            y: ((B.maxLat - lat) / (B.maxLat - B.minLat)) * 100,
-        };
-    };
     const shopPos = toMapPos(SHOP_LAT, SHOP_LNG);
+
+    const CITY_LABELS = [
+        { name: "Delhi", lat: 28.6, lng: 77.2 },
+        { name: "Mumbai", lat: 19.0, lng: 72.8 },
+        { name: "Lucknow", lat: 26.8, lng: 80.9 },
+        { name: "Kolkata", lat: 22.6, lng: 88.4 },
+    ];
 
     return (
         <div style={{ fontFamily: "'DM Sans', sans-serif", minHeight: "100%", background: "#F1F5F9" }}>
+            {/* FIX 2: Keyframes kept in one place, no duplication */}
             <style>{`
-                @keyframes spin { to { transform: rotate(360deg); } }
-                @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+                @keyframes pulse {
+                    0%, 100% { opacity: 1; }
+                    50%       { opacity: 0.45; }
+                }
+                .skeleton {
+                    animation: pulse 1.5s ease-in-out infinite;
+                    background: #E2E8F0;
+                    border-radius: 10px;
+                }
             `}</style>
 
             <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 20px 48px" }}>
@@ -164,7 +253,24 @@ const AdminDashboard = () => {
                     </div>
                 </div>
 
-                {/* Error */}
+                {/* ── FIX 3: Session expired banner (replaces silent loading) ── */}
+                {sessionExpired && (
+                    <div style={{
+                        background: "#FFF7ED", border: "1px solid #FED7AA", color: "#C2410C",
+                        padding: "12px 16px", borderRadius: 12, fontSize: 13, fontWeight: 600,
+                        marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between",
+                    }}>
+                        <span>⚠️ Session expire ho gayi. Dobara login karo.</span>
+                        <Link to="/admin/login" style={{
+                            background: "#EA580C", color: "#fff", padding: "6px 14px",
+                            borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none",
+                        }}>
+                            Login
+                        </Link>
+                    </div>
+                )}
+
+                {/* Generic error */}
                 {fetchError && (
                     <div style={{
                         background: "#FEF2F2", border: "1px solid #FECACA", color: "#DC2626",
@@ -178,7 +284,7 @@ const AdminDashboard = () => {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12, marginBottom: 12 }}>
                     {loading ? (
                         [0, 1, 2, 3].map(i => (
-                            <div key={i} style={{ height: 90, borderRadius: 14, background: "#E2E8F0", animation: "pulse 1.5s infinite" }} />
+                            <div key={i} className="skeleton" style={{ height: 90 }} />
                         ))
                     ) : [
                         { label: "Total Revenue", value: `₹${(stats?.revenue || 0).toLocaleString("en-IN")}`, icon: <FaRupeeSign size={13} />, accent: "#10B981", bg: "#ECFDF5", border: "#A7F3D0" },
@@ -230,7 +336,9 @@ const AdminDashboard = () => {
                 )}
 
                 {/* ── POS Banner ── */}
-                {posStats && (
+                {loadingPos ? (
+                    <div className="skeleton" style={{ height: 90, marginBottom: 20 }} />
+                ) : posStats && (
                     <div style={{
                         background: "#0F172A", borderRadius: 16, padding: "20px 24px",
                         display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center",
@@ -287,10 +395,10 @@ const AdminDashboard = () => {
                             <span style={{ marginLeft: "auto", fontSize: 11, color: "#94A3B8" }}>{customerLocations.length} tracked</span>
                         </div>
                         <div style={{ padding: "16px 18px" }}>
-                            {loading ? (
+                            {loadingUsers ? (
                                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                                     {[0, 1, 2, 3].map(i => (
-                                        <div key={i} style={{ height: 28, borderRadius: 8, background: "#F1F5F9", animation: "pulse 1.5s infinite" }} />
+                                        <div key={i} className="skeleton" style={{ height: 28 }} />
                                     ))}
                                 </div>
                             ) : cityStats.length === 0 ? (
@@ -321,7 +429,7 @@ const AdminDashboard = () => {
                         </div>
                     </div>
 
-                    {/* Map */}
+                    {/* ── FIX 1: Customer Map — accurate projection ── */}
                     <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #E2E8F0", overflow: "hidden", boxShadow: "0 1px 6px rgba(0,0,0,0.04)" }}>
                         <div style={{ padding: "14px 18px", borderBottom: "1px solid #F1F5F9", display: "flex", alignItems: "center", gap: 8 }}>
                             <FaMapMarkerAlt size={12} color="#EF4444" />
@@ -335,45 +443,71 @@ const AdminDashboard = () => {
                             </div>
                         </div>
                         <div style={{ padding: 12 }}>
-                            <div style={{ position: "relative", paddingBottom: "90%" }}>
-                                <div style={{ position: "absolute", inset: 0 }}>
-                                    <svg viewBox="0 0 400 450" style={{ width: "100%", height: "100%", background: "#F0F9FF", borderRadius: 10 }}>
-                                        <path d="M160,20 L200,15 L240,25 L270,40 L290,70 L300,100 L310,130 L320,160 L315,190 L310,220 L300,250 L285,275 L265,295 L250,320 L240,345 L230,370 L220,390 L210,410 L200,425 L190,410 L180,390 L170,365 L158,340 L145,315 L130,290 L115,265 L105,240 L95,210 L88,180 L85,150 L88,120 L95,95 L110,70 L130,50 L160,20 Z"
-                                            fill="#E0F2FE" stroke="#94A3B8" strokeWidth="1.5" />
-                                        {[0, 1, 2, 3, 4].map(i => (
-                                            <line key={`h${i}`} x1="80" y1={80 + i * 70} x2="325" y2={80 + i * 70} stroke="#E2E8F0" strokeWidth="0.5" strokeDasharray="4,4" />
-                                        ))}
-                                        {[0, 1, 2, 3, 4].map(i => (
-                                            <line key={`v${i}`} x1={100 + i * 50} y1="20" x2={100 + i * 50} y2="430" stroke="#E2E8F0" strokeWidth="0.5" strokeDasharray="4,4" />
-                                        ))}
-                                        <g transform={`translate(${80 + shopPos.x * 2.45},${20 + shopPos.y * 4.1})`}>
-                                            <circle r="8" fill="#F59E0B" stroke="white" strokeWidth="2" />
-                                            <text y="4" textAnchor="middle" fontSize="8" fill="white" fontWeight="bold">S</text>
-                                            <text y="-12" textAnchor="middle" fontSize="7" fill="#92400E" fontWeight="bold">Shop</text>
-                                        </g>
-                                        {customerLocations.slice(0, 20).map((user, i) => {
-                                            const p = toMapPos(user.location.latitude, user.location.longitude);
-                                            return (
-                                                <g key={i} transform={`translate(${80 + p.x * 2.45},${20 + p.y * 4.1})`}>
-                                                    <circle r="5" fill="#3B82F6" stroke="white" strokeWidth="1.5" opacity="0.85" />
-                                                </g>
-                                            );
-                                        })}
-                                        {[
-                                            { name: "Delhi", lat: 28.6, lng: 77.2 },
-                                            { name: "Mumbai", lat: 19.0, lng: 72.8 },
-                                            { name: "Lucknow", lat: 26.8, lng: 80.9 },
-                                            { name: "Kolkata", lat: 22.6, lng: 88.4 },
-                                        ].map(({ name, lat, lng }) => {
-                                            const p = toMapPos(lat, lng);
-                                            return (
-                                                <text key={name} x={80 + p.x * 2.45} y={20 + p.y * 4.1 + 14}
-                                                    textAnchor="middle" fontSize="6" fill="#64748B" fontWeight="500">{name}</text>
-                                            );
-                                        })}
-                                    </svg>
-                                </div>
-                            </div>
+                            {loadingUsers ? (
+                                <div className="skeleton" style={{ paddingBottom: "90%", borderRadius: 10 }} />
+                            ) : (
+                                // viewBox matches SVG_W × SVG_H so toMapPos coords land correctly
+                                <svg
+                                    viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+                                    style={{ width: "100%", display: "block", background: "#F0F9FF", borderRadius: 10 }}
+                                    aria-label="India customer map"
+                                >
+                                    {/* India outline (simplified) */}
+                                    <path
+                                        d="M160,20 L200,15 L240,25 L270,40 L290,70 L300,100 L310,130
+                                           L320,160 L315,190 L310,220 L300,250 L285,275 L265,295
+                                           L250,320 L240,345 L230,370 L220,390 L210,410 L200,425
+                                           L190,410 L180,390 L170,365 L158,340 L145,315 L130,290
+                                           L115,265 L105,240 L95,210 L88,180 L85,150 L88,120
+                                           L95,95 L110,70 L130,50 L160,20 Z"
+                                        fill="#E0F2FE" stroke="#94A3B8" strokeWidth="1.5"
+                                    />
+
+                                    {/* Grid lines */}
+                                    {[0, 1, 2, 3, 4].map(i => (
+                                        <line key={`h${i}`}
+                                            x1={SVG_PAD.left} y1={SVG_PAD.top + i * 80}
+                                            x2={SVG_W - SVG_PAD.right} y2={SVG_PAD.top + i * 80}
+                                            stroke="#E2E8F0" strokeWidth="0.5" strokeDasharray="4,4"
+                                        />
+                                    ))}
+                                    {[0, 1, 2, 3, 4].map(i => (
+                                        <line key={`v${i}`}
+                                            x1={SVG_PAD.left + i * 72} y1={SVG_PAD.top}
+                                            x2={SVG_PAD.left + i * 72} y2={SVG_H - SVG_PAD.bottom}
+                                            stroke="#E2E8F0" strokeWidth="0.5" strokeDasharray="4,4"
+                                        />
+                                    ))}
+
+                                    {/* City name labels */}
+                                    {CITY_LABELS.map(({ name, lat, lng }) => {
+                                        const p = toMapPos(lat, lng);
+                                        return (
+                                            <text key={name} x={p.x} y={p.y + 14}
+                                                textAnchor="middle" fontSize="7" fill="#64748B" fontWeight="500">
+                                                {name}
+                                            </text>
+                                        );
+                                    })}
+
+                                    {/* Customer dots — capped at 40 for performance */}
+                                    {customerLocations.slice(0, 40).map((user, i) => {
+                                        const p = toMapPos(user.location.latitude, user.location.longitude);
+                                        return (
+                                            <circle key={i} cx={p.x} cy={p.y}
+                                                r="5" fill="#3B82F6" stroke="white" strokeWidth="1.5" opacity="0.85"
+                                            />
+                                        );
+                                    })}
+
+                                    {/* Shop marker — rendered last so it's always on top */}
+                                    <g transform={`translate(${shopPos.x},${shopPos.y})`}>
+                                        <circle r="9" fill="#F59E0B" stroke="white" strokeWidth="2" />
+                                        <text y="4" textAnchor="middle" fontSize="8" fill="white" fontWeight="bold">S</text>
+                                        <text y="-13" textAnchor="middle" fontSize="7" fill="#92400E" fontWeight="bold">Shop</text>
+                                    </g>
+                                </svg>
+                            )}
                         </div>
                     </div>
 
@@ -393,7 +527,7 @@ const AdminDashboard = () => {
                             background: "#fff", border: `1px solid ${border}`,
                             borderRadius: 14, padding: "18px 16px",
                             textDecoration: "none", display: "flex", flexDirection: "column", gap: 10,
-                            transition: "all 0.15s", boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
+                            transition: "box-shadow 0.15s", boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
                         }}
                             onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.1)"}
                             onMouseLeave={e => e.currentTarget.style.boxShadow = "0 1px 6px rgba(0,0,0,0.04)"}
@@ -443,7 +577,7 @@ const AdminDashboard = () => {
                     {queriesLoading ? (
                         <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
                             {[0, 1, 2].map(i => (
-                                <div key={i} style={{ height: 56, borderRadius: 10, background: "#F1F5F9", animation: "pulse 1.5s infinite" }} />
+                                <div key={i} className="skeleton" style={{ height: 56 }} />
                             ))}
                         </div>
                     ) : queries.length === 0 ? (
@@ -460,7 +594,6 @@ const AdminDashboard = () => {
                                     background: query.isRead ? "transparent" : "#FDFAF6",
                                     transition: "background 0.15s",
                                 }}>
-                                    {/* Row */}
                                     <div
                                         onClick={() => {
                                             setExpandedQuery(isExpanded ? null : query._id);
@@ -473,9 +606,8 @@ const AdminDashboard = () => {
                                         onMouseEnter={e => e.currentTarget.style.background = "#F8FAFC"}
                                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                                     >
-                                        {/* Icon */}
                                         <div style={{
-                                            width: 36, height: 36, borderRadius: "50%", shrink: 0,
+                                            width: 36, height: 36, borderRadius: "50%",
                                             background: query.isRead ? "#F1F5F9" : "#EDE9FE",
                                             display: "flex", alignItems: "center", justifyContent: "center",
                                             flexShrink: 0,
@@ -486,7 +618,6 @@ const AdminDashboard = () => {
                                             }
                                         </div>
 
-                                        {/* Info */}
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                                                 <span style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{query.name}</span>
@@ -516,7 +647,6 @@ const AdminDashboard = () => {
                                             </p>
                                         </div>
 
-                                        {/* Right */}
                                         <div style={{ textAlign: "right", flexShrink: 0 }}>
                                             <div style={{ fontSize: 10, color: "#94A3B8" }}>
                                                 {new Date(query.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
@@ -527,7 +657,6 @@ const AdminDashboard = () => {
                                         </div>
                                     </div>
 
-                                    {/* Expanded Details */}
                                     {isExpanded && (
                                         <div style={{
                                             margin: "0 20px 14px",
@@ -573,9 +702,9 @@ const AdminDashboard = () => {
                             View all <FaArrowRight size={9} />
                         </Link>
                     </div>
-                    {loading ? (
+                    {loadingOrders ? (
                         <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
-                            {[0, 1, 2].map(i => <div key={i} style={{ height: 48, borderRadius: 10, background: "#F1F5F9", animation: "pulse 1.5s infinite" }} />)}
+                            {[0, 1, 2].map(i => <div key={i} className="skeleton" style={{ height: 48 }} />)}
                         </div>
                     ) : recentOrders.length === 0 ? (
                         <div style={{ padding: "40px 0", textAlign: "center" }}>

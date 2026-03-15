@@ -6,12 +6,9 @@ import {
     FaPhone, FaUser, FaShoppingBag,
     FaTimesCircle, FaGift, FaUndo, FaInfoCircle,
     FaSpinner, FaFileInvoice,
-    // FaTruck, // TODO: Re-enable when Shiprocket integration is active
 } from "react-icons/fa";
 
-/* ─────────────────────────────────────────────
-   STATUS CONFIG
-───────────────────────────────────────────── */
+/* ── Status Config ── */
 const STATUS_CONFIG = {
     PLACED: { label: "Placed", color: "bg-yellow-50 text-yellow-700 border-yellow-200", dot: "bg-yellow-400" },
     CONFIRMED: { label: "Confirmed", color: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-400" },
@@ -22,9 +19,6 @@ const STATUS_CONFIG = {
     CANCELLED: { label: "Cancelled", color: "bg-red-50 text-red-700 border-red-200", dot: "bg-red-400" },
 };
 
-/* ─────────────────────────────────────────────
-   REFUND STATUS CONFIG
-───────────────────────────────────────────── */
 const REFUND_STATUS = {
     NONE: null,
     REQUESTED: {
@@ -56,7 +50,6 @@ const REFUND_STATUS = {
 
 const FLOW_STEPS = ["PLACED", "CONFIRMED", "PACKED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"];
 const CANCELLABLE = ["PLACED", "CONFIRMED"];
-
 const STEP_DOTS = FLOW_STEPS.map((_, i) => i + 1);
 
 const getItemImage = (item) => item.images?.[0]?.url || item.image || null;
@@ -91,7 +84,7 @@ const OrderDetails = () => {
         } finally { setLoading(false); }
     };
 
-    useEffect(() => { if (id) fetchOrder(); }, [id]);
+    useEffect(() => { if (id) fetchOrder(); }, [id]); // eslint-disable-line
 
     const handleCancel = async () => {
         try {
@@ -170,21 +163,20 @@ const OrderDetails = () => {
     const canRequestRefund = isCancelled && isRazorpay && isPaid && refundStatus === "NONE";
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-stone-50 via-white to-amber-50/20 py-8 px-4">
+        <div className="min-h-screen bg-gradient-to-br from-stone-50 via-white to-amber-50/20 py-8 px-4"
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            {/* ✅ No @import — fonts loaded in index.html */}
             <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
                 .order-font { font-family: 'DM Sans', sans-serif; }
-                @keyframes fadeUp  { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
                 @keyframes slideIn { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:translateX(0)} }
-                .fade-up  { animation: fadeUp  0.4s ease forwards; }
                 .slide-in { animation: slideIn 0.3s ease forwards; }
                 .card { background:white; border-radius:20px; border:1px solid #f0ece8; box-shadow:0 1px 3px rgba(0,0,0,0.04),0 4px 16px rgba(0,0,0,0.03); }
                 .card:hover { box-shadow:0 4px 24px rgba(0,0,0,0.08); transition:box-shadow 0.2s; }
             `}</style>
 
-            <div className="order-font max-w-2xl mx-auto space-y-4 fade-up">
+            <div className="order-font max-w-2xl mx-auto space-y-4">
 
-                {/* ── Header ── */}
+                {/* Header */}
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <Link to="/orders"
@@ -212,11 +204,8 @@ const OrderDetails = () => {
                     </div>
                     <div className="flex items-center gap-2">
                         {isDelivered && (
-                            <button
-                                onClick={handleDownloadInvoice}
-                                disabled={downloadingInvoice}
-                                className="flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-50 cursor-pointer"
-                            >
+                            <button onClick={handleDownloadInvoice} disabled={downloadingInvoice}
+                                className="flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-50 cursor-pointer">
                                 <FaFileInvoice size={11} />
                                 {downloadingInvoice ? "Downloading..." : "Invoice"}
                             </button>
@@ -228,7 +217,7 @@ const OrderDetails = () => {
                     </div>
                 </div>
 
-                {/* ── Cancelled Banner ── */}
+                {/* Cancelled Banner */}
                 {isCancelled && (
                     <div className="card p-4 flex items-center gap-3 border-red-100 bg-gradient-to-r from-red-50 to-white slide-in">
                         <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center shrink-0">
@@ -243,7 +232,7 @@ const OrderDetails = () => {
                     </div>
                 )}
 
-                {/* ── Refund Status Banner ── */}
+                {/* Refund Status Banner */}
                 {refundInfo && (
                     <div className={`card p-4 flex items-start gap-3 border slide-in ${refundInfo.color}`}>
                         {refundStatus === "PROCESSING"
@@ -252,9 +241,7 @@ const OrderDetails = () => {
                         }
                         <div>
                             <p className="font-bold text-sm">{refundInfo.label}</p>
-                            {refundInfo.desc && (
-                                <p className="text-xs mt-0.5 opacity-80">{refundInfo.desc}</p>
-                            )}
+                            {refundInfo.desc && <p className="text-xs mt-0.5 opacity-80">{refundInfo.desc}</p>}
                             {refundStatus === "REJECTED" && order.refund?.adminNote && (
                                 <p className="text-xs mt-1 font-medium">Reason: {order.refund.adminNote}</p>
                             )}
@@ -268,38 +255,7 @@ const OrderDetails = () => {
                     </div>
                 )}
 
-                {/*
-                 * ─────────────────────────────────────────────────────────────
-                 * TODO (3 months): Re-enable Shipment Tracking card when
-                 * Shiprocket is live. Displays courier name, AWB code, and a
-                 * "Track Shipment" link using order.shipping.trackingUrl.
-                 * ─────────────────────────────────────────────────────────────
-                 *
-                 * {order.shipping?.trackingUrl && (
-                 *     <div className="card p-5">
-                 *         <h3 className="font-bold text-zinc-800 mb-3 text-sm flex items-center gap-2">
-                 *             <span className="w-1 h-4 bg-amber-500 rounded-full" />
-                 *             Shipment Tracking
-                 *         </h3>
-                 *         <div className="flex flex-wrap items-center justify-between gap-3">
-                 *             <div className="flex items-center gap-2 text-sm text-zinc-600">
-                 *                 <FaTruck size={13} className="text-amber-500" />
-                 *                 <span>Courier:</span>
-                 *                 <span className="font-bold text-zinc-800">{order.shipping.courierName || "Courier"}</span>
-                 *                 {order.shipping.awbCode && (
-                 *                     <span className="text-zinc-400 font-mono text-xs">AWB: {order.shipping.awbCode}</span>
-                 *                 )}
-                 *             </div>
-                 *             <a href={order.shipping.trackingUrl} target="_blank" rel="noreferrer"
-                 *                 className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition font-bold">
-                 *                 Track Shipment →
-                 *             </a>
-                 *         </div>
-                 *     </div>
-                 * )}
-                 */}
-
-                {/* ── Order Tracking ── */}
+                {/* Order Tracking */}
                 {!isCancelled && stepIdx >= 0 && (
                     <div className="card p-5">
                         <h2 className="font-black text-zinc-800 text-sm mb-5 flex items-center gap-2">
@@ -337,7 +293,7 @@ const OrderDetails = () => {
                     </div>
                 )}
 
-                {/* ── Ordered Items ── */}
+                {/* Ordered Items */}
                 <div className="card p-5">
                     <h2 className="font-black text-zinc-800 text-sm mb-4 flex items-center gap-2">
                         <span className="w-1 h-4 bg-amber-500 rounded-full" />
@@ -360,7 +316,7 @@ const OrderDetails = () => {
                                         <p className="font-bold text-zinc-800 text-sm truncate">{item.name}</p>
                                         <p className="text-xs text-zinc-400 mt-0.5">
                                             Qty: <span className="font-semibold text-zinc-600">{item.qty}</span>
-                                            {" x "}
+                                            {" × "}
                                             <span className="font-semibold text-zinc-600">Rs.{item.price.toLocaleString("en-IN")}</span>
                                         </p>
                                         {item.selectedSize && (
@@ -369,9 +325,7 @@ const OrderDetails = () => {
                                             </span>
                                         )}
                                         {item.customization?.text && (
-                                            <p className="text-[10px] text-amber-600 font-semibold mt-0.5">
-                                                "{item.customization.text}"
-                                            </p>
+                                            <p className="text-[10px] text-amber-600 font-semibold mt-0.5">"{item.customization.text}"</p>
                                         )}
                                     </div>
                                     <p className="font-black text-zinc-900 text-sm shrink-0">
@@ -383,7 +337,7 @@ const OrderDetails = () => {
                     </div>
                 </div>
 
-                {/* ── Price + Delivery ── */}
+                {/* Price + Delivery */}
                 <div className="grid md:grid-cols-2 gap-4">
                     <div className="card p-5">
                         <h2 className="font-black text-zinc-800 text-sm mb-4 flex items-center gap-2">
@@ -412,15 +366,11 @@ const OrderDetails = () => {
                             </div>
                             <div className="flex justify-between pt-3 border-t border-stone-100">
                                 <span className="font-black text-zinc-900">Total</span>
-                                <span className="font-black text-zinc-900 text-lg">
-                                    Rs.{Number(order.totalAmount).toLocaleString("en-IN")}
-                                </span>
+                                <span className="font-black text-zinc-900 text-lg">Rs.{Number(order.totalAmount).toLocaleString("en-IN")}</span>
                             </div>
                             <div className="flex justify-between pt-1">
                                 <span className="text-zinc-400">Payment</span>
-                                <span className="font-bold text-zinc-700">
-                                    {isRazorpay ? "Online Paid" : "Cash on Delivery"}
-                                </span>
+                                <span className="font-bold text-zinc-700">{isRazorpay ? "Online Paid" : "Cash on Delivery"}</span>
                             </div>
                         </div>
                     </div>
@@ -447,7 +397,7 @@ const OrderDetails = () => {
                     </div>
                 </div>
 
-                {/* ── Cancel Section ── */}
+                {/* Cancel */}
                 {canCancel && (
                     <div className="card p-5 border-red-100">
                         <h2 className="font-black text-zinc-800 text-sm mb-1">Cancel Order</h2>
@@ -484,7 +434,7 @@ const OrderDetails = () => {
                     </div>
                 )}
 
-                {/* ── Manual Refund Request ── */}
+                {/* Refund Request */}
                 {canRequestRefund && (
                     <div className="card p-5 border-amber-100">
                         <h2 className="font-black text-zinc-800 text-sm mb-1 flex items-center gap-2">
@@ -527,12 +477,11 @@ const OrderDetails = () => {
                     </div>
                 )}
 
-                {/* ── Continue Shopping ── */}
+                {/* Continue Shopping */}
                 <Link to="/"
                     className="flex items-center justify-center gap-2 w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold text-sm hover:bg-amber-500 transition-all active:scale-95 shadow-lg shadow-zinc-900/10 cursor-pointer">
                     <FaShoppingBag size={13} /> Continue Shopping
                 </Link>
-
             </div>
         </div>
     );

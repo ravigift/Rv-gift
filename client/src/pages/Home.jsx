@@ -1,9 +1,12 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import api from "../api/axios";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchProducts } from "../features/products/productSlice"; // ✅ Redux
 import { useCart } from "../hooks/useCart";
 import { imgUrl } from "../utils/imageUrl";
 import { FaStar, FaRegStar, FaSearch, FaFire, FaArrowRight, FaShoppingCart, FaPencilAlt } from "react-icons/fa";
+
+const PAGE_SIZE = 12;
 
 /* ── Skeleton Card ── */
 const SkeletonCard = () => (
@@ -26,13 +29,11 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
     const navigate = useNavigate();
     const { cartItems } = useCart();
     const inCart = cartItems.some(i => i._id === product._id);
-
     const imageUrl = imgUrl.card(product.images?.[0]?.url || "");
     const rating = product.rating || 0;
     const numReviews = product.numReviews || 0;
     const [imgLoaded, setImgLoaded] = useState(false);
 
-    // ✅ Offer price logic
     const hasDiscount = product.mrp && Number(product.mrp) > Number(product.price);
     const discountPct = hasDiscount
         ? Math.round(((Number(product.mrp) - Number(product.price)) / Number(product.mrp)) * 100)
@@ -55,7 +56,6 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                     onError={e => { e.target.src = "https://via.placeholder.com/400x400?text=No+Image"; setImgLoaded(true); }}
                     className={`w-full h-full object-contain p-3 group-hover:scale-110 transition-transform duration-500 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
                 />
-                {/* Left badges */}
                 <div className="absolute top-2 left-2 flex flex-col gap-1">
                     {product.isCustomizable && !isOutOfStock && (
                         <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">✏️ Custom</span>
@@ -64,7 +64,6 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                         <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Out of Stock</span>
                     )}
                 </div>
-                {/* ✅ Discount badge top-right */}
                 {hasDiscount && !isOutOfStock && (
                     <div className="absolute top-2 right-2">
                         <span className="bg-green-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">
@@ -93,7 +92,6 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                 </div>
                 <p className="text-zinc-400 text-xs line-clamp-2 leading-relaxed mb-3">{product.description}</p>
                 <div className="mt-auto">
-                    {/* ✅ Price with MRP strikethrough */}
                     <div className="mb-3">
                         <div className="flex items-baseline gap-1.5 flex-wrap">
                             <span className="text-zinc-900 text-xl font-black leading-none">
@@ -136,39 +134,36 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
 ════════════════════════════════════════ */
 const Home = () => {
     const navigate = useNavigate();
+    const dispatch = useDispatch();
     const [searchParams, setSearchParams] = useSearchParams();
+
     const searchQuery = searchParams.get("search") || "";
     const activeCategory = searchParams.get("category") || "";
-    // ✅ New: customizable filter flag
     const showCustomizable = searchParams.get("customizable") === "true";
     const { addItem } = useCart();
 
-    const [allProducts, setAllProducts] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
+    // ✅ Redux state — products survive navigation
+    const allProducts = useSelector(state => state.products.items);
+    const status = useSelector(state => state.products.status);
+    const reduxError = useSelector(state => state.products.error);
 
+    const loading = status === "loading" || status === "idle";
+    const error = reduxError || "";
+
+    const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+    // Reset visible count on filter change
+    useEffect(() => { setVisibleCount(PAGE_SIZE); }, [searchQuery, activeCategory, showCustomizable]);
+
+    // ✅ Fetch only if not already loaded — no reload on navigate!
     useEffect(() => {
-        if (allProducts.length > 0) return;
-        const fetchProducts = async () => {
-            try {
-                setLoading(true);
-                setError("");
-                const { data } = await api.get("/products");
-                setAllProducts(data);
-            } catch {
-                setError("Failed to load products. Please check your connection.");
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchProducts();
-    }, []);
+        if (status === "idle") {
+            dispatch(fetchProducts());
+        }
+    }, [dispatch, status]);
 
-    // ✅ Filtering — now includes customizable filter
     const products = useMemo(() => {
         let filtered = allProducts;
-
-        // Customizable filter — takes priority over category
         if (showCustomizable) {
             filtered = filtered.filter(p => p.isCustomizable === true);
         } else if (activeCategory) {
@@ -176,7 +171,6 @@ const Home = () => {
                 p.category?.toLowerCase() === activeCategory.toLowerCase()
             );
         }
-
         if (searchQuery && searchQuery.trim().length >= 2) {
             const q = searchQuery.trim().toLowerCase();
             filtered = filtered.filter(p =>
@@ -185,11 +179,9 @@ const Home = () => {
                 p.tags?.some(t => t.toLowerCase().includes(q))
             );
         }
-
         return filtered;
     }, [allProducts, searchQuery, activeCategory, showCustomizable]);
 
-    // ✅ Customizable products count for hero badge
     const customizableCount = useMemo(
         () => allProducts.filter(p => p.isCustomizable).length,
         [allProducts]
@@ -205,7 +197,6 @@ const Home = () => {
         navigate("/checkout", { state: { buyNowItem: { ...product, quantity: 1 } } });
     }, [navigate]);
 
-    // ✅ Set category pill
     const setCategory = (cat) => {
         const params = {};
         if (searchQuery) params.search = searchQuery;
@@ -213,7 +204,6 @@ const Home = () => {
         setSearchParams(params);
     };
 
-    // ✅ Set customizable filter
     const setCustomizableFilter = () => {
         const params = {};
         if (searchQuery) params.search = searchQuery;
@@ -222,54 +212,67 @@ const Home = () => {
     };
 
     const clearFilters = () => setSearchParams({});
-
     const formatCat = (cat) => cat.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase());
-
-    // Active state for "All" pill — none of the special filters active
     const isAllActive = !activeCategory && !showCustomizable;
+
+    const visibleProducts = products.slice(0, visibleCount);
+    const hasMore = visibleCount < products.length;
 
     return (
         <div className="min-h-screen bg-stone-100">
             <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@400;500;600;700;800&display=swap');
                 .hero-font { font-family: 'Playfair Display', serif; }
                 .body-font { font-family: 'DM Sans', sans-serif; }
-                @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
-                @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-                @keyframes fadeRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-                @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-6px); } }
-                @keyframes pulse-ring { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245,158,11,0.4); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(245,158,11,0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245,158,11,0); } }
-                @keyframes gradientMove { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-                .shimmer-text { background: linear-gradient(90deg, #f59e0b, #fcd34d, #f59e0b, #fbbf24); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: shimmer 3s linear infinite; }
+
+                @keyframes shimmer      { 0%{background-position:-200% center} 100%{background-position:200% center} }
+                @keyframes fadeUp       { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes fadeRight    { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
+                @keyframes float        { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+                @keyframes pulse-ring   { 0%{transform:scale(.95);box-shadow:0 0 0 0 rgba(245,158,11,.4)} 70%{transform:scale(1);box-shadow:0 0 0 10px rgba(245,158,11,0)} 100%{transform:scale(.95);box-shadow:0 0 0 0 rgba(245,158,11,0)} }
+                @keyframes gradientMove { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+
+                .shimmer-text {
+                    background: linear-gradient(90deg,#f59e0b,#fcd34d,#f59e0b,#fbbf24);
+                    background-size: 200% auto;
+                    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+                    background-clip: text;
+                    animation: shimmer 3s linear infinite;
+                    will-change: background-position;
+                }
                 .hero-anim-1 { animation: fadeUp 0.6s ease 0.1s both; }
                 .hero-anim-2 { animation: fadeUp 0.6s ease 0.25s both; }
                 .hero-anim-3 { animation: fadeUp 0.6s ease 0.4s both; }
                 .hero-anim-4 { animation: fadeUp 0.6s ease 0.55s both; }
-                .stats-anim { animation: fadeRight 0.6s ease 0.3s both; }
-                .float-1 { animation: float 3.5s ease-in-out infinite; }
-                .float-2 { animation: float 3.5s ease-in-out 0.5s infinite; }
-                .float-3 { animation: float 3.5s ease-in-out 1s infinite; }
+                .stats-anim  { animation: fadeRight 0.6s ease 0.3s both; }
+                .float-1 { animation: float 3.5s ease-in-out infinite; will-change: transform; }
+                .float-2 { animation: float 3.5s ease-in-out 0.5s infinite; will-change: transform; }
+                .float-3 { animation: float 3.5s ease-in-out 1s infinite; will-change: transform; }
                 .pulse-btn { animation: pulse-ring 2s ease-in-out infinite; }
-                .animated-bg { background: linear-gradient(135deg, #0a0f1a, #111827, #0f172a, #1a1207); background-size: 300% 300%; animation: gradientMove 12s ease infinite; }
-                .glass-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); backdrop-filter: blur(8px); }
-                .gold-border { border: 1px solid rgba(245,158,11,0.3); background: rgba(245,158,11,0.06); }
-                .scrollbar-hide::-webkit-scrollbar { display: none; }
-                .btn-hover { transition: all 0.2s ease; }
-                .btn-hover:hover { transform: translateY(-2px); }
+                .animated-bg {
+                    background: linear-gradient(135deg,#0a0f1a,#111827,#0f172a,#1a1207);
+                    background-size: 300% 300%;
+                    animation: gradientMove 12s ease infinite;
+                    will-change: background-position;
+                }
+                .glass-card  { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.09); backdrop-filter:blur(8px); }
+                .gold-border { border:1px solid rgba(245,158,11,.3); background:rgba(245,158,11,.06); }
+                .scrollbar-hide::-webkit-scrollbar { display:none; }
+                .btn-hover   { transition: all 0.2s ease; }
+                .btn-hover:hover  { transform: translateY(-2px); }
                 .btn-hover:active { transform: scale(0.97); }
             `}</style>
 
-            {/* ── HERO — only show when no search/filter active ── */}
+            {/* ── HERO ── */}
             {!searchQuery && !activeCategory && !showCustomizable && (
                 <div className="body-font animated-bg relative w-full overflow-hidden" style={{ minHeight: "500px" }}>
                     <div className="absolute top-[-80px] right-[-80px] w-[500px] h-[500px] rounded-full pointer-events-none"
-                        style={{ background: "radial-gradient(circle, rgba(245,158,11,0.12) 0%, transparent 65%)" }} />
+                        style={{ background: "radial-gradient(circle,rgba(245,158,11,.12) 0%,transparent 65%)" }} />
                     <div className="absolute bottom-[-60px] left-[10%] w-[350px] h-[350px] rounded-full pointer-events-none"
-                        style={{ background: "radial-gradient(circle, rgba(245,158,11,0.06) 0%, transparent 65%)" }} />
+                        style={{ background: "radial-gradient(circle,rgba(245,158,11,.06) 0%,transparent 65%)" }} />
                     <div className="absolute inset-0 pointer-events-none opacity-[0.035]"
-                        style={{ backgroundImage: "radial-gradient(circle, #f59e0b 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+                        style={{ backgroundImage: "radial-gradient(circle,#f59e0b 1px,transparent 1px)", backgroundSize: "32px 32px" }} />
                     <div className="absolute top-0 right-[28%] w-px h-full pointer-events-none"
-                        style={{ background: "linear-gradient(to bottom, transparent, rgba(245,158,11,0.15), transparent)" }} />
+                        style={{ background: "linear-gradient(to bottom,transparent,rgba(245,158,11,.15),transparent)" }} />
 
                     <div className="relative max-w-7xl mx-auto px-6 py-16 md:py-24">
                         <div className="flex flex-col md:flex-row items-center justify-between gap-10">
@@ -291,11 +294,10 @@ const Home = () => {
                                     <button
                                         onClick={() => document.getElementById("products-section").scrollIntoView({ behavior: "smooth" })}
                                         className="btn-hover group/btn flex items-center justify-center gap-2.5 font-black px-8 py-3.5 rounded-2xl text-sm cursor-pointer"
-                                        style={{ background: "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)", color: "#111", boxShadow: "0 8px 28px rgba(245,158,11,0.4), 0 2px 8px rgba(0,0,0,0.3)" }}>
+                                        style={{ background: "linear-gradient(135deg,#f59e0b 0%,#fbbf24 100%)", color: "#111", boxShadow: "0 8px 28px rgba(245,158,11,.4),0 2px 8px rgba(0,0,0,.3)" }}>
                                         Shop Now
                                         <FaArrowRight size={11} className="group-hover/btn:translate-x-1 transition-transform duration-200" />
                                     </button>
-                                    {/* ✅ Now uses customizable filter — shows ALL customizable products */}
                                     <button
                                         onClick={() => {
                                             setCustomizableFilter();
@@ -352,16 +354,13 @@ const Home = () => {
             {/* ── Products Section ── */}
             <div id="products-section" className="body-font max-w-7xl mx-auto px-4 py-8">
 
-                {/* ✅ Category Pills — includes Customizable pill */}
+                {/* Category Pills */}
                 {categories.length > 0 && (
                     <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
-                        {/* All */}
                         <button onClick={clearFilters}
                             className={`shrink-0 px-4 py-2 rounded-full text-xs font-bold border transition-all duration-200 cursor-pointer active:scale-95 ${isAllActive ? "bg-zinc-900 text-white border-zinc-900 shadow-sm" : "bg-white text-zinc-600 border-stone-200 hover:border-zinc-400 hover:bg-stone-50"}`}>
                             All
                         </button>
-
-                        {/* ✅ Customizable pill — shows all isCustomizable products */}
                         {customizableCount > 0 && (
                             <button onClick={setCustomizableFilter}
                                 className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold border transition-all duration-200 cursor-pointer active:scale-95 whitespace-nowrap ${showCustomizable ? "bg-emerald-500 text-white border-emerald-500 shadow-sm shadow-emerald-200" : "bg-white text-emerald-700 border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50"}`}>
@@ -371,8 +370,6 @@ const Home = () => {
                                 </span>
                             </button>
                         )}
-
-                        {/* Regular category pills */}
                         {categories.map(cat => (
                             <button key={cat} onClick={() => setCategory(cat)}
                                 className={`shrink-0 px-4 py-2 rounded-full text-xs font-bold border transition-all duration-200 whitespace-nowrap cursor-pointer active:scale-95 ${activeCategory === cat ? "bg-amber-500 text-white border-amber-500 shadow-sm shadow-amber-200" : "bg-white text-zinc-600 border-stone-200 hover:border-amber-400 hover:text-amber-600 hover:bg-amber-50"}`}>
@@ -415,7 +412,8 @@ const Home = () => {
                 {error && (
                     <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center mb-6">
                         <p className="text-red-500 font-bold mb-3">⚠️ {error}</p>
-                        <button onClick={() => { setAllProducts([]); setError(""); }}
+                        <button
+                            onClick={() => dispatch(fetchProducts())}
                             className="bg-zinc-900 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-zinc-800 transition-colors duration-200 cursor-pointer active:scale-95">
                             Retry
                         </button>
@@ -446,12 +444,24 @@ const Home = () => {
 
                 {/* Grid */}
                 {!loading && !error && products.length > 0 && (
-                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {products.map(product => (
-                            <ProductCard key={product._id} product={product}
-                                onAddToCart={handleAddToCart} onBuyNow={handleBuyNow} />
-                        ))}
-                    </div>
+                    <>
+                        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {visibleProducts.map(product => (
+                                <ProductCard key={product._id} product={product}
+                                    onAddToCart={handleAddToCart} onBuyNow={handleBuyNow} />
+                            ))}
+                        </div>
+                        {hasMore && (
+                            <div className="flex justify-center mt-8">
+                                <button
+                                    onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
+                                    className="flex items-center gap-2 px-8 py-3 rounded-2xl bg-white border border-stone-200 hover:border-amber-400 text-zinc-700 hover:text-amber-600 font-bold text-sm transition-all duration-200 cursor-pointer active:scale-95 shadow-sm hover:shadow-md">
+                                    Load More
+                                    <span className="text-xs text-zinc-400 font-normal">({products.length - visibleCount} remaining)</span>
+                                </button>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>

@@ -1,11 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/adminApi";
-import { imgUrl } from "../utils/imageUrl"; // ✅ Cloudinary optimization
+import { imgUrl } from "../utils/imageUrl";
 import {
     FaPlus, FaSync, FaEdit, FaTrash, FaSearch,
-    FaBoxOpen, FaBoxes,
+    FaBoxOpen, FaBoxes, FaChevronLeft, FaChevronRight,
 } from "react-icons/fa";
+
+// ── Pagination config ──────────────────────────────────────
+const PAGE_SIZE = 10; // products per page
 
 const AdminProducts = () => {
     const [products, setProducts] = useState([]);
@@ -21,6 +24,19 @@ const AdminProducts = () => {
     const [stockInput, setStockInput] = useState("");
     const [savingStockId, setSavingStockId] = useState(null);
 
+    // ── Pagination state ───────────────────────────────────
+    const [currentPage, setCurrentPage] = useState(1);
+
+    // Derived pagination values
+    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+    const pageStart = (currentPage - 1) * PAGE_SIZE;
+    const pageEnd = pageStart + PAGE_SIZE;
+    const paginated = filtered.slice(pageStart, pageEnd);
+
+    // Reset to page 1 whenever search/filter changes
+    useEffect(() => { setCurrentPage(1); }, [search]);
+
+    // ── Helpers ────────────────────────────────────────────
     const showToast = (type, msg) => {
         setToast({ type, msg });
         setTimeout(() => setToast(null), 3000);
@@ -52,6 +68,9 @@ const AdminProducts = () => {
             await api.delete(`/products/${id}`);
             setProducts(p => p.filter(x => x._id !== id));
             setFiltered(p => p.filter(x => x._id !== id));
+            // If last item on page was deleted, go to previous page
+            if (paginated.length === 1 && currentPage > 1)
+                setCurrentPage(p => p - 1);
             showToast("success", "Product deleted!");
         } catch { showToast("error", "Failed to delete"); }
         finally { setDeletingId(null); setConfirmId(null); }
@@ -63,12 +82,16 @@ const AdminProducts = () => {
         try {
             setSavingStockId(product._id);
             const fd = new FormData();
-            fd.append("name", product.name); fd.append("price", product.price);
-            fd.append("category", product.category); fd.append("stock", newStock);
+            fd.append("name", product.name);
+            fd.append("price", product.price);
+            fd.append("category", product.category);
+            fd.append("stock", newStock);
             fd.append("isCustomizable", product.isCustomizable ? "true" : "false");
             fd.append("sizes", JSON.stringify(product.sizes || []));
             fd.append("highlights", JSON.stringify(
-                product.highlights instanceof Map ? Object.fromEntries(product.highlights) : (product.highlights || {})
+                product.highlights instanceof Map
+                    ? Object.fromEntries(product.highlights)
+                    : (product.highlights || {})
             ));
             await api.put(`/products/${product._id}`, fd);
             const updated = { ...product, stock: newStock, inStock: newStock > 0 };
@@ -83,6 +106,7 @@ const AdminProducts = () => {
     const refreshProducts = async () => {
         setRefreshing(true);
         await fetchProducts();
+        setCurrentPage(1);
         setTimeout(() => setRefreshing(false), 600);
     };
 
@@ -96,6 +120,22 @@ const AdminProducts = () => {
         return { label: `${n} left`, cls: "text-emerald-600 bg-emerald-50 border-emerald-200" };
     };
 
+    // ── Page number buttons helper ─────────────────────────
+    // Shows: 1 … 4 [5] 6 … 12  (max 5 visible page buttons)
+    const getPageNumbers = () => {
+        if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
+        const pages = [];
+        if (currentPage <= 3) {
+            pages.push(1, 2, 3, 4, "…", totalPages);
+        } else if (currentPage >= totalPages - 2) {
+            pages.push(1, "…", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+        } else {
+            pages.push(1, "…", currentPage - 1, currentPage, currentPage + 1, "…", totalPages);
+        }
+        return pages;
+    };
+
+    // ── Loading / Error screens ────────────────────────────
     if (loading) return (
         <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F8FAFC" }}>
             <div style={{ textAlign: "center" }}>
@@ -123,8 +163,38 @@ const AdminProducts = () => {
         <div style={{ minHeight: "100vh", background: "#F8FAFC", fontFamily: "'DM Sans',sans-serif" }}>
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
-                @keyframes spin{to{transform:rotate(360deg)}}
-                @keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+                @keyframes spin    { to { transform: rotate(360deg); } }
+                @keyframes fadeIn  { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+                @keyframes slideUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+
+                .page-btn {
+                    min-width: 32px; height: 32px;
+                    border-radius: 8px;
+                    font-size: 12px; font-weight: 700;
+                    border: 1px solid #E2E8F0;
+                    background: #fff; color: #475569;
+                    cursor: pointer;
+                    display: flex; align-items: center; justify-content: center;
+                    transition: all 0.15s;
+                    padding: 0 6px;
+                }
+                .page-btn:hover:not(:disabled):not(.active) {
+                    background: #F1F5F9;
+                    border-color: #CBD5E1;
+                    color: #0F172A;
+                }
+                .page-btn.active {
+                    background: #F59E0B;
+                    border-color: #F59E0B;
+                    color: #fff;
+                    cursor: default;
+                    box-shadow: 0 2px 8px rgba(245,158,11,0.35);
+                }
+                .page-btn:disabled {
+                    opacity: 0.38;
+                    cursor: not-allowed;
+                }
+                .page-row { animation: slideUp 0.18s ease; }
             `}</style>
 
             {/* Toast */}
@@ -135,7 +205,7 @@ const AdminProducts = () => {
                     padding: "10px 18px", whiteSpace: "nowrap",
                     background: toast.type === "success" ? "#10B981" : "#EF4444",
                     color: "#fff", borderRadius: 10, fontWeight: 700, fontSize: 13,
-                    boxShadow: "0 4px 20px rgba(0,0,0,0.15)", animation: "fadeIn 0.2s ease"
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.15)", animation: "fadeIn 0.2s ease",
                 }}>
                     {toast.type === "success" ? "✓" : "✕"} {toast.msg}
                 </div>
@@ -149,6 +219,7 @@ const AdminProducts = () => {
                         <h1 style={{ fontWeight: 800, fontSize: 20, color: "#0F172A", margin: 0 }}>Products</h1>
                         <p style={{ fontSize: 12, color: "#94A3B8", margin: "3px 0 0", fontWeight: 500 }}>
                             {products.length} total · {filtered.length} showing
+                            {totalPages > 1 && ` · Page ${currentPage} of ${totalPages}`}
                         </p>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
@@ -157,7 +228,8 @@ const AdminProducts = () => {
                             padding: "8px 12px", background: "#fff",
                             border: "1px solid #E2E8F0", borderRadius: 9,
                             fontSize: 12, fontWeight: 600, color: "#64748B",
-                            cursor: "pointer", opacity: refreshing ? 0.6 : 1
+                            cursor: "pointer", opacity: refreshing ? 0.6 : 1,
+                            transition: "all 0.15s",
                         }}>
                             <FaSync size={11} style={{ animation: refreshing ? "spin 0.8s linear infinite" : "none" }} />
                             Refresh
@@ -166,7 +238,7 @@ const AdminProducts = () => {
                             display: "flex", alignItems: "center", gap: 6,
                             padding: "8px 14px", background: "#F59E0B", color: "#fff",
                             borderRadius: 9, fontSize: 12, fontWeight: 700,
-                            textDecoration: "none", boxShadow: "0 2px 8px rgba(245,158,11,0.3)"
+                            textDecoration: "none", boxShadow: "0 2px 8px rgba(245,158,11,0.3)",
                         }}>
                             <FaPlus size={11} /> Add Product
                         </Link>
@@ -181,10 +253,7 @@ const AdminProducts = () => {
                         { label: "Out of Stock", value: products.filter(p => !p.inStock).length, color: "#EF4444", bg: "#FEF2F2", border: "#FECACA" },
                         { label: "Avg Price", value: `₹${products.length ? Math.round(products.reduce((s, p) => s + p.price, 0) / products.length).toLocaleString("en-IN") : 0}`, color: "#3B82F6", bg: "#EFF6FF", border: "#BFDBFE" },
                     ].map(({ label, value, color, bg, border }) => (
-                        <div key={label} style={{
-                            background: bg, border: `1px solid ${border}`,
-                            borderRadius: 12, padding: "10px 12px"
-                        }}>
+                        <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "10px 12px" }}>
                             <p style={{ fontSize: 10, color: "#94A3B8", fontWeight: 600, marginBottom: 4 }}>{label}</p>
                             <p style={{ fontSize: 18, fontWeight: 800, color, margin: 0 }}>{value}</p>
                         </div>
@@ -203,23 +272,20 @@ const AdminProducts = () => {
                             paddingTop: 10, paddingBottom: 10,
                             background: "#fff", border: "1px solid #E2E8F0",
                             borderRadius: 10, fontSize: 13, color: "#374151",
-                            outline: "none", fontFamily: "inherit", boxSizing: "border-box"
+                            outline: "none", fontFamily: "inherit", boxSizing: "border-box",
                         }}
                     />
                     {search && (
                         <button onClick={() => setSearch("")} style={{
                             position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
-                            background: "none", border: "none", color: "#94A3B8", cursor: "pointer", fontSize: 14
+                            background: "none", border: "none", color: "#94A3B8", cursor: "pointer", fontSize: 14,
                         }}>✕</button>
                     )}
                 </div>
 
                 {/* Empty */}
                 {filtered.length === 0 ? (
-                    <div style={{
-                        background: "#fff", border: "1px dashed #CBD5E1",
-                        borderRadius: 16, padding: "48px 20px", textAlign: "center"
-                    }}>
+                    <div style={{ background: "#fff", border: "1px dashed #CBD5E1", borderRadius: 16, padding: "48px 20px", textAlign: "center" }}>
                         <FaBoxOpen size={32} style={{ color: "#CBD5E1", margin: "0 auto 12px" }} />
                         <p style={{ fontWeight: 700, color: "#475569", marginBottom: 4 }}>
                             {search ? `No results for "${search}"` : "No products yet"}
@@ -233,40 +299,40 @@ const AdminProducts = () => {
 
                         {/* ── DESKTOP TABLE ── */}
                         <div className="hidden md:block">
-                            {/* thead */}
                             <div style={{
                                 display: "grid", gap: 8,
                                 gridTemplateColumns: "28px 40px 1fr 100px 70px 120px 80px",
                                 padding: "10px 16px", background: "#F8FAFC",
                                 borderBottom: "1px solid #F1F5F9",
                                 fontSize: 10, fontWeight: 700, color: "#94A3B8",
-                                textTransform: "uppercase", letterSpacing: "0.06em"
+                                textTransform: "uppercase", letterSpacing: "0.06em",
                             }}>
                                 <div>#</div><div>Img</div><div>Product</div>
                                 <div>Category</div><div>Price</div><div>Stock</div>
                                 <div style={{ textAlign: "right" }}>Actions</div>
                             </div>
                             <div>
-                                {filtered.map((product, idx) => {
-                                    // ✅ Optimized: 200px thumbnail — lazy load
+                                {paginated.map((product, idx) => {
                                     const rawImg = product.images?.[0]?.url || product.image || null;
                                     const img = rawImg ? imgUrl.thumbnail(rawImg) : null;
                                     const sb = stockBadge(product);
                                     const isES = editingStockId === product._id;
                                     const isIC = confirmId === product._id;
+                                    // Global row number across pages
+                                    const rowNum = pageStart + idx + 1;
                                     return (
-                                        <div key={product._id} style={{
+                                        <div key={product._id} className="page-row" style={{
                                             display: "grid", gap: 8,
                                             gridTemplateColumns: "28px 40px 1fr 100px 70px 120px 80px",
                                             padding: "10px 16px", alignItems: "center",
                                             borderBottom: "1px solid #F8FAFC",
                                             opacity: deletingId === product._id ? 0.5 : 1,
-                                            transition: "background 0.1s"
+                                            transition: "background 0.1s",
                                         }}
                                             onMouseEnter={e => e.currentTarget.style.background = "#FAFAFA"}
                                             onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                                         >
-                                            <div style={{ fontSize: 11, color: "#CBD5E1", fontWeight: 600 }}>{idx + 1}</div>
+                                            <div style={{ fontSize: 11, color: "#CBD5E1", fontWeight: 600 }}>{rowNum}</div>
                                             <div style={{ width: 36, height: 36, borderRadius: 8, background: "#F1F5F9", border: "1px solid #E2E8F0", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                                 {img
                                                     ? <img src={img} alt={product.name} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "contain", padding: 3 }} />
@@ -301,7 +367,7 @@ const AdminProducts = () => {
                                                     </div>
                                                 ) : (
                                                     <button onClick={() => { setEditingStockId(product._id); setStockInput(String(product.stock ?? 0)); }}
-                                                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 8px", border: `1px solid`, borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", background: "transparent" }}
+                                                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 8px", border: "1px solid", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", background: "transparent" }}
                                                         className={sb.cls}>
                                                         <FaBoxes size={9} /> {sb.label} <span style={{ fontSize: 9, opacity: 0.5 }}>✎</span>
                                                     </button>
@@ -310,7 +376,7 @@ const AdminProducts = () => {
                                             <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
                                                 <Link to={`/admin/products/${product._id}/edit`} style={{
                                                     width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
-                                                    background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, color: "#3B82F6", textDecoration: "none"
+                                                    background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, color: "#3B82F6", textDecoration: "none",
                                                 }}>
                                                     <FaEdit size={11} />
                                                 </Link>
@@ -326,7 +392,7 @@ const AdminProducts = () => {
                                                 ) : (
                                                     <button onClick={() => setConfirmId(product._id)} style={{
                                                         width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
-                                                        background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#EF4444", cursor: "pointer"
+                                                        background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, color: "#EF4444", cursor: "pointer",
                                                     }}>
                                                         <FaTrash size={11} />
                                                     </button>
@@ -340,26 +406,20 @@ const AdminProducts = () => {
 
                         {/* ── MOBILE CARDS ── */}
                         <div className="md:hidden">
-                            {filtered.map((product) => {
-                                // ✅ Optimized: 200px thumbnail — lazy load
+                            {paginated.map((product) => {
                                 const rawImg = product.images?.[0]?.url || product.image || null;
                                 const img = rawImg ? imgUrl.thumbnail(rawImg) : null;
                                 const sb = stockBadge(product);
                                 const isES = editingStockId === product._id;
                                 const isIC = confirmId === product._id;
                                 return (
-                                    <div key={product._id} style={{
+                                    <div key={product._id} className="page-row" style={{
                                         padding: "12px 14px",
                                         borderBottom: "1px solid #F1F5F9",
-                                        opacity: deletingId === product._id ? 0.5 : 1
+                                        opacity: deletingId === product._id ? 0.5 : 1,
                                     }}>
                                         <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                                            <div style={{
-                                                width: 48, height: 48, borderRadius: 10,
-                                                background: "#F1F5F9", border: "1px solid #E2E8F0",
-                                                overflow: "hidden", flexShrink: 0,
-                                                display: "flex", alignItems: "center", justifyContent: "center"
-                                            }}>
+                                            <div style={{ width: 48, height: 48, borderRadius: 10, background: "#F1F5F9", border: "1px solid #E2E8F0", overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                                                 {img
                                                     ? <img src={img} alt={product.name} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "contain", padding: 4 }} />
                                                     : <FaBoxOpen size={16} style={{ color: "#CBD5E1" }} />}
@@ -401,13 +461,12 @@ const AdminProducts = () => {
                                                 </div>
                                             </div>
                                         </div>
-
                                         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                                             <Link to={`/admin/products/${product._id}/edit`} style={{
                                                 flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
                                                 gap: 6, padding: "7px 0", borderRadius: 9,
                                                 background: "#EFF6FF", border: "1px solid #BFDBFE",
-                                                color: "#3B82F6", fontSize: 12, fontWeight: 700, textDecoration: "none"
+                                                color: "#3B82F6", fontSize: 12, fontWeight: 700, textDecoration: "none",
                                             }}>
                                                 <FaEdit size={11} /> Edit
                                             </Link>
@@ -416,14 +475,14 @@ const AdminProducts = () => {
                                                     <button onClick={() => deleteHandler(product._id)} style={{
                                                         flex: 1, padding: "7px 0", background: "#EF4444",
                                                         color: "#fff", borderRadius: 9, fontSize: 12,
-                                                        fontWeight: 700, border: "none", cursor: "pointer"
+                                                        fontWeight: 700, border: "none", cursor: "pointer",
                                                     }}>
                                                         {deletingId === product._id ? "..." : "Confirm"}
                                                     </button>
                                                     <button onClick={() => setConfirmId(null)} style={{
                                                         flex: 1, padding: "7px 0", background: "#F1F5F9",
                                                         color: "#64748B", borderRadius: 9, fontSize: 12,
-                                                        fontWeight: 700, border: "none", cursor: "pointer"
+                                                        fontWeight: 700, border: "none", cursor: "pointer",
                                                     }}>Cancel</button>
                                                 </>
                                             ) : (
@@ -431,7 +490,7 @@ const AdminProducts = () => {
                                                     flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
                                                     gap: 6, padding: "7px 0", borderRadius: 9,
                                                     background: "#FEF2F2", border: "1px solid #FECACA",
-                                                    color: "#EF4444", fontSize: 12, fontWeight: 700, cursor: "pointer"
+                                                    color: "#EF4444", fontSize: 12, fontWeight: 700, cursor: "pointer",
                                                 }}>
                                                     <FaTrash size={11} /> Delete
                                                 </button>
@@ -442,20 +501,60 @@ const AdminProducts = () => {
                             })}
                         </div>
 
-                        {/* Footer */}
+                        {/* ── PAGINATION + Footer ── */}
                         <div style={{
                             display: "flex", alignItems: "center", justifyContent: "space-between",
-                            padding: "10px 14px", background: "#F8FAFC", borderTop: "1px solid #F1F5F9"
+                            padding: "12px 14px", background: "#F8FAFC",
+                            borderTop: "1px solid #F1F5F9", flexWrap: "wrap", gap: 10,
                         }}>
+                            {/* Left: count info */}
                             <p style={{ fontSize: 12, color: "#94A3B8", margin: 0 }}>
-                                Showing <b style={{ color: "#475569" }}>{filtered.length}</b> of <b style={{ color: "#475569" }}>{products.length}</b>
+                                Showing{" "}
+                                <b style={{ color: "#475569" }}>{pageStart + 1}–{Math.min(pageEnd, filtered.length)}</b>
+                                {" "}of{" "}
+                                <b style={{ color: "#475569" }}>{filtered.length}</b>
+                                {" "}products
                             </p>
-                            <Link to="/admin/products/new" style={{
-                                display: "flex", alignItems: "center", gap: 5,
-                                fontSize: 12, color: "#F59E0B", fontWeight: 700, textDecoration: "none"
-                            }}>
-                                <FaPlus size={10} /> Add New
-                            </Link>
+
+                            {/* Right: pagination controls */}
+                            {totalPages > 1 && (
+                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                    {/* Prev */}
+                                    <button
+                                        className="page-btn"
+                                        onClick={() => setCurrentPage(p => p - 1)}
+                                        disabled={currentPage === 1}
+                                        title="Previous page"
+                                    >
+                                        <FaChevronLeft size={10} />
+                                    </button>
+
+                                    {/* Page numbers */}
+                                    {getPageNumbers().map((pg, i) =>
+                                        pg === "…" ? (
+                                            <span key={`ellipsis-${i}`} style={{ fontSize: 12, color: "#CBD5E1", padding: "0 2px" }}>…</span>
+                                        ) : (
+                                            <button
+                                                key={pg}
+                                                className={`page-btn${currentPage === pg ? " active" : ""}`}
+                                                onClick={() => setCurrentPage(pg)}
+                                            >
+                                                {pg}
+                                            </button>
+                                        )
+                                    )}
+
+                                    {/* Next */}
+                                    <button
+                                        className="page-btn"
+                                        onClick={() => setCurrentPage(p => p + 1)}
+                                        disabled={currentPage === totalPages}
+                                        title="Next page"
+                                    >
+                                        <FaChevronRight size={10} />
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}

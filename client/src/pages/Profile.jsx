@@ -67,7 +67,7 @@ const Profile = () => {
                             </div>
                             <FaArrowRight size={11} className="text-zinc-300 group-hover:text-amber-400 transition-colors" />
                         </Link>
-                        <Link to="/profile/addresses"
+                        {/* <Link to="/profile/addresses"
                             className="flex items-center justify-between p-3 rounded-xl hover:bg-amber-50 hover:border-amber-200 border border-transparent transition-all group">
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center group-hover:bg-amber-100 transition-colors">
@@ -76,7 +76,7 @@ const Profile = () => {
                                 <span className="font-bold text-zinc-700 text-sm group-hover:text-amber-700 transition-colors">Saved Addresses</span>
                             </div>
                             <FaArrowRight size={11} className="text-zinc-300 group-hover:text-amber-400 transition-colors" />
-                        </Link>
+                        </Link> */}
                     </div>
                 </div>
 

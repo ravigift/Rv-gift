@@ -19,24 +19,34 @@ const Register = () => {
 
     const onChange = (e) => {
         const { name, value } = e.target;
-        // Only allow digits for phone
         if (name === "phone" && !/^\d*$/.test(value)) return;
         setForm({ ...form, [name]: value });
         setError("");
     };
 
-    // Step 1 — Register
+    // ── Step 1: Register ────────────────────────────────────
     const submitHandler = async (e) => {
         e.preventDefault();
         const { name, email, phone, password } = form;
-        if (!name || !email || !phone || !password) return setError("All fields are required");
-        if (!/^[6-9]\d{9}$/.test(phone)) return setError("Enter a valid 10-digit Indian mobile number");
-        if (password.length < 6) return setError("Password must be at least 6 characters");
+
+        if (!name || !email || !phone || !password)
+            return setError("All fields are required");
+
+        if (!/^[6-9]\d{9}$/.test(phone))
+            return setError("Enter a valid 10-digit Indian mobile number");
+
+        if (password.length < 8)
+            return setError("Password must be at least 8 characters");
 
         try {
             setLoading(true);
             setError("");
-            await api.post("/auth/register", { name: name.trim(), email: email.trim(), phone: phone.trim(), password });
+            await api.post("/auth/register", {
+                name: name.trim(),
+                email: email.trim(),
+                phone: phone.trim(),
+                password,
+            });
             setStep("otp");
         } catch (err) {
             setError(err?.response?.data?.message || "Registration failed");
@@ -45,15 +55,17 @@ const Register = () => {
         }
     };
 
-    // Step 2 — Verify OTP
+    // ── Step 2: Verify OTP ──────────────────────────────────
     const verifyOtp = async (e) => {
         e.preventDefault();
         if (!otp.trim() || otp.length !== 6) return setError("Enter valid 6-digit OTP");
-
         try {
             setLoading(true);
             setError("");
-            const { data } = await api.post("/auth/verify-otp", { email: form.email.trim(), otp: otp.trim() });
+            const { data } = await api.post("/auth/verify-otp", {
+                email: form.email.trim(),
+                otp: otp.trim(),
+            });
             loginWithData(data);
             navigate("/", { replace: true });
         } catch (err) {
@@ -63,7 +75,7 @@ const Register = () => {
         }
     };
 
-    // Resend OTP
+    // ── Resend OTP ──────────────────────────────────────────
     const resendOtp = async () => {
         try {
             setResendLoading(true);
@@ -78,13 +90,20 @@ const Register = () => {
         }
     };
 
+    // ── Password strength ────────────────────────────────────
+    // weak   = < 8  (invalid — button disabled)
+    // medium = 8–11
+    // strong = 12+
     const passwordStrength = form.password.length === 0 ? null
-        : form.password.length < 6 ? "weak"
-            : form.password.length < 9 ? "medium"
+        : form.password.length < 8 ? "weak"
+            : form.password.length < 12 ? "medium"
                 : "strong";
 
     const strengthColor = { weak: "bg-red-400", medium: "bg-amber-400", strong: "bg-emerald-400" };
-    const strengthLabel = { weak: "Weak", medium: "Medium", strong: "Strong" };
+    const strengthLabel = { weak: "Too short", medium: "Medium", strong: "Strong" };
+    const strengthText = { weak: "text-red-400", medium: "text-amber-500", strong: "text-emerald-500" };
+
+    const passwordInvalid = form.password.length > 0 && form.password.length < 8;
 
     return (
         <div className="min-h-[90vh] flex items-center justify-center px-4 py-10"
@@ -92,10 +111,10 @@ const Register = () => {
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
                 .auth-font { font-family: 'DM Sans', sans-serif; }
-                @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-                @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }
+                @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes shake  { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }
                 .fade-up { animation: fadeUp 0.4s ease forwards; }
-                .shake { animation: shake 0.35s ease; }
+                .shake   { animation: shake 0.35s ease; }
                 .input-wrap { position: relative; }
                 .input-field {
                     width: 100%; padding: 11px 12px 11px 40px;
@@ -103,35 +122,36 @@ const Register = () => {
                     font-size: 14px; background: #fafaf9;
                     outline: none; transition: all 0.2s;
                     font-family: 'DM Sans', sans-serif; color: #18181b;
+                    box-sizing: border-box;
                 }
                 .input-field:focus { border-color: #f59e0b; background: #fff; box-shadow: 0 0 0 3px rgba(245,158,11,0.1); }
                 .input-field:hover:not(:focus) { border-color: #d6d3d1; }
                 .input-icon { position:absolute; left:13px; top:50%; transform:translateY(-50%); color:#a8a29e; pointer-events:none; }
                 .phone-prefix {
-                    position: absolute; left: 38px; top: 50%; transform: translateY(-50%);
-                    font-size: 13px; font-weight: 700; color: #78716c; pointer-events: none;
+                    position:absolute; left:38px; top:50%; transform:translateY(-50%);
+                    font-size:13px; font-weight:700; color:#78716c; pointer-events:none;
                 }
                 .input-field-phone { padding-left: 68px !important; }
                 .otp-input {
-                    width:100%; padding: 16px;
-                    border: 2px solid #e7e5e4; border-radius: 12px;
-                    font-size: 28px; font-weight: 900; text-align: center;
-                    letter-spacing: 12px; background: #fafaf9;
-                    outline: none; transition: all 0.2s;
-                    font-family: 'DM Sans', sans-serif;
+                    width:100%; padding:16px;
+                    border:2px solid #e7e5e4; border-radius:12px;
+                    font-size:28px; font-weight:900; text-align:center;
+                    letter-spacing:12px; background:#fafaf9;
+                    outline:none; transition:all 0.2s;
+                    font-family:'DM Sans',sans-serif; box-sizing:border-box;
                 }
-                .otp-input:focus { border-color: #f59e0b; background: white; box-shadow: 0 0 0 3px rgba(245,158,11,0.12); }
+                .otp-input:focus { border-color:#f59e0b; background:white; box-shadow:0 0 0 3px rgba(245,158,11,0.12); }
                 .submit-btn {
-                    width:100%; padding: 14px;
-                    border-radius: 12px; font-weight: 900; font-size: 14px;
-                    color: #111; border: none; cursor: pointer;
-                    background: linear-gradient(135deg, #f59e0b, #fbbf24);
-                    box-shadow: 0 6px 20px rgba(245,158,11,0.35);
-                    transition: all 0.2s; display:flex; align-items:center; justify-content:center; gap:8px;
+                    width:100%; padding:14px;
+                    border-radius:12px; font-weight:900; font-size:14px;
+                    color:#111; border:none; cursor:pointer;
+                    background:linear-gradient(135deg,#f59e0b,#fbbf24);
+                    box-shadow:0 6px 20px rgba(245,158,11,0.35);
+                    transition:all 0.2s; display:flex; align-items:center; justify-content:center; gap:8px;
                 }
-                .submit-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(245,158,11,0.45); }
-                .submit-btn:active:not(:disabled) { transform: scale(0.98); }
-                .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+                .submit-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 10px 28px rgba(245,158,11,0.45); }
+                .submit-btn:active:not(:disabled) { transform:scale(0.98); }
+                .submit-btn:disabled { opacity:0.6; cursor:not-allowed; }
             `}</style>
 
             <div className="auth-font w-full max-w-md fade-up">
@@ -145,7 +165,7 @@ const Register = () => {
                         {/* Icon */}
                         <div className="flex justify-center mb-5">
                             <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-200 -rotate-3 hover:rotate-0 transition-transform duration-300 cursor-default"
-                                style={{ background: "linear-gradient(135deg, #f59e0b, #fbbf24)" }}>
+                                style={{ background: "linear-gradient(135deg,#f59e0b,#fbbf24)" }}>
                                 <FaGift size={24} className="text-white" />
                             </div>
                         </div>
@@ -192,13 +212,9 @@ const Register = () => {
                                             <FaPhone className="input-icon" size={12} />
                                             <span className="phone-prefix">+91</span>
                                             <input
-                                                name="phone"
-                                                type="tel"
-                                                inputMode="numeric"
-                                                maxLength={10}
-                                                placeholder="9876543210"
-                                                value={form.phone}
-                                                onChange={onChange}
+                                                name="phone" type="tel" inputMode="numeric"
+                                                maxLength={10} placeholder="9876543210"
+                                                value={form.phone} onChange={onChange}
                                                 className="input-field input-field-phone"
                                             />
                                         </div>
@@ -220,14 +236,22 @@ const Register = () => {
                                         <label className="text-[11px] font-black text-zinc-400 mb-1.5 block uppercase tracking-wider">Password</label>
                                         <div className="input-wrap">
                                             <FaLock className="input-icon" size={12} />
-                                            <input name="password" type={showPassword ? "text" : "password"}
-                                                placeholder="Min. 6 characters" value={form.password} onChange={onChange}
-                                                style={{ paddingRight: "44px" }} className="input-field" />
+                                            <input
+                                                name="password"
+                                                type={showPassword ? "text" : "password"}
+                                                placeholder="Min. 8 characters"
+                                                value={form.password}
+                                                onChange={onChange}
+                                                style={{ paddingRight: "44px" }}
+                                                className="input-field"
+                                            />
                                             <button type="button" onClick={() => setShowPassword(s => !s)}
                                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-amber-500 transition-colors p-1 cursor-pointer">
                                                 {showPassword ? <FaEyeSlash size={13} /> : <FaEye size={13} />}
                                             </button>
                                         </div>
+
+                                        {/* Strength meter */}
                                         {passwordStrength && (
                                             <div className="mt-1.5 flex gap-1 items-center">
                                                 {[1, 2, 3].map(i => (
@@ -238,15 +262,25 @@ const Register = () => {
                                                             : "bg-stone-200"
                                                         }`} />
                                                 ))}
-                                                <span className={`text-[10px] ml-1 font-bold ${passwordStrength === "weak" ? "text-red-400"
-                                                        : passwordStrength === "medium" ? "text-amber-500"
-                                                            : "text-emerald-500"
-                                                    }`}>{strengthLabel[passwordStrength]}</span>
+                                                <span className={`text-[10px] ml-1 font-bold ${strengthText[passwordStrength]}`}>
+                                                    {strengthLabel[passwordStrength]}
+                                                </span>
                                             </div>
+                                        )}
+
+                                        {/* Inline hint when too short */}
+                                        {passwordInvalid && (
+                                            <p className="text-[11px] text-red-500 mt-1 font-medium">
+                                                {8 - form.password.length} more character{8 - form.password.length > 1 ? "s" : ""} needed
+                                            </p>
                                         )}
                                     </div>
 
-                                    <button type="submit" disabled={loading} className="submit-btn mt-2">
+                                    <button
+                                        type="submit"
+                                        disabled={loading || passwordInvalid}
+                                        className="submit-btn mt-2"
+                                    >
                                         {loading ? (
                                             <><span className="w-4 h-4 border-2 border-black/20 border-t-black/60 rounded-full animate-spin" /> Sending OTP...</>
                                         ) : "Create Account 🎉"}
@@ -256,7 +290,9 @@ const Register = () => {
                                 <div className="mt-5 pt-5 border-t border-stone-100 text-center">
                                     <p className="text-sm text-zinc-400">
                                         Already have an account?{" "}
-                                        <Link to="/login" className="text-amber-600 font-black hover:text-amber-700 transition-colors cursor-pointer">Login →</Link>
+                                        <Link to="/login" className="text-amber-600 font-black hover:text-amber-700 transition-colors cursor-pointer">
+                                            Login →
+                                        </Link>
                                     </p>
                                 </div>
                             </>
@@ -283,18 +319,17 @@ const Register = () => {
 
                                 <form onSubmit={verifyOtp} className="space-y-5">
                                     <div>
-                                        <label className="text-[11px] font-black text-zinc-400 mb-2 block uppercase tracking-wider text-center">Enter 6-digit OTP</label>
+                                        <label className="text-[11px] font-black text-zinc-400 mb-2 block uppercase tracking-wider text-center">
+                                            Enter 6-digit OTP
+                                        </label>
                                         <input
-                                            type="text"
-                                            inputMode="numeric"
-                                            maxLength={6}
+                                            type="text" inputMode="numeric" maxLength={6}
                                             value={otp}
                                             onChange={(e) => { setOtp(e.target.value.replace(/\D/g, "")); setError(""); }}
                                             placeholder="• • • • • •"
                                             className="otp-input"
                                         />
                                     </div>
-
                                     <button type="submit" disabled={loading} className="submit-btn">
                                         {loading ? (
                                             <><span className="w-4 h-4 border-2 border-black/20 border-t-black/60 rounded-full animate-spin" /> Verifying...</>

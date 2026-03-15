@@ -773,4 +773,4 @@ const styles = `
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none;margin:0; }
 `;
 
-export default AdminPOS;
+export default AdminPOS;    

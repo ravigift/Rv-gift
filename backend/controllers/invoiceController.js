@@ -15,7 +15,6 @@ export const downloadInvoice = async (req, res) => {
             return res.status(403).json({ message: "Access denied" });
 
         const pdfBuffer = await generateInvoiceBuffer(order);
-
         const filename = `RVGifts_Invoice_${order.invoiceNumber || order._id.toString().slice(-8).toUpperCase()}.pdf`;
 
         res.setHeader("Content-Type", "application/pdf");

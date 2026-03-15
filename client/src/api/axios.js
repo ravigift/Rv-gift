@@ -6,9 +6,10 @@ const baseURL =
 
 const api = axios.create({
   baseURL,
-  timeout: 60000, // ✅ 60 sec — Render cold start handle karega
+  timeout: 60000, // 60s — Render cold start handle karta hai
 });
 
+// ── Request: token attach ────────────────────────────────────
 api.interceptors.request.use(
   (config) => {
     try {
@@ -27,12 +28,16 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// ── Response: error handling ─────────────────────────────────
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      console.warn("User token expired");
+      // Token expire ya invalid — clean logout + redirect
       localStorage.removeItem("auth");
+      if (!window.location.pathname.includes("/login")) {
+        window.location.replace("/login");
+      }
     }
 
     if (error.code === "ECONNABORTED") {

@@ -1,13 +1,21 @@
-// models/posSecurityModel.js
 import mongoose from "mongoose";
 
-const posSecuritySchema = new mongoose.Schema({
-    deletePin: {
-        type: String,
-        default: "",   // required hata diya — pehli baar blank rahega
+/*
+ * PosSecurity
+ * ─────────────────────────────────────────────
+ * deletePin    → bcrypt hashed — plain text kabhi store nahi hoga
+ * resetOtp     → SHA-256 hashed — brute force se safe
+ * resetOtpExpire → 10 min expiry
+ *
+ * Collection mein sirf EK document hoga (singleton pattern)
+ */
+const posSecuritySchema = new mongoose.Schema(
+    {
+        deletePin: { type: String, default: "" },      // bcrypt hash
+        resetOtp: { type: String, default: null },    // sha256 hash
+        resetOtpExpire: { type: Date, default: null },
     },
-    resetOtp: Number,
-    resetOtpExpire: Date,
-});
+    { timestamps: true }
+);
 
 export default mongoose.model("PosSecurity", posSecuritySchema);

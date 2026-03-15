@@ -3,12 +3,12 @@ import QRCode from "qrcode";
 
 const SHOP = {
     name: process.env.SHOP_NAME || "RV Gift and Printing",
-    address: process.env.SHOP_ADDRESS || "Gadhi Chowk, Dostpur Chauraha, Akbarpur",
+    address: process.env.SHOP_ADDRESS || "Gadhi Chowk, Dost Pur Road, Shahzadpur, Akbarpur",
     city: process.env.SHOP_CITY || "Ambedkar Nagar - 224122, Uttar Pradesh",
     stateCode: process.env.SHOP_STATE_CODE || "09",
     gstin: process.env.SHOP_GSTIN || "09AOHPV4034Q3Z3",
     email: process.env.SHOP_EMAIL || "officialrvgift@gmail.com",
-    phone: process.env.SHOP_PHONE || "8299519532",
+    phone: process.env.SHOP_PHONE || "8299519532, 9792770976",
     website: process.env.SHOP_WEBSITE || "rvgift.com",
 };
 
@@ -33,7 +33,6 @@ const C = {
 const rs = (n) => "Rs. " + Number(n || 0).toFixed(2);
 const dt = (d) => new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
 
-// ✅ Safely get MRP from item — supports mrp or originalPrice field
 const getItemMrp = (item) => {
     const val = item?.mrp ?? item?.originalPrice ?? null;
     if (val === null || val === undefined || val === "") return null;
@@ -47,7 +46,10 @@ export const generateInvoiceBuffer = async (order) => {
         try {
             const invoiceNo = order.invoiceNumber || order._id.toString().slice(-8).toUpperCase();
             const verifyUrl = `${VERIFY_BASE}/verify/${invoiceNo}`;
-            const qrDataUrl = await QRCode.toDataURL(verifyUrl, { width: 100, margin: 1, color: { dark: C.dark, light: C.white } });
+            const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
+                width: 100, margin: 1,
+                color: { dark: C.dark, light: C.white },
+            });
             const qrBuffer = Buffer.from(qrDataUrl.split(",")[1], "base64");
 
             const doc = new PDFDocument({ margin: 0, size: "A4", autoFirstPage: true });
@@ -116,7 +118,8 @@ export const generateInvoiceBuffer = async (order) => {
                 doc.font("Helvetica").fontSize(8.5).fillColor(C.mid).text("Email: " + order.email, M, nY);
                 nY += 14;
             }
-            doc.font("Helvetica").fontSize(8.5).fillColor(C.zinc).text(order.address || "—", M, nY, { width: half - 5, lineGap: 2 });
+            doc.font("Helvetica").fontSize(8.5).fillColor(C.zinc)
+                .text(order.address || "—", M, nY, { width: half - 5, lineGap: 2 });
             const addrH = doc.heightOfString(order.address || "—", { width: half - 5 });
             const leftBottom = nY + addrH + 8;
 
@@ -140,14 +143,13 @@ export const generateInvoiceBuffer = async (order) => {
             hline(y, C.border); y += 14;
 
             // ── ITEMS TABLE ───────────────────────────────────────
-            // ✅ Columns adjusted to fit MRP column: DESC narrowed, MRP added before TOTAL
             const COL = {
                 no: M,
                 desc: M + 24,
-                hsn: M + 212,        // shifted left slightly
+                hsn: M + 212,
                 qty: M + 268,
                 rate: M + 310,
-                mrp: M + 368,        // ✅ NEW MRP column
+                mrp: M + 368,
                 gst: M + 424,
                 total: M + 464,
             };
@@ -156,7 +158,6 @@ export const generateInvoiceBuffer = async (order) => {
                 rate: 52, mrp: 50, gst: 34, total: 55,
             };
 
-            // Table header
             rect(M, y, CW, 24, C.dark);
             rect(M, y, 3, 24, C.amber);
 
@@ -166,7 +167,7 @@ export const generateInvoiceBuffer = async (order) => {
             doc.text("HSN/SAC", COL.hsn, y + 8, { width: CW2.hsn, align: "center" });
             doc.text("QTY", COL.qty, y + 8, { width: CW2.qty, align: "center" });
             doc.text("RATE", COL.rate, y + 8, { width: CW2.rate, align: "right" });
-            doc.text("MRP", COL.mrp, y + 8, { width: CW2.mrp, align: "right" }); // ✅
+            doc.text("MRP", COL.mrp, y + 8, { width: CW2.mrp, align: "right" });
             doc.text("GST%", COL.gst, y + 8, { width: CW2.gst, align: "center" });
             doc.text("TOTAL", COL.total, y + 8, { width: CW2.total, align: "right" });
             y += 24;
@@ -174,7 +175,7 @@ export const generateInvoiceBuffer = async (order) => {
             const items = order.items || [];
             let subtotal = 0;
             let totalGST = 0;
-            let totalSavings = 0;      // ✅ track total savings across all items
+            let totalSavings = 0;
 
             items.forEach((item, i) => {
                 const qty = Number(item.qty || item.quantity || 1);
@@ -186,7 +187,6 @@ export const generateInvoiceBuffer = async (order) => {
                 subtotal += base;
                 totalGST += gstAmt;
 
-                // ✅ MRP per item
                 const mrpVal = getItemMrp(item);
                 const savings = mrpVal ? (mrpVal - rate) * qty : 0;
                 totalSavings += savings;
@@ -217,17 +217,13 @@ export const generateInvoiceBuffer = async (order) => {
                     .text(rs(rate), COL.rate, ty, { width: CW2.rate, align: "right" })
                     .text(gstPct > 0 ? gstPct + "%" : "Nil", COL.gst, ty, { width: CW2.gst, align: "center" });
 
-                // ✅ MRP column — strikethrough if discount present
                 if (mrpVal) {
                     const mrpText = rs(mrpVal);
-                    const mrpTY = ty;
                     doc.font("Helvetica").fontSize(7.5).fillColor(C.strikeGray)
-                        .text(mrpText, COL.mrp, mrpTY, { width: CW2.mrp, align: "right" });
-                    // Draw strikethrough line through MRP text
+                        .text(mrpText, COL.mrp, ty, { width: CW2.mrp, align: "right" });
                     const textW = doc.widthOfString(mrpText);
                     const lineX = COL.mrp + CW2.mrp - textW;
-                    doc.moveTo(lineX, mrpTY + 5)
-                        .lineTo(lineX + textW, mrpTY + 5)
+                    doc.moveTo(lineX, ty + 5).lineTo(lineX + textW, ty + 5)
                         .strokeColor(C.strikeGray).lineWidth(0.8).stroke();
                 } else {
                     doc.font("Helvetica").fontSize(8).fillColor(C.light)
@@ -238,8 +234,6 @@ export const generateInvoiceBuffer = async (order) => {
                     .text(rs(lineTotal), COL.total, ty, { width: CW2.total, align: "right" });
 
                 y += rowH;
-
-                // Page break guard
                 if (y > 700) { doc.addPage(); y = 50; }
             });
 
@@ -248,7 +242,12 @@ export const generateInvoiceBuffer = async (order) => {
             // ── TOTALS ────────────────────────────────────────────
             const delCharge = Number(order.deliveryCharge ?? (subtotal >= 499 ? 0 : 49));
             const platFee = Number(order.platformFee ?? 9);
-            const grandTotal = Number(order.totalAmount || (subtotal + totalGST + delCharge + platFee));
+
+            // ✅ FIX: Grand Total — order.totalAmount DB se sahi hai
+            // Agar DB mein 0 ya missing hai toh calculate karo
+            const grandTotal = Number(order.totalAmount) > 0
+                ? Number(order.totalAmount)
+                : subtotal + totalGST + delCharge + platFee;
 
             const TX = M + CW - 235, TL = 130, TV = 100;
 
@@ -272,7 +271,6 @@ export const generateInvoiceBuffer = async (order) => {
             );
             trow("Platform Fee:", rs(platFee));
 
-            // ✅ Show total savings if any discounts applied
             if (totalSavings > 0) {
                 trow("Total Savings:", "- " + rs(totalSavings), false, C.green);
             }
@@ -284,8 +282,10 @@ export const generateInvoiceBuffer = async (order) => {
             // Grand total row
             doc.rect(TX - 6, y - 4, TL + TV + 12, 30).fill(C.amberLight);
             doc.rect(TX - 6, y - 4, 3, 30).fill(C.amber);
-            doc.font("Helvetica-Bold").fontSize(9).fillColor(C.zinc).text("GRAND TOTAL", TX, y + 5, { width: TL });
-            doc.font("Helvetica-Bold").fontSize(13).fillColor(C.amber).text(rs(grandTotal), TX + TL, y + 3, { width: TV, align: "right" });
+            doc.font("Helvetica-Bold").fontSize(9).fillColor(C.zinc)
+                .text("GRAND TOTAL", TX, y + 5, { width: TL });
+            doc.font("Helvetica-Bold").fontSize(13).fillColor(C.amber)
+                .text(rs(grandTotal), TX + TL, y + 3, { width: TV, align: "right" });
             y += 40;
 
             // ── PAYMENT STATUS ────────────────────────────────────
@@ -296,15 +296,19 @@ export const generateInvoiceBuffer = async (order) => {
             doc.rect(M, y, CW, 46).lineWidth(0.5).stroke(C.border);
             rect(M, y, 3, 46, C.amber);
 
-            doc.font("Helvetica-Bold").fontSize(7).fillColor(C.mid).text("PAYMENT METHOD", M + 14, y + 8, { characterSpacing: 0.6 });
-            doc.font("Helvetica-Bold").fontSize(10).fillColor(C.dark).text(isCOD ? "Cash on Delivery (COD)" : "Online Payment (Razorpay)", M + 14, y + 20);
+            doc.font("Helvetica-Bold").fontSize(7).fillColor(C.mid)
+                .text("PAYMENT METHOD", M + 14, y + 8, { characterSpacing: 0.6 });
+            doc.font("Helvetica-Bold").fontSize(10).fillColor(C.dark)
+                .text(isCOD ? "Cash on Delivery (COD)" : "Online Payment (Razorpay)", M + 14, y + 20);
             if (!isCOD && order.payment?.razorpayPaymentId) {
-                doc.font("Helvetica").fontSize(7.5).fillColor(C.mid).text("Txn ID: " + order.payment.razorpayPaymentId, M + 14, y + 33);
+                doc.font("Helvetica").fontSize(7.5).fillColor(C.mid)
+                    .text("Txn ID: " + order.payment.razorpayPaymentId, M + 14, y + 33);
             }
 
             const badgeX = PW - M - 90, badgeY = y + 12;
             doc.rect(badgeX, badgeY, 80, 22).fill(pmBg);
-            doc.font("Helvetica-Bold").fontSize(9).fillColor(pmTx).text(isPaid ? "PAID" : "COLLECTED", badgeX, badgeY + 7, { width: 80, align: "center" });
+            doc.font("Helvetica-Bold").fontSize(9).fillColor(pmTx)
+                .text(isPaid ? "PAID" : "COLLECTED", badgeX, badgeY + 7, { width: 80, align: "center" });
 
             y += 58;
 
@@ -324,11 +328,14 @@ export const generateInvoiceBuffer = async (order) => {
 
             doc.image(qrBuffer, M + 14, y + 8, { width: 70, height: 70 });
 
-            doc.font("Helvetica-Bold").fontSize(9).fillColor(C.dark).text("Scan to Verify Invoice", M + 96, y + 12);
-            doc.font("Helvetica").fontSize(7.5).fillColor(C.mid).text("Scan this QR code to confirm the authenticity of this invoice.", M + 96, y + 26, { width: CW - 116 });
+            doc.font("Helvetica-Bold").fontSize(9).fillColor(C.dark)
+                .text("Scan to Verify Invoice", M + 96, y + 12);
+            doc.font("Helvetica").fontSize(7.5).fillColor(C.mid)
+                .text("Scan this QR code to confirm the authenticity of this invoice.", M + 96, y + 26, { width: CW - 116 });
             doc.font("Helvetica-Bold").fontSize(7.5).fillColor(C.zinc).text("Invoice No: ", M + 96, y + 44);
             doc.font("Helvetica").fontSize(7.5).fillColor(C.amber).text(invoiceNo, M + 158, y + 44);
-            doc.font("Helvetica").fontSize(7.5).fillColor(C.light).text(verifyUrl, M + 96, y + 58, { width: CW - 116 });
+            doc.font("Helvetica").fontSize(7.5).fillColor(C.light)
+                .text(verifyUrl, M + 96, y + 58, { width: CW - 116 });
 
             y += qrBoxH + 14;
 

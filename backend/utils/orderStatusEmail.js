@@ -107,7 +107,7 @@ export const getOrderStatusEmailTemplate = ({
       <!-- Thank you -->
       <div style="margin-top:24px;padding:20px;background:#ecfdf5;border-radius:8px;text-align:center">
         <p style="margin:0;color:#065f46;font-weight:600;font-size:15px">Thank you for shopping with RV Gift Shop</p>
-        <p style="margin:6px 0 0;color:#6b7280;font-size:12px">RV Gift and Printing &bull; Gadhi Chowk, Akbarpur, Ambedkar Nagar</p>
+        <p style="margin:6px 0 0;color:#6b7280;font-size:12px">RV Gift and Printing &bull; Gadhi Chowk, Dost Pur Road, Shahzadpur, Akbarpur</p>
       </div>
 
     </div>

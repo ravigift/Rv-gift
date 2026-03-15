@@ -1,17 +1,13 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import ProtectedRoute from "../components/ProtectedRoute";
+import PageTransition from "../components/PageTransition"; // ✅ smooth transitions
 
-// ─────────────────────────────────────────────────────────
-// Eagerly loaded — these are the first screens a user sees
-// ─────────────────────────────────────────────────────────
+// Eagerly loaded
 import Home from "../pages/Home";
 import Login from "../pages/Login";
 
-// ─────────────────────────────────────────────────────────
-// Lazy loaded — only downloaded when the user navigates
-// to that route, keeping the initial bundle small
-// ─────────────────────────────────────────────────────────
+// Lazy loaded
 const Register = lazy(() => import("../pages/Register"));
 const Cart = lazy(() => import("../pages/Cart"));
 const Checkout = lazy(() => import("../pages/Checkout"));
@@ -26,11 +22,8 @@ const VerifyInvoice = lazy(() => import("../pages/Verifyinvoice"));
 const PrivacyPolicy = lazy(() => import("../pages/PrivacyPolicy"));
 const TermsConditions = lazy(() => import("../pages/TermsConditions"));
 const RefundPolicy = lazy(() => import("../pages/RefundPolicy"));
-const ContactUs = lazy(() => import("../pages/Contactus "));
+const ContactUs = lazy(() => import("../pages/Contactus")); // ✅ file renamed: no space
 
-// ─────────────────────────────────────────────────────────
-// Minimal full-screen spinner shown while a lazy chunk loads
-// ─────────────────────────────────────────────────────────
 const PageLoader = () => (
     <div className="min-h-screen flex items-center justify-center bg-stone-50">
         <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
@@ -43,14 +36,15 @@ const ScrollToTop = () => {
     return null;
 };
 
-const AppRoutes = () => {
-    return (
-        <>
-            <ScrollToTop />
-            <Suspense fallback={<PageLoader />}>
+const AppRoutes = () => (
+    <>
+        <ScrollToTop />
+        <Suspense fallback={<PageLoader />}>
+            <PageTransition>
                 <Routes>
-                    {/* ── PUBLIC ── */}
+                    {/* PUBLIC */}
                     <Route path="/" element={<Home />} />
+                    <Route path="/products" element={<Navigate to="/" replace />} />
                     <Route path="/products/:id" element={<ProductDetails />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
@@ -62,7 +56,7 @@ const AppRoutes = () => {
                     <Route path="/refund-policy" element={<RefundPolicy />} />
                     <Route path="/contact" element={<ContactUs />} />
 
-                    {/* ── PROTECTED ── */}
+                    {/* PROTECTED */}
                     <Route element={<ProtectedRoute />}>
                         <Route path="/cart" element={<Cart />} />
                         <Route path="/checkout" element={<Checkout />} />
@@ -73,12 +67,12 @@ const AppRoutes = () => {
                         <Route path="/profile/addresses" element={<Profile />} />
                     </Route>
 
-                    {/* ── FALLBACK ── */}
+                    {/* FALLBACK */}
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
-            </Suspense>
-        </>
-    );
-};
+            </PageTransition>
+        </Suspense>
+    </>
+);
 
 export default AppRoutes;

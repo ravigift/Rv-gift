@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { getMyOrders } from "../features/orders/orderSlice";
@@ -17,25 +17,49 @@ const STATUS_CONFIG = {
 
 const FLOW = ["PLACED", "CONFIRMED", "PACKED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"];
 const CANCELLABLE = ["PLACED", "CONFIRMED"];
+const STALE_MS = 60_000; // 1 minute — re-fetch only if data older than this
+
 const getItemImage = (item) => item.images?.[0]?.url || item.image || null;
 
 const MyOrders = () => {
     const dispatch = useDispatch();
-    const { orders = [], status, error } = useSelector(state => state.orders);
+    const { orders = [], status, error, lastFetched } = useSelector(state => state.orders);
+
     const [refreshing, setRefreshing] = useState(false);
     const [activeFilter, setActiveFilter] = useState("ALL");
     const [cancellingId, setCancellingId] = useState(null);
     const [confirmCancelId, setConfirmCancelId] = useState(null);
     const [downloadingId, setDownloadingId] = useState(null);
 
-    useEffect(() => { dispatch(getMyOrders()); }, [dispatch]);
+    // ── Smart fetch: only call API if data is stale or missing ──────────────
+    // This prevents re-fetching on every mount (e.g. back button, tab switch).
+    // lastFetched must be saved in your orderSlice (see note below).
+    useEffect(() => {
+        const isStale = !lastFetched || Date.now() - lastFetched > STALE_MS;
+        const isEmpty = orders.length === 0 && status !== "loading";
 
+        if (isStale || isEmpty) {
+            dispatch(getMyOrders());
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    // NOTE: Add `lastFetched: null` to your orderSlice initialState, and set
+    // `state.lastFetched = Date.now()` in the getMyOrders.fulfilled case.
+    // Example:
+    //   builder.addCase(getMyOrders.fulfilled, (state, action) => {
+    //       state.orders = action.payload;
+    //       state.status = "succeeded";
+    //       state.lastFetched = Date.now();   // ← add this line
+    //   });
+
+    // ── Manual refresh (user-triggered) ─────────────────────────────────────
     const handleRefresh = async () => {
         setRefreshing(true);
-        dispatch(getMyOrders());
+        await dispatch(getMyOrders());
         setRefreshing(false);
     };
 
+    // ── Cancel order ─────────────────────────────────────────────────────────
     const handleCancel = async (orderId) => {
         try {
             setCancellingId(orderId);
@@ -49,6 +73,7 @@ const MyOrders = () => {
         }
     };
 
+    // ── Invoice download ──────────────────────────────────────────────────────
     const handleDownloadInvoice = async (orderId) => {
         try {
             setDownloadingId(orderId);
@@ -68,9 +93,12 @@ const MyOrders = () => {
         }
     };
 
-    const filtered = activeFilter === "ALL" ? orders : orders.filter(o => o.orderStatus === activeFilter);
+    const filtered = activeFilter === "ALL"
+        ? orders
+        : orders.filter(o => o.orderStatus === activeFilter);
 
-    if (status === "loading" && !refreshing) return (
+    // ── Full-page loading (only first load, not refresh) ─────────────────────
+    if (status === "loading" && !refreshing && orders.length === 0) return (
         <div className="min-h-screen bg-[#f1f3f6] flex items-center justify-center">
             <div className="text-center">
                 <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
@@ -86,7 +114,7 @@ const MyOrders = () => {
             <div className="max-w-4xl mx-auto">
                 <div className="flex flex-col lg:flex-row gap-4 items-start">
 
-                    {/* LEFT SIDEBAR */}
+                    {/* ── LEFT SIDEBAR ── */}
                     <div className="w-full lg:w-64 shrink-0 space-y-3">
                         <div className="bg-white rounded-sm border border-stone-200 p-4">
                             <div className="flex items-center gap-3">
@@ -104,21 +132,29 @@ const MyOrders = () => {
                             </div>
                             <div className="py-1">
                                 <button onClick={() => setActiveFilter("ALL")}
-                                    className={`w-full flex items-center justify-between px-4 py-2.5 text-sm font-semibold transition-colors ${activeFilter === "ALL" ? "bg-blue-50 text-blue-600 border-l-2 border-blue-500" : "text-zinc-600 hover:bg-stone-50"}`}>
+                                    className={`w-full flex items-center justify-between px-4 py-2.5 text-sm font-semibold transition-colors ${activeFilter === "ALL"
+                                            ? "bg-blue-50 text-blue-600 border-l-2 border-blue-500"
+                                            : "text-zinc-600 hover:bg-stone-50"
+                                        }`}>
                                     <span>All Orders</span>
-                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${activeFilter === "ALL" ? "bg-blue-100 text-blue-600" : "bg-stone-100 text-zinc-500"}`}>{orders.length}</span>
+                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${activeFilter === "ALL" ? "bg-blue-100 text-blue-600" : "bg-stone-100 text-zinc-500"
+                                        }`}>{orders.length}</span>
                                 </button>
                                 {Object.entries(STATUS_CONFIG).map(([key, cfg]) => {
                                     const count = orders.filter(o => o.orderStatus === key).length;
                                     if (count === 0) return null;
                                     return (
                                         <button key={key} onClick={() => setActiveFilter(key)}
-                                            className={`w-full flex items-center justify-between px-4 py-2.5 text-sm font-semibold transition-colors ${activeFilter === key ? "bg-blue-50 text-blue-600 border-l-2 border-blue-500" : "text-zinc-600 hover:bg-stone-50"}`}>
+                                            className={`w-full flex items-center justify-between px-4 py-2.5 text-sm font-semibold transition-colors ${activeFilter === key
+                                                    ? "bg-blue-50 text-blue-600 border-l-2 border-blue-500"
+                                                    : "text-zinc-600 hover:bg-stone-50"
+                                                }`}>
                                             <span className="flex items-center gap-2">
                                                 <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
                                                 {cfg.label}
                                             </span>
-                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${activeFilter === key ? "bg-blue-100 text-blue-600" : "bg-stone-100 text-zinc-500"}`}>{count}</span>
+                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${activeFilter === key ? "bg-blue-100 text-blue-600" : "bg-stone-100 text-zinc-500"
+                                                }`}>{count}</span>
                                         </button>
                                     );
                                 })}
@@ -126,9 +162,10 @@ const MyOrders = () => {
                         </div>
                     </div>
 
-                    {/* RIGHT MAIN */}
+                    {/* ── RIGHT MAIN ── */}
                     <div className="flex-1 min-w-0 w-full space-y-3">
 
+                        {/* Header bar — shows inline refresh spinner, not full-page loader */}
                         <div className="bg-white rounded-sm border border-stone-200 px-5 py-3 flex items-center justify-between">
                             <h1 className="font-black text-zinc-900 text-base">
                                 {activeFilter === "ALL" ? "All Orders" : STATUS_CONFIG[activeFilter]?.label}
@@ -150,7 +187,8 @@ const MyOrders = () => {
                                 <FaShoppingBag size={48} className="text-stone-200 mx-auto mb-4" />
                                 <p className="text-zinc-600 font-bold text-lg mb-1">No orders yet!</p>
                                 <p className="text-zinc-400 text-sm mb-6">Looks like you haven't placed any orders.</p>
-                                <Link to="/" className="inline-flex items-center gap-2 px-8 py-3 bg-amber-500 text-white rounded-sm font-bold text-sm hover:bg-amber-600 transition-all active:scale-95">
+                                <Link to="/"
+                                    className="inline-flex items-center gap-2 px-8 py-3 bg-amber-500 text-white rounded-sm font-bold text-sm hover:bg-amber-600 transition-all active:scale-95">
                                     Start Shopping <FaArrowRight size={11} />
                                 </Link>
                             </div>
@@ -183,7 +221,7 @@ const MyOrders = () => {
                             return (
                                 <div key={order._id} className="bg-white rounded-sm border border-stone-200 overflow-hidden hover:shadow-md transition-shadow duration-200">
 
-                                    {/* Order header bar */}
+                                    {/* Order header */}
                                     <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 bg-stone-50 border-b border-stone-100">
                                         <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500">
                                             <div>
@@ -203,15 +241,14 @@ const MyOrders = () => {
                                             <div>
                                                 <p className="font-black text-[10px] uppercase tracking-widest text-zinc-400 mb-0.5">Payment</p>
                                                 <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${isPaid ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                                    : isCOD ? "bg-amber-50 text-amber-700 border-amber-200"
-                                                        : "bg-stone-50 text-zinc-500 border-stone-200"
+                                                        : isCOD ? "bg-amber-50 text-amber-700 border-amber-200"
+                                                            : "bg-stone-50 text-zinc-500 border-stone-200"
                                                     }`}>
                                                     {isPaid ? "✅ Paid Online" : isCOD ? "💵 COD" : "⏳ Pending"}
                                                 </span>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            {/* Invoice — only after DELIVERED */}
                                             {isDelivered && (
                                                 <button
                                                     onClick={() => handleDownloadInvoice(order._id)}
@@ -238,7 +275,8 @@ const MyOrders = () => {
                                                 <div key={idx} className="px-5 py-4 flex gap-4 items-start">
                                                     <div className="w-20 h-20 rounded border border-stone-100 bg-stone-50 overflow-hidden flex items-center justify-center shrink-0">
                                                         {img
-                                                            ? <img src={img} alt={item.name} className="w-full h-full object-contain p-1.5" onError={e => { e.target.style.display = "none"; }} />
+                                                            ? <img src={img} alt={item.name} className="w-full h-full object-contain p-1.5"
+                                                                onError={e => { e.target.style.display = "none"; }} />
                                                             : <FaBoxOpen size={20} className="text-stone-300" />}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
@@ -278,7 +316,7 @@ const MyOrders = () => {
                                         })}
                                     </div>
 
-                                    {/* Live Shipment Tracking */}
+                                    {/* Shipment tracking */}
                                     {order.shipping?.trackingUrl && ["PACKED", "SHIPPED", "OUT_FOR_DELIVERY"].includes(order.orderStatus) && (
                                         <div className="px-5 pb-4 border-t border-stone-100 bg-indigo-50/40">
                                             <div className="flex flex-wrap items-center justify-between gap-2 pt-3">
@@ -287,9 +325,7 @@ const MyOrders = () => {
                                                         {order.shipping.courierName || "Courier"}
                                                     </span>
                                                     {order.shipping.awbCode && (
-                                                        <span className="ml-2 text-zinc-400 font-mono">
-                                                            AWB: {order.shipping.awbCode}
-                                                        </span>
+                                                        <span className="ml-2 text-zinc-400 font-mono">AWB: {order.shipping.awbCode}</span>
                                                     )}
                                                 </div>
                                                 <a href={order.shipping.trackingUrl} target="_blank" rel="noreferrer"
