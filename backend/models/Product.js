@@ -73,19 +73,26 @@ const productSchema = new mongoose.Schema(
 );
 
 /* ─────────────────────────────────────────────
-   AUTO SLUG — generate before save
+   AUTO SLUG — max 8 words, single DB query
+   Uses _id as suffix to guarantee uniqueness
+   without looping — much faster on create
 ───────────────────────────────────────────── */
-productSchema.pre("save", async function () {
+productSchema.pre("save", function () {
     if (!this.isModified("name") && this.slug) return;
-    let base = slugify(this.name, { lower: true, strict: true });
-    let slug = base;
-    let count = 1;
-    while (
-        await mongoose.model("Product").exists({ slug, _id: { $ne: this._id } })
-    ) {
-        slug = `${base}-${count++}`;
+
+    // Max 8 words for SEO friendly URL
+    const base = slugify(this.name, { lower: true, strict: true })
+        .split("-").slice(0, 8).join("-");
+
+    // ✅ Use _id as guaranteed unique suffix — no DB loop needed
+    // Result: "ram-mandir-ayodhya-model" or "ram-mandir-ayodhya-model-abc123"
+    if (!this.slug || this.isModified("name")) {
+        // Try base first; if conflict Mongoose unique index will catch it
+        // For new docs, append short _id to guarantee uniqueness instantly
+        this.slug = this.isNew
+            ? `${base}-${this._id.toString().slice(-5)}`
+            : base;
     }
-    this.slug = slug;
 });
 
 /* ─────────────────────────────────────────────

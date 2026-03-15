@@ -4,11 +4,10 @@ import api from "../api/adminApi";
 import { imgUrl } from "../utils/imageUrl";
 import {
     FaPlus, FaSync, FaEdit, FaTrash, FaSearch,
-    FaBoxOpen, FaBoxes, FaChevronLeft, FaChevronRight,
+    FaBoxOpen, FaBoxes, FaChevronLeft, FaChevronRight, FaLink,
 } from "react-icons/fa";
 
-// ── Pagination config ──────────────────────────────────────
-const PAGE_SIZE = 10; // products per page
+const PAGE_SIZE = 10;
 
 const AdminProducts = () => {
     const [products, setProducts] = useState([]);
@@ -23,20 +22,15 @@ const AdminProducts = () => {
     const [editingStockId, setEditingStockId] = useState(null);
     const [stockInput, setStockInput] = useState("");
     const [savingStockId, setSavingStockId] = useState(null);
-
-    // ── Pagination state ───────────────────────────────────
     const [currentPage, setCurrentPage] = useState(1);
 
-    // Derived pagination values
     const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
     const pageStart = (currentPage - 1) * PAGE_SIZE;
     const pageEnd = pageStart + PAGE_SIZE;
     const paginated = filtered.slice(pageStart, pageEnd);
 
-    // Reset to page 1 whenever search/filter changes
     useEffect(() => { setCurrentPage(1); }, [search]);
 
-    // ── Helpers ────────────────────────────────────────────
     const showToast = (type, msg) => {
         setToast({ type, msg });
         setTimeout(() => setToast(null), 3000);
@@ -68,9 +62,7 @@ const AdminProducts = () => {
             await api.delete(`/products/${id}`);
             setProducts(p => p.filter(x => x._id !== id));
             setFiltered(p => p.filter(x => x._id !== id));
-            // If last item on page was deleted, go to previous page
-            if (paginated.length === 1 && currentPage > 1)
-                setCurrentPage(p => p - 1);
+            if (paginated.length === 1 && currentPage > 1) setCurrentPage(p => p - 1);
             showToast("success", "Product deleted!");
         } catch { showToast("error", "Failed to delete"); }
         finally { setDeletingId(null); setConfirmId(null); }
@@ -110,6 +102,7 @@ const AdminProducts = () => {
         setTimeout(() => setRefreshing(false), 600);
     };
 
+    // ✅ Category — properly format karo (hyphen → space → title case)
     const formatCat = (cat) =>
         cat?.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase()) || "—";
 
@@ -120,8 +113,6 @@ const AdminProducts = () => {
         return { label: `${n} left`, cls: "text-emerald-600 bg-emerald-50 border-emerald-200" };
     };
 
-    // ── Page number buttons helper ─────────────────────────
-    // Shows: 1 … 4 [5] 6 … 12  (max 5 visible page buttons)
     const getPageNumbers = () => {
         if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
         const pages = [];
@@ -135,7 +126,6 @@ const AdminProducts = () => {
         return pages;
     };
 
-    // ── Loading / Error screens ────────────────────────────
     if (loading) return (
         <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F8FAFC" }}>
             <div style={{ textAlign: "center" }}>
@@ -151,10 +141,7 @@ const AdminProducts = () => {
             <div style={{ textAlign: "center", background: "#fff", borderRadius: 16, padding: 40, border: "1px solid #E2E8F0" }}>
                 <p style={{ fontSize: 32, marginBottom: 8 }}>⚠️</p>
                 <p style={{ color: "#374151", fontWeight: 700, marginBottom: 16 }}>{error}</p>
-                <button onClick={fetchProducts} style={{
-                    padding: "8px 20px", background: "#1E293B", color: "#fff",
-                    borderRadius: 10, fontWeight: 700, fontSize: 13, border: "none", cursor: "pointer"
-                }}>Retry</button>
+                <button onClick={fetchProducts} style={{ padding: "8px 20px", background: "#1E293B", color: "#fff", borderRadius: 10, fontWeight: 700, fontSize: 13, border: "none", cursor: "pointer" }}>Retry</button>
             </div>
         </div>
     );
@@ -166,35 +153,24 @@ const AdminProducts = () => {
                 @keyframes spin    { to { transform: rotate(360deg); } }
                 @keyframes fadeIn  { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
                 @keyframes slideUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-
                 .page-btn {
-                    min-width: 32px; height: 32px;
-                    border-radius: 8px;
-                    font-size: 12px; font-weight: 700;
-                    border: 1px solid #E2E8F0;
-                    background: #fff; color: #475569;
-                    cursor: pointer;
+                    min-width: 32px; height: 32px; border-radius: 8px;
+                    font-size: 12px; font-weight: 700; border: 1px solid #E2E8F0;
+                    background: #fff; color: #475569; cursor: pointer;
                     display: flex; align-items: center; justify-content: center;
-                    transition: all 0.15s;
-                    padding: 0 6px;
+                    transition: all 0.15s; padding: 0 6px;
                 }
-                .page-btn:hover:not(:disabled):not(.active) {
-                    background: #F1F5F9;
-                    border-color: #CBD5E1;
-                    color: #0F172A;
-                }
-                .page-btn.active {
-                    background: #F59E0B;
-                    border-color: #F59E0B;
-                    color: #fff;
-                    cursor: default;
-                    box-shadow: 0 2px 8px rgba(245,158,11,0.35);
-                }
-                .page-btn:disabled {
-                    opacity: 0.38;
-                    cursor: not-allowed;
-                }
+                .page-btn:hover:not(:disabled):not(.active) { background: #F1F5F9; border-color: #CBD5E1; color: #0F172A; }
+                .page-btn.active { background: #F59E0B; border-color: #F59E0B; color: #fff; cursor: default; box-shadow: 0 2px 8px rgba(245,158,11,0.35); }
+                .page-btn:disabled { opacity: 0.38; cursor: not-allowed; }
                 .page-row { animation: slideUp 0.18s ease; }
+                .slug-chip {
+                    display: inline-flex; align-items: center; gap: 3px;
+                    font-size: 9px; font-weight: 600; color: #6366F1;
+                    background: #EEF2FF; border: 1px solid #C7D2FE;
+                    padding: 1px 6px; border-radius: 20px;
+                    max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                }
             `}</style>
 
             {/* Toast */}
@@ -211,7 +187,7 @@ const AdminProducts = () => {
                 </div>
             )}
 
-            <div style={{ maxWidth: 900, margin: "0 auto", padding: "20px 12px 40px" }}>
+            <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 12px 40px" }}>
 
                 {/* Header */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
@@ -228,8 +204,7 @@ const AdminProducts = () => {
                             padding: "8px 12px", background: "#fff",
                             border: "1px solid #E2E8F0", borderRadius: 9,
                             fontSize: 12, fontWeight: 600, color: "#64748B",
-                            cursor: "pointer", opacity: refreshing ? 0.6 : 1,
-                            transition: "all 0.15s",
+                            cursor: "pointer", opacity: refreshing ? 0.6 : 1, transition: "all 0.15s",
                         }}>
                             <FaSync size={11} style={{ animation: refreshing ? "spin 0.8s linear infinite" : "none" }} />
                             Refresh
@@ -297,11 +272,11 @@ const AdminProducts = () => {
                 ) : (
                     <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #E2E8F0", overflow: "hidden" }}>
 
-                        {/* ── DESKTOP TABLE ── */}
+                        {/* DESKTOP TABLE */}
                         <div className="hidden md:block">
                             <div style={{
                                 display: "grid", gap: 8,
-                                gridTemplateColumns: "28px 40px 1fr 100px 70px 120px 80px",
+                                gridTemplateColumns: "28px 40px 1fr 110px 70px 120px 80px",
                                 padding: "10px 16px", background: "#F8FAFC",
                                 borderBottom: "1px solid #F1F5F9",
                                 fontSize: 10, fontWeight: 700, color: "#94A3B8",
@@ -318,12 +293,12 @@ const AdminProducts = () => {
                                     const sb = stockBadge(product);
                                     const isES = editingStockId === product._id;
                                     const isIC = confirmId === product._id;
-                                    // Global row number across pages
                                     const rowNum = pageStart + idx + 1;
+
                                     return (
                                         <div key={product._id} className="page-row" style={{
                                             display: "grid", gap: 8,
-                                            gridTemplateColumns: "28px 40px 1fr 100px 70px 120px 80px",
+                                            gridTemplateColumns: "28px 40px 1fr 110px 70px 120px 80px",
                                             padding: "10px 16px", alignItems: "center",
                                             borderBottom: "1px solid #F8FAFC",
                                             opacity: deletingId === product._id ? 0.5 : 1,
@@ -333,23 +308,43 @@ const AdminProducts = () => {
                                             onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                                         >
                                             <div style={{ fontSize: 11, color: "#CBD5E1", fontWeight: 600 }}>{rowNum}</div>
+
+                                            {/* Image */}
                                             <div style={{ width: 36, height: 36, borderRadius: 8, background: "#F1F5F9", border: "1px solid #E2E8F0", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                                 {img
                                                     ? <img src={img} alt={product.name} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "contain", padding: 3 }} />
                                                     : <FaBoxOpen size={13} style={{ color: "#CBD5E1" }} />}
                                             </div>
+
+                                            {/* ✅ Name + slug chip */}
                                             <div style={{ minWidth: 0 }}>
-                                                <p style={{ fontWeight: 700, fontSize: 13, color: "#0F172A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.name}</p>
-                                                <p style={{ fontSize: 11, color: "#94A3B8", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.description || "—"}</p>
+                                                <p style={{ fontWeight: 700, fontSize: 13, color: "#0F172A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                    {product.name}
+                                                </p>
+                                                <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3 }}>
+                                                    {product.slug ? (
+                                                        <span className="slug-chip" title={`/products/${product.slug}`}>
+                                                            <FaLink size={7} /> {product.slug}
+                                                        </span>
+                                                    ) : (
+                                                        <span style={{ fontSize: 9, color: "#F59E0B", fontWeight: 600 }}>⚠ no slug — edit to fix</span>
+                                                    )}
+                                                </div>
                                             </div>
+
+                                            {/* ✅ Category — single badge, not tags */}
                                             <div>
-                                                <span style={{ background: "#FFFBEB", border: "1px solid #FDE68A", color: "#92400E", fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 20 }}>
+                                                <span style={{ background: "#FFFBEB", border: "1px solid #FDE68A", color: "#92400E", fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap" }}>
                                                     {formatCat(product.category)}
                                                 </span>
                                             </div>
+
+                                            {/* Price */}
                                             <div style={{ fontWeight: 800, fontSize: 13, color: "#10B981" }}>
                                                 ₹{Number(product.price || 0).toLocaleString("en-IN")}
                                             </div>
+
+                                            {/* Stock */}
                                             <div>
                                                 {isES ? (
                                                     <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
@@ -373,6 +368,8 @@ const AdminProducts = () => {
                                                     </button>
                                                 )}
                                             </div>
+
+                                            {/* Actions */}
                                             <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
                                                 <Link to={`/admin/products/${product._id}/edit`} style={{
                                                     width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
@@ -383,9 +380,7 @@ const AdminProducts = () => {
                                                 {isIC ? (
                                                     <div style={{ display: "flex", gap: 4 }}>
                                                         <button onClick={() => deleteHandler(product._id)}
-                                                            style={{ padding: "4px 8px", background: "#EF4444", color: "#fff", borderRadius: 7, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer" }}>
-                                                            Yes
-                                                        </button>
+                                                            style={{ padding: "4px 8px", background: "#EF4444", color: "#fff", borderRadius: 7, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer" }}>Yes</button>
                                                         <button onClick={() => setConfirmId(null)}
                                                             style={{ padding: "4px 8px", background: "#F1F5F9", color: "#64748B", borderRadius: 7, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer" }}>No</button>
                                                     </div>
@@ -404,7 +399,7 @@ const AdminProducts = () => {
                             </div>
                         </div>
 
-                        {/* ── MOBILE CARDS ── */}
+                        {/* MOBILE CARDS */}
                         <div className="md:hidden">
                             {paginated.map((product) => {
                                 const rawImg = product.images?.[0]?.url || product.image || null;
@@ -433,7 +428,16 @@ const AdminProducts = () => {
                                                         ₹{Number(product.price || 0).toLocaleString("en-IN")}
                                                     </p>
                                                 </div>
+
+                                                {/* ✅ Slug chip mobile */}
+                                                {product.slug && (
+                                                    <span className="slug-chip" style={{ marginTop: 3, display: "inline-flex" }}>
+                                                        <FaLink size={7} /> {product.slug}
+                                                    </span>
+                                                )}
+
                                                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                                                    {/* ✅ Category only */}
                                                     <span style={{ background: "#FFFBEB", border: "1px solid #FDE68A", color: "#92400E", fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 20 }}>
                                                         {formatCat(product.category)}
                                                     </span>
@@ -501,13 +505,12 @@ const AdminProducts = () => {
                             })}
                         </div>
 
-                        {/* ── PAGINATION + Footer ── */}
+                        {/* PAGINATION */}
                         <div style={{
                             display: "flex", alignItems: "center", justifyContent: "space-between",
                             padding: "12px 14px", background: "#F8FAFC",
                             borderTop: "1px solid #F1F5F9", flexWrap: "wrap", gap: 10,
                         }}>
-                            {/* Left: count info */}
                             <p style={{ fontSize: 12, color: "#94A3B8", margin: 0 }}>
                                 Showing{" "}
                                 <b style={{ color: "#475569" }}>{pageStart + 1}–{Math.min(pageEnd, filtered.length)}</b>
@@ -515,42 +518,21 @@ const AdminProducts = () => {
                                 <b style={{ color: "#475569" }}>{filtered.length}</b>
                                 {" "}products
                             </p>
-
-                            {/* Right: pagination controls */}
                             {totalPages > 1 && (
                                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                    {/* Prev */}
-                                    <button
-                                        className="page-btn"
-                                        onClick={() => setCurrentPage(p => p - 1)}
-                                        disabled={currentPage === 1}
-                                        title="Previous page"
-                                    >
+                                    <button className="page-btn" onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1} title="Previous page">
                                         <FaChevronLeft size={10} />
                                     </button>
-
-                                    {/* Page numbers */}
                                     {getPageNumbers().map((pg, i) =>
                                         pg === "…" ? (
                                             <span key={`ellipsis-${i}`} style={{ fontSize: 12, color: "#CBD5E1", padding: "0 2px" }}>…</span>
                                         ) : (
-                                            <button
-                                                key={pg}
-                                                className={`page-btn${currentPage === pg ? " active" : ""}`}
-                                                onClick={() => setCurrentPage(pg)}
-                                            >
+                                            <button key={pg} className={`page-btn${currentPage === pg ? " active" : ""}`} onClick={() => setCurrentPage(pg)}>
                                                 {pg}
                                             </button>
                                         )
                                     )}
-
-                                    {/* Next */}
-                                    <button
-                                        className="page-btn"
-                                        onClick={() => setCurrentPage(p => p + 1)}
-                                        disabled={currentPage === totalPages}
-                                        title="Next page"
-                                    >
+                                    <button className="page-btn" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages} title="Next page">
                                         <FaChevronRight size={10} />
                                     </button>
                                 </div>
