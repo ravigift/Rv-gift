@@ -112,8 +112,8 @@ const VerifyInvoice = () => {
                             <div className="flex justify-between items-center py-2">
                                 <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Payment</span>
                                 <span className={`text-xs font-bold px-3 py-1 rounded-full ${data.paymentStatus === "PAID"
-                                        ? "bg-emerald-100 text-emerald-700"
-                                        : "bg-amber-100 text-amber-700"
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-amber-100 text-amber-700"
                                     }`}>
                                     {data.paymentStatus || "PENDING"}
                                 </span>
@@ -150,12 +150,12 @@ const VerifyInvoice = () => {
                                 <p className="text-red-600 text-xs leading-relaxed">
                                     Invoice number{" "}
                                     <span className="font-mono font-bold">{invoiceNumber}</span>{" "}
-                                    does not exist in our system. If you received this from RV Gifts, please contact us immediately.
+                                    does not exist in our system. If you received this from RV Gifts and Printing, please contact us immediately.
                                 </p>
                             </div>
                             <p className="text-zinc-400 text-xs">
                                 Contact:{" "}
-                                <span className="font-bold text-zinc-600">8808485840</span>
+                                <span className="font-bold text-zinc-600">8299519532,9792770976</span>
                             </p>
                         </div>
                     </div>
@@ -168,7 +168,7 @@ const VerifyInvoice = () => {
                             to="/"
                             className="text-amber-600 font-semibold text-sm hover:text-amber-700 transition-colors"
                         >
-                            Back to RV Gifts
+                            Back to RV Gifts and Printing
                         </Link>
                     </div>
                 )}

@@ -15,6 +15,8 @@ const addressSchema = new mongoose.Schema(
         state: { type: String, required: true, trim: true, maxlength: 100 },
         pincode: { type: String, required: true, trim: true, match: [/^\d{6}$/, "Invalid pincode"] },
         isDefault: { type: Boolean, default: false },
+        lat: { type: Number, default: null }, // ✅ COD 15km check ke liye
+        lng: { type: Number, default: null },
     },
     { timestamps: true }
 );
@@ -45,7 +47,7 @@ const userSchema = new mongoose.Schema(
             minlength: [6, "Password must be at least 6 characters"],
         },
 
-        /* ── Mobile Number ── ✅ optional (users registered without phone) */
+        /* ── Mobile Number — optional (purane users ke liye) ── */
         phone: {
             type: String,
             required: false,
