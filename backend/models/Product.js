@@ -75,8 +75,8 @@ const productSchema = new mongoose.Schema(
 /* ─────────────────────────────────────────────
    AUTO SLUG — generate before save
 ───────────────────────────────────────────── */
-productSchema.pre("save", async function (next) {
-    if (!this.isModified("name") && this.slug) return next();
+productSchema.pre("save", async function () {
+    if (!this.isModified("name") && this.slug) return;
     let base = slugify(this.name, { lower: true, strict: true });
     let slug = base;
     let count = 1;
@@ -86,7 +86,6 @@ productSchema.pre("save", async function (next) {
         slug = `${base}-${count++}`;
     }
     this.slug = slug;
-    next();
 });
 
 /* ─────────────────────────────────────────────
