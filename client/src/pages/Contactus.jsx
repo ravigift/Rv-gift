@@ -1,8 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function ContactUs() {
     const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "" });
     const [status, setStatus] = useState(null); // null | "loading" | "success" | "error"
+
+    // ✅ SEO — dynamic title & meta
+    useEffect(() => {
+        document.title = "Contact Us | RV Gift & Printing - Akbarpur, Ambedkar Nagar";
+        const desc = document.querySelector('meta[name="description"]');
+        if (desc) desc.setAttribute("content",
+            "Contact RV Gift & Printing in Akbarpur. Call +91 82995 19532, email officialrvgift@gmail.com, or visit us at Gadhi Chowk, Dost Pur Road, Akbarpur, Ambedkar Nagar UP."
+        );
+    }, []);
 
     const handleChange = (e) => {
         setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -16,7 +25,7 @@ export default function ContactUs() {
         setStatus("loading");
 
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/contact`, { // ✅ Fixed: removed extra /api
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/contact`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(form),
@@ -62,7 +71,7 @@ export default function ContactUs() {
                             icon="📞"
                             title="Call Us"
                             line1="+91 82995 19532 / +91 97927 70976"
-                            line2="Mon–Sat, 10am – 6pm"
+                            line2="Mon–Sun, 10am – 6pm"
                         />
                         <InfoCard
                             icon="📍"

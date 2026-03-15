@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchProducts } from "../features/products/productSlice"; // ✅ Redux
+import { fetchProducts } from "../features/products/productSlice";
 import { useCart } from "../hooks/useCart";
 import { imgUrl } from "../utils/imageUrl";
 import { FaStar, FaRegStar, FaSearch, FaFire, FaArrowRight, FaShoppingCart, FaPencilAlt } from "react-icons/fa";
@@ -40,8 +40,11 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
         : null;
     const isOutOfStock = product.inStock === false;
 
+    // ✅ Slug-based URL — fallback to _id
+    const productUrl = `/products/${product.slug || product._id}`;
+
     return (
-        <div onClick={() => navigate(`/products/${product._id}`)}
+        <div onClick={() => navigate(productUrl)}
             className="group bg-white rounded-2xl border border-stone-100 hover:border-amber-200 hover:shadow-2xl shadow-sm transition-all duration-300 cursor-pointer flex flex-col overflow-hidden select-none">
             <div className="relative h-52 bg-stone-50 flex items-center justify-center overflow-hidden">
                 {!imgLoaded && <div className="absolute inset-0 bg-stone-100 animate-pulse" />}
@@ -142,7 +145,6 @@ const Home = () => {
     const showCustomizable = searchParams.get("customizable") === "true";
     const { addItem } = useCart();
 
-    // ✅ Redux state — products survive navigation
     const allProducts = useSelector(state => state.products.items);
     const status = useSelector(state => state.products.status);
     const reduxError = useSelector(state => state.products.error);
@@ -152,10 +154,17 @@ const Home = () => {
 
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-    // Reset visible count on filter change
+    // ✅ SEO — dynamic title & meta
+    useEffect(() => {
+        document.title = "RV Gift & Printing | Gifts, Printing & Customization - Akbarpur, Ambedkar Nagar";
+        const desc = document.querySelector('meta[name="description"]');
+        if (desc) desc.setAttribute("content",
+            "Shop personalized gifts, custom printing, and unique gift items at RV Gift & Printing, Akbarpur. Fast delivery across India. Visit us at Gadri Chowk, Dostpur Chauraha, Ambedkar Nagar UP."
+        );
+    }, []);
+
     useEffect(() => { setVisibleCount(PAGE_SIZE); }, [searchQuery, activeCategory, showCustomizable]);
 
-    // ✅ Fetch only if not already loaded — no reload on navigate!
     useEffect(() => {
         if (status === "idle") {
             dispatch(fetchProducts());

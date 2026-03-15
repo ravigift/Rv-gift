@@ -28,6 +28,9 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
         ? Math.round(((Number(product.mrp) - Number(product.price)) / Number(product.mrp)) * 100)
         : null;
 
+    // ✅ Slug-based URL — fallback to _id if slug missing
+    const productUrl = `/products/${product.slug || product._id}`;
+
     const handleAddToCart = (e) => {
         e.stopPropagation();
         if (inCart || isOutOfStock) return;
@@ -130,7 +133,7 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                 .btn-buy:disabled { background: #f4f4f5; color: #a1a1aa; box-shadow: none; cursor: not-allowed; transform: none; }
             `}</style>
 
-            <div className="pcard" onClick={() => navigate(`/products/${product._id}`, { state: { product } })}>
+            <div className="pcard" onClick={() => navigate(productUrl)}>
 
                 {/* ── IMAGE ── */}
                 <div className="pcard-img-wrap">
@@ -166,7 +169,7 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                         )}
                     </div>
 
-                    {/* ✅ Discount badge — top right corner */}
+                    {/* Discount badge */}
                     {hasDiscount && !isOutOfStock && (
                         <div className="absolute top-2.5 right-2.5 z-10">
                             <span className="bg-green-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">
@@ -175,7 +178,7 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                         </div>
                     )}
 
-                    {/* Rating pill — move down if discount badge present */}
+                    {/* Rating pill */}
                     {numReviews > 0 && !hasDiscount && (
                         <div className="absolute top-2.5 right-2.5 z-10">
                             <span className={`flex items-center gap-0.5 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm ${rating >= 4 ? "bg-emerald-500" : rating >= 3 ? "bg-amber-400" : "bg-red-400"}`}>
@@ -231,7 +234,7 @@ const ProductCard = ({ product, onAddToCart, onBuyNow }) => {
                         )}
                     </div>
 
-                    {/* ✅ Price display — offer + MRP strikethrough */}
+                    {/* Price */}
                     <div className="mb-3">
                         <div className="flex items-baseline gap-1.5 flex-wrap">
                             <span className={`text-[18px] font-black leading-none ${isOutOfStock ? "text-zinc-400" : "text-zinc-900"}`}>

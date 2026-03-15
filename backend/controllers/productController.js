@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Product from "../models/Product.js";
 import cloudinary from "../config/cloudinary.js";
 import { normalizeCategory } from "../utils/normalizeCategory.js";
@@ -26,16 +27,22 @@ const safeDestroy = async (publicId) => {
 };
 
 /* ─────────────────────────────────────────────
-   PARSE MRP — safely extract numeric MRP
-   Returns null if invalid / less than price
+   PARSE MRP
 ───────────────────────────────────────────── */
 const parseMrp = (mrpRaw, price) => {
     if (mrpRaw === undefined || mrpRaw === null || mrpRaw === "") return null;
     const n = Number(mrpRaw);
     if (isNaN(n) || n <= 0) return null;
-    // MRP must be >= selling price to make sense
     if (price && n < Number(price)) return null;
     return n;
+};
+
+/* ─────────────────────────────────────────────
+   HELPER — find by slug or id
+───────────────────────────────────────────── */
+const findProduct = (identifier) => {
+    const isId = mongoose.Types.ObjectId.isValid(identifier);
+    return Product.findOne(isId ? { _id: identifier } : { slug: identifier });
 };
 
 /* ─────────────────────────────────────────────
@@ -73,14 +80,13 @@ export const createProduct = async (req, res) => {
         }
 
         const stockQty = Math.max(0, Number(stock) || 0);
-        // ✅ Parse MRP
         const mrpValue = parseMrp(mrp, price);
 
         const product = await Product.create({
             name: name.trim(),
             description: description?.trim() || "",
             price: Number(price),
-            mrp: mrpValue,                          // ✅ stored
+            mrp: mrpValue,
             category: normalizeCategory(category),
             images,
             isCustomizable: isCustomizable === true || isCustomizable === "true",
@@ -119,9 +125,8 @@ export const getAllProducts = async (req, res) => {
             ];
         }
 
-        // ✅ Select only fields needed for listing — faster response
         const products = await Product.find(query)
-            .select("name description price mrp category images tags rating numReviews isCustomizable stock inStock createdAt")
+            .select("name description price mrp slug category images tags rating numReviews isCustomizable stock inStock createdAt")
             .sort({ createdAt: -1 })
             .lean();
 
@@ -133,11 +138,11 @@ export const getAllProducts = async (req, res) => {
 };
 
 /* ─────────────────────────────────────────────
-   GET SINGLE PRODUCT
+   GET SINGLE PRODUCT — by slug or id
 ───────────────────────────────────────────── */
 export const getSingleProduct = async (req, res) => {
     try {
-        const product = await Product.findById(req.params.id).lean();
+        const product = await findProduct(req.params.id).lean();
         if (!product)
             return res.status(404).json({ message: "Product not found" });
         res.json(product);
@@ -152,7 +157,7 @@ export const getSingleProduct = async (req, res) => {
 ───────────────────────────────────────────── */
 export const updateProduct = async (req, res) => {
     try {
-        const product = await Product.findById(req.params.id);
+        const product = await findProduct(req.params.id);
         if (!product)
             return res.status(404).json({ message: "Product not found" });
 
@@ -164,7 +169,6 @@ export const updateProduct = async (req, res) => {
         if (updateData.price)
             updateData.price = Number(updateData.price);
 
-        // ✅ Parse MRP on update
         if (updateData.mrp !== undefined) {
             updateData.mrp = parseMrp(updateData.mrp, updateData.price ?? product.price);
         }
@@ -198,8 +202,15 @@ export const updateProduct = async (req, res) => {
             }));
         }
 
+        // ✅ If name changed, regenerate slug
+        if (updateData.name && updateData.name !== product.name) {
+            product.name = updateData.name;
+            await product.save(); // triggers pre-save slug hook
+            delete updateData.name;
+        }
+
         const updatedProduct = await Product.findByIdAndUpdate(
-            req.params.id,
+            product._id,
             updateData,
             { new: true, runValidators: true }
         );
@@ -216,18 +227,16 @@ export const updateProduct = async (req, res) => {
 ───────────────────────────────────────────── */
 export const getRelatedProducts = async (req, res) => {
     try {
-        const product = await Product.findById(req.params.id)
-            .select("category")
-            .lean();
+        const product = await findProduct(req.params.id).select("category").lean();
         if (!product)
             return res.status(404).json({ message: "Product not found" });
 
         const related = await Product.find({
             _id: { $ne: product._id },
             category: product.category,
-            inStock: true,                  // ✅ only show in-stock related products
+            inStock: true,
         })
-            .select("name price mrp category images rating numReviews isCustomizable stock inStock")
+            .select("name price mrp slug category images rating numReviews isCustomizable stock inStock")
             .limit(10)
             .lean();
 
@@ -243,7 +252,7 @@ export const getRelatedProducts = async (req, res) => {
 ───────────────────────────────────────────── */
 export const deleteProduct = async (req, res) => {
     try {
-        const product = await Product.findById(req.params.id);
+        const product = await findProduct(req.params.id);
         if (!product)
             return res.status(404).json({ message: "Product not found" });
 

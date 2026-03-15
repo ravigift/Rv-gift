@@ -22,7 +22,6 @@ const StarRow = ({ value }) => (
     </div>
 );
 
-// ✅ Safely extract MRP — supports mrp, originalPrice, comparePrice, compareAtPrice
 const getMrp = (product) => {
     const val = product?.mrp ?? product?.originalPrice ?? product?.comparePrice ?? product?.compareAtPrice ?? null;
     if (val === null || val === undefined || val === "") return null;
@@ -30,7 +29,6 @@ const getMrp = (product) => {
     return n > 0 ? n : null;
 };
 
-// ✅ Price display component
 const PriceDisplay = ({ price, mrp }) => {
     const hasDiscount = mrp && Number(mrp) > Number(price);
     const discountPct = hasDiscount
@@ -57,7 +55,7 @@ const PriceDisplay = ({ price, mrp }) => {
 };
 
 const ProductDetails = () => {
-    const { id } = useParams();
+    const { id } = useParams(); // ✅ id = slug ya _id dono handle hoga
     const navigate = useNavigate();
     const { addItem, cartItems } = useCart();
     const { user } = useAuth();
@@ -90,11 +88,11 @@ const ProductDetails = () => {
     const [notifyError, setNotifyError] = useState("");
     const [showNotifyInput, setShowNotifyInput] = useState(false);
 
-    const inCart = cartItems.some(i => i._id === id);
+    const inCart = cartItems.some(i => i._id === product?._id);
 
-    const fetchReviews = async () => {
+    const fetchReviews = async (productId) => {
         try {
-            const { data } = await api.get(`/reviews/${id}`);
+            const { data } = await api.get(`/reviews/${productId}`);
             setReviews(data);
         } catch { }
     };
@@ -103,20 +101,14 @@ const ProductDetails = () => {
         const fetchData = async () => {
             try {
                 setLoading(true);
+                // ✅ id = slug or _id — backend handles both
                 const [{ data: prod }, { data: related }] = await Promise.all([
                     api.get(`/products/${id}`),
                     api.get(`/products/${id}/related`),
                 ]);
-                // ✅ Debug log — browser console mein dekho kya field naam aa raha hai
-                console.log("[ProductDetails] price fields:", {
-                    price: prod.price,
-                    mrp: prod.mrp,
-                    originalPrice: prod.originalPrice,
-                    comparePrice: prod.comparePrice,
-                });
                 setProduct(prod);
                 setRelatedProducts(related);
-                await fetchReviews();
+                await fetchReviews(prod._id);
             } catch {
                 setError("Failed to load product");
             } finally {
@@ -178,7 +170,7 @@ const ProductDetails = () => {
         try {
             setNotifySubmitting(true);
             setNotifyError("");
-            const key = `notify_${id}`;
+            const key = `notify_${product._id}`;
             const existing = JSON.parse(localStorage.getItem(key) || "[]");
             if (!existing.includes(notifyEmail.trim())) {
                 existing.push(notifyEmail.trim());
@@ -199,9 +191,9 @@ const ProductDetails = () => {
         try {
             setSubmitting(true);
             setReviewError("");
-            await api.post(`/reviews/${id}`, { rating: myRating, comment: myComment });
+            await api.post(`/reviews/${product._id}`, { rating: myRating, comment: myComment });
             setReviewSuccess(true);
-            await fetchReviews();
+            await fetchReviews(product._id);
             const { data } = await api.get(`/products/${id}`);
             setProduct(data);
             setTimeout(() => setReviewSuccess(false), 2500);
@@ -215,7 +207,7 @@ const ProductDetails = () => {
     const handleDeleteReview = async (reviewId) => {
         try {
             await api.delete(`/reviews/${reviewId}`);
-            await fetchReviews();
+            await fetchReviews(product._id);
             setMyRating(0); setMyComment("");
         } catch { }
     };
@@ -253,7 +245,6 @@ const ProductDetails = () => {
         pct: reviews.length ? Math.round((reviews.filter(r => r.rating === star).length / reviews.length) * 100) : 0,
     }));
 
-    // ✅ Safely get MRP
     const mrpValue = getMrp(product);
     const hasDiscount = mrpValue && mrpValue > Number(product.price);
     const savedAmount = hasDiscount ? mrpValue - Number(product.price) : 0;
@@ -286,7 +277,7 @@ const ProductDetails = () => {
                 <div className="bg-white rounded-3xl border border-stone-100 shadow-sm overflow-hidden">
                     <div className="grid md:grid-cols-2 gap-0">
 
-                        {/* ── IMAGE ── */}
+                        {/* IMAGE */}
                         <div className="relative bg-gradient-to-br from-stone-50 via-white to-amber-50/20 flex items-center justify-center overflow-hidden"
                             style={{ minHeight: "420px" }}>
                             {heroImageUrl ? (
@@ -324,7 +315,7 @@ const ProductDetails = () => {
                             </div>
                         </div>
 
-                        {/* ── INFO ── */}
+                        {/* INFO */}
                         <div className="flex flex-col p-6 md:p-8 border-t md:border-t-0 md:border-l border-stone-100">
 
                             {product.category && (
@@ -344,7 +335,7 @@ const ProductDetails = () => {
                                 <span className="text-xs text-zinc-400">{reviews.length} reviews</span>
                             </div>
 
-                            {/* ✅ Price section */}
+                            {/* Price */}
                             <div className="mb-3 pb-4 border-b border-stone-100">
                                 <PriceDisplay price={product.price} mrp={mrpValue} />
                                 <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -359,7 +350,7 @@ const ProductDetails = () => {
                                 </div>
                             </div>
 
-                            {/* Stock Indicator */}
+                            {/* Stock */}
                             <div className="flex items-center gap-2 mb-4">
                                 {product.inStock ? (
                                     <>

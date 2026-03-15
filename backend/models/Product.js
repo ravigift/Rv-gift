@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import slugify from "slugify";
 
 const productSchema = new mongoose.Schema(
     {
@@ -18,11 +19,16 @@ const productSchema = new mongoose.Schema(
             required: true,
             min: 0,
         },
-        // ✅ MRP / Original price — for discount display
         mrp: {
             type: Number,
             default: null,
             min: 0,
+        },
+        slug: {
+            type: String,
+            unique: true,
+            index: true,
+            sparse: true,
         },
         category: {
             type: String,
@@ -36,7 +42,7 @@ const productSchema = new mongoose.Schema(
                     public_id: { type: String, required: true },
                 },
             ],
-            validate: v => v.length > 0,
+            validate: (v) => v.length > 0,
         },
         tags: { type: [String], default: [] },
         sizes: { type: [String], default: [] },
@@ -47,7 +53,6 @@ const productSchema = new mongoose.Schema(
         stock: { type: Number, default: 0, min: 0 },
         inStock: { type: Boolean, default: true },
 
-        // ── Shipping ──
         weight: {
             type: Number,
             default: 500,
@@ -62,19 +67,37 @@ const productSchema = new mongoose.Schema(
     },
     {
         timestamps: true,
-        // ✅ Faster reads — Map converted to plain object in JSON
         toJSON: { virtuals: true },
         toObject: { virtuals: true },
     }
 );
 
-// ✅ Text search index
-productSchema.index({ name: "text", description: "text", tags: "text" });
+/* ─────────────────────────────────────────────
+   AUTO SLUG — generate before save
+───────────────────────────────────────────── */
+productSchema.pre("save", async function (next) {
+    if (!this.isModified("name") && this.slug) return next();
+    let base = slugify(this.name, { lower: true, strict: true });
+    let slug = base;
+    let count = 1;
+    while (
+        await mongoose.model("Product").exists({ slug, _id: { $ne: this._id } })
+    ) {
+        slug = `${base}-${count++}`;
+    }
+    this.slug = slug;
+    next();
+});
 
-// ✅ Compound index for category + stock listing (common query pattern)
+/* ─────────────────────────────────────────────
+   INDEXES
+───────────────────────────────────────────── */
+productSchema.index({ name: "text", description: "text", tags: "text" });
 productSchema.index({ category: 1, inStock: 1, createdAt: -1 });
 
-// ✅ Virtual: discount percentage — auto-calculated, not stored
+/* ─────────────────────────────────────────────
+   VIRTUAL — discount percent
+───────────────────────────────────────────── */
 productSchema.virtual("discountPercent").get(function () {
     if (this.mrp && this.mrp > this.price) {
         return Math.round(((this.mrp - this.price) / this.mrp) * 100);
