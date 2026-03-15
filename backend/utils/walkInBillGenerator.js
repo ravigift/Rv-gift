@@ -3,8 +3,8 @@ import QRCode from "qrcode";
 
 export const SHOP = {
     name: process.env.SHOP_NAME || "RV Gift and Printing",
-    tagline: process.env.SHOP_TAGLINE || "Unique Gifts for Every Occasion",
-    address: process.env.SHOP_ADDRESS || "Gadhi Chowk, Dostpur Chauraha, Akbarpur",
+    tagline: process.env.SHOP_TAGLINE || "Special Gifts for Every Celebration",
+    address: process.env.SHOP_ADDRESS || "Gandi Chowk, Dost Pur Road, Shahzadpur, Akbarpur",
     city: process.env.SHOP_CITY || "Ambedkar Nagar - 224122, Uttar Pradesh",
     phone: process.env.SHOP_PHONE || "8299519532",
     email: process.env.SHOP_EMAIL || "officialrvgift@gmail.com",

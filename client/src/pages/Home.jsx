@@ -159,7 +159,7 @@ const Home = () => {
         document.title = "RV Gift & Printing | Gifts, Printing & Customization - Akbarpur, Ambedkar Nagar";
         const desc = document.querySelector('meta[name="description"]');
         if (desc) desc.setAttribute("content",
-            "Shop personalized gifts, custom printing, and unique gift items at RV Gift & Printing, Akbarpur. Fast delivery across India. Visit us at Gadri Chowk, Dostpur Chauraha, Ambedkar Nagar UP."
+            "Shop personalized gifts, custom printing, and Special Gifts for Every Celebration at RV Gift & Printing, Akbarpur. Fast delivery across India. Visit us at Gadri Chowk, Dostpur Chauraha, Ambedkar Nagar UP."
         );
     }, []);
 

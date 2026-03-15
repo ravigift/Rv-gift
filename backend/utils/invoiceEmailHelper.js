@@ -79,7 +79,7 @@ export const generateInvoiceBuffer = async (order) => {
             rect(M, 20, 3, 78, C.amber);
 
             doc.font("Helvetica-Bold").fontSize(21).fillColor(C.dark).text(SHOP.name, M + 14, 20);
-            doc.font("Helvetica").fontSize(8).fillColor(C.amber).text("Unique Gifts for Every Occasion", M + 14, 46, { characterSpacing: 0.6 });
+            doc.font("Helvetica").fontSize(8).fillColor(C.amber).text("Special Gifts for Every Celebration", M + 14, 46, { characterSpacing: 0.6 });
             doc.font("Helvetica").fontSize(7.5).fillColor(C.mid)
                 .text(SHOP.address, M + 14, 60)
                 .text(SHOP.city + "   |   State Code: " + SHOP.stateCode, M + 14, 72)
