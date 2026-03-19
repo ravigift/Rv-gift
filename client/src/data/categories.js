@@ -7,12 +7,11 @@ export const CATEGORIES = [
     { name: "Baby & Kids Gifts", value: "kids-gifts", icon: "👶" },
     { name: "Corporate Gifts", value: "corporate-gift", icon: "💼" },
 
-    // ⌚ WATCHES & CLOCKS
-    { name: "Personalized Clocks", value: "custom-clock", icon: "⏰" },
-    { name: "Promotional Watches", value: "promo-watch", icon: "⌚" },
-
-    // 🧸 TOYS & LIGHTS
+    // 💡 LAMPS & LIGHTS
     { name: "LED Tech Lamps", value: "led-lamp", icon: "💡" },
+    { name: "Photo Lamp", value: "photo-lamp", icon: "🌟" },
+
+    // 🧸 TOYS
     { name: "Panda & Soft Toys", value: "soft-toy", icon: "🐼" },
 
     // 💍 ACCESSORIES
@@ -20,15 +19,20 @@ export const CATEGORIES = [
     { name: "Wallets & Passports", value: "wallet-passport", icon: "👛" },
     { name: "Keychains", value: "keychain", icon: "🔑" },
     { name: "Festive Rakhi", value: "rakhi-special", icon: "✨" },
+    { name: "Hand Watches", value: "hand-watch", icon: "⌚" },
+    { name: "Perfume", value: "perfume", icon: "🌸" },
 
-    // 👕 T-SHIRTS & WEARABLES
+    // 👕 WEARABLES
     { name: "Custom T-Shirts", value: "custom-tshirt", icon: "👕" },
     { name: "Printed Caps", value: "printed-cap", icon: "🧢" },
 
     // 🖨️ PRINTING & DECOR
     { name: "Photo Frames", value: "photo-frame", icon: "🖼️" },
+    { name: "LED Photo Frames", value: "led-photo-frame", icon: "✨" },
+    { name: "Rock Photo Frames", value: "rock-photo-frame", icon: "🪨" },
     { name: "Printed Mugs & Bottles", value: "mug-bottle", icon: "☕" },
     { name: "Custom Cushions", value: "printed-cushion", icon: "🛋️" },
     { name: "Office Stationery", value: "office-stationery", icon: "✒️" },
-    { name: "Tech Accessories", value: "tech-accessory", icon: "📱" },
+    { name: "Home Decor", value: "home-decor", icon: "🏡" },
+
 ];

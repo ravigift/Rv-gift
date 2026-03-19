@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import api from "../api/axios";
-import { store } from "../app/store";       // ✅ Redux store
-import { clearCart } from "../features/cart/cartSlice"; // ✅ clearCart action
+import { store } from "../app/store";
+import { clearCart } from "../features/cart/cartSlice";
 
 const AuthContext = createContext(null);
 
@@ -58,13 +58,14 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     /* ── Save location after login ── */
-    const saveUserLocation = async (userId) => {
+    // ✅ IDOR fix: userId body mein nahi bhejte — backend token se khud lete hai
+    const saveUserLocation = async () => {
         if (locationAsked) return;
         setLocationAsked(true);
         const location = await requestLocation();
         if (location) {
             try {
-                await api.post("/auth/save-location", { userId, ...location });
+                await api.post("/auth/save-location", location);
             } catch { /* silent fail */ }
         }
     };
@@ -88,13 +89,13 @@ export const AuthProvider = ({ children }) => {
     const login = async (email, password) => {
         const { data } = await api.post("/auth/login", { email, password });
         _saveAuth(data);
-        saveUserLocation(data._id);
+        saveUserLocation(); // ✅ userId argument hata diya
     };
 
     /* ── Login with data (after OTP verify) ── */
     const loginWithData = (data) => {
         _saveAuth(data);
-        saveUserLocation(data._id);
+        saveUserLocation(); // ✅ userId argument hata diya
     };
 
     /* ── Register ── */
@@ -104,14 +105,12 @@ export const AuthProvider = ({ children }) => {
 
     /* ── Logout — cart bhi clear karo ── */
     const logout = () => {
-        // ✅ Redux cart clear karo — doosre user ko nahi dikhega
         store.dispatch(clearCart());
 
-        // ✅ localStorage se auth + cart data hatao
         const userId = user?._id || "guest";
         localStorage.removeItem("auth");
-        localStorage.removeItem(`persist:cart_${userId}`); // user-specific cart key
-        localStorage.removeItem("cartItems");               // CartContext ka bhi (agar use ho)
+        localStorage.removeItem(`persist:cart_${userId}`);
+        localStorage.removeItem("cartItems");
 
         setUser(null);
         setLocationAsked(false);
