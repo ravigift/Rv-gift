@@ -15,10 +15,10 @@ import {
 /* ─────────────────────────────────────────────────────────────
    CONSTANTS
 ───────────────────────────────────────────────────────────── */
-const PLATFORM_FEE = 0;
-const FREE_DELIVERY_ABOVE = 1;
-const COD_DELIVERY_CHARGE = 0;
-const ONLINE_DELIVERY_CHARGE = 0;
+const PLATFORM_FEE = 9;
+const FREE_DELIVERY_ABOVE = 1000;
+const COD_DELIVERY_CHARGE = 70;
+const ONLINE_DELIVERY_CHARGE = 70;
 
 // Shop location — Akbarpur, Ambedkar Nagar, UP
 const SHOP_LAT = 26.41922;
