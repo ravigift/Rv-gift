@@ -21,8 +21,8 @@ const COD_DELIVERY_CHARGE = 70;
 const ONLINE_DELIVERY_CHARGE = 70;
 
 // Shop location — Akbarpur, Ambedkar Nagar, UP
-const SHOP_LAT = 26.41922;
-const SHOP_LNG = 82.53598;
+const SHOP_LAT = 26.41918;
+const SHOP_LNG = 82.536526;
 const COD_RADIUS_KM = 15;
 
 /* ─────────────────────────────────────────────────────────────
