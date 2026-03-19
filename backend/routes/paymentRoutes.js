@@ -10,7 +10,7 @@ import {
    requestRefund,
    processRefund,
    getRefundStatus,
-} from "../controllers/Paymentcontroller .js";
+} from "../controllers/Paymentcontroller.js"; // ✅ renamed — space hata diya
 import { protect, adminOnly } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();

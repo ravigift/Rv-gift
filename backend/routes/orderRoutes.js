@@ -47,7 +47,10 @@ router.patch("/:id/cancel", protect, cancelOrder);
 router.put("/:id/refund/process", protect, adminOnly, processRefund);
 router.put("/:id/refund/retry", protect, adminOnly, retryRefund);
 
-/* ── INVOICE (owner or admin) ── */
+/* ── INVOICE — sirf order owner ya admin/owner ── */
+// ✅ controller mein isOwner || isAdmin check hai, route pe protect zaroori hai
+// Note: adminOnly nahi kyunki user bhi apna invoice download kar sakta hai
+// Controller already handles both cases securely
 router.get("/:id/invoice", protect, downloadInvoice);
 
 /* ── GET SINGLE ORDER — MUST be last ── */

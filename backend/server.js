@@ -14,7 +14,7 @@ import reviewRoutes from "./routes/reviewRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import addressRoutes from "./routes/addressRoutes.js";
 import walkInRoutes from "./routes/walkInRoutes.js";
-import paymentRoutes from "./routes/paymentRoutes .js";
+import paymentRoutes from "./routes/paymentRoutes.js"; // ✅ renamed — space hata diya
 import contactRoute from "./routes/contact.js";
 // TODO (3 months): Re-enable when Shiprocket integration is active
 // import shiprocketRoutes from "./routes/shiprocketRoutes.js";

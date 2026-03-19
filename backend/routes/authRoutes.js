@@ -21,7 +21,7 @@ router.post("/register", register);
 router.post("/login", login);
 router.post("/verify-otp", verifyOtp);
 router.post("/resend-otp", resendOtp);
-router.post("/save-location", saveLocation);
+router.post("/save-location", protect, saveLocation); // ✅ auth required — IDOR fix
 
 // ── User Password Reset  →  rvgift.com ─────────────────────
 router.post("/forgot-password", forgotPassword);

@@ -68,11 +68,21 @@ export const verifyPaymentAndCreateOrder = async (req, res) => {
             latitude, longitude,
         } = orderData;
 
+        // ✅ Input validation — orderController jaise
+        if (!items?.length || items.length > 20)
+            return res.status(400).json({ message: "Invalid cart", success: false });
+        if (!customerName?.trim() || !phone?.trim() || !address?.trim())
+            return res.status(400).json({ message: "Customer details missing", success: false });
+        if (!/^[6-9]\d{9}$/.test(phone?.trim()))
+            return res.status(400).json({ message: "Invalid phone number", success: false });
+        if (!totalAmount || Number(totalAmount) <= 0)
+            return res.status(400).json({ message: "Invalid total amount", success: false });
+
         // Stock deduction
         for (const item of items) {
             const product = await Product.findById(item.productId || item._id);
             if (!product) continue;
-            const qty = Number(item.qty || item.quantity || 1);
+            const qty = Math.min(Math.max(1, Number(item.qty || item.quantity || 1)), 100);
             if (!product.inStock || product.stock < qty)
                 return res.status(400).json({ message: `"${product.name}" is out of stock`, success: false });
             product.stock -= qty;
@@ -82,14 +92,15 @@ export const verifyPaymentAndCreateOrder = async (req, res) => {
 
         const formattedItems = items.map(i => ({
             productId: i.productId || i._id,
-            name: i.name,
-            price: Number(i.price),
-            qty: Number(i.qty || 1),
-            image: i.image || "",
+            name: String(i.name || "Product").slice(0, 200),
+            price: Math.max(0, Number(i.price || 0)),
+            mrp: i.mrp ? Number(i.mrp) : null,
+            qty: Math.min(Math.max(1, Number(i.qty || i.quantity || 1)), 100),
+            image: typeof i.image === "string" ? i.image : i.images?.[0]?.url || "",
             customization: {
-                text: i.customization?.text || "",
-                imageUrl: i.customization?.imageUrl || "",
-                note: i.customization?.note || "",
+                text: String(i.customization?.text || "").trim().slice(0, 500),
+                imageUrl: String(i.customization?.imageUrl || "").trim().slice(0, 1000),
+                note: String(i.customization?.note || "").trim().slice(0, 1000),
             },
         }));
 

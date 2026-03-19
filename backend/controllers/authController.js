@@ -209,8 +209,9 @@ export const getProfile = async (req, res) => {
 // ══════════════════════════════════════════════
 export const saveLocation = async (req, res) => {
     try {
-        const { userId, latitude, longitude, city, state } = req.body;
-        if (!userId) return res.status(400).json({ message: "userId required" });
+        // ✅ IDOR fix: userId body se nahi, verified token se lo
+        const userId = req.user._id;
+        const { latitude, longitude, city, state } = req.body;
         if (latitude && (latitude < -90 || latitude > 90))
             return res.status(400).json({ message: "Invalid latitude" });
         if (longitude && (longitude < -180 || longitude > 180))
