@@ -17,9 +17,7 @@ const PAYMENT_MODES = [
     { value: "UPI", label: "UPI", icon: <FaMobileAlt size={14} />, color: "bg-sky-500" },
 ];
 
-// ✅ UPI ID env variable se lo — hardcoded nahi
-const UPI_ID = import.meta.env.VITE_UPI_ID || "";
-if (!UPI_ID) console.warn("[AdminPOS] VITE_UPI_ID env variable set nahi hai");
+const UPI_ID = "9792770976-2@ibl";
 const UPI_QR_IMG = upiQR;
 
 const emptyItem = () => ({ name: "", qty: 1, price: "", gstPercent: 0 });
