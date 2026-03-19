@@ -111,6 +111,12 @@ const AdminDashboard = () => {
                 }
             };
 
+            // ✅ Race condition fix: orders aur products pehle fetch karo, phir ek saath stats set karo
+            // Pehle dono responses collect karo
+            let orderStats = null;
+            let totalProducts = 0;
+            let recentOrdersList = [];
+
             // Fire all requests in parallel; each handles its own loading/error state.
             await Promise.all([
                 safeGet("/orders", (data) => {
@@ -119,19 +125,22 @@ const AdminDashboard = () => {
                     const pending = list.filter(o => o.orderStatus === "PLACED");
                     const revenue = delivered.reduce((s, o) => s + (o.totalAmount || 0), 0);
 
-                    setStats({
+                    // ✅ Local variable mein store karo — setStats abhi nahi
+                    orderStats = {
                         totalOrders: list.length,
                         revenue,
                         pending: pending.length,
                         delivered: delivered.length,
                         inTransit: list.filter(o => ["SHIPPED", "OUT_FOR_DELIVERY"].includes(o.orderStatus)).length,
-                    });
-                    setRecentOrders(list.slice(0, 5));
+                    };
+                    recentOrdersList = list.slice(0, 5);
+                    setRecentOrders(recentOrdersList);
                 }, setLoadingOrders),
 
                 safeGet("/products", (data) => {
                     const prodList = Array.isArray(data) ? data : [];
-                    setStats(prev => prev ? { ...prev, totalProducts: prodList.length } : { totalProducts: prodList.length });
+                    // ✅ Local variable mein store karo
+                    totalProducts = prodList.length;
                 }, setLoadingProducts),
 
                 safeGet("/auth/users", (data) => {
@@ -160,6 +169,16 @@ const AdminDashboard = () => {
                     if (Array.isArray(data)) setQueries(data);
                 }, null, () => setQueriesLoading(false)), // always cleared via finally
             ]);
+
+            // ✅ Race condition fix: dono responses aa jaane ke baad ek baar stats set karo
+            if (isMounted.current && (orderStats || totalProducts > 0)) {
+                setStats(prev => ({
+                    ...(orderStats || {}),
+                    totalProducts,
+                    // agar orders fail hua toh prev stats preserve karo
+                    ...(orderStats ? {} : (prev || {})),
+                }));
+            }
         };
 
         fetchData();
