@@ -280,20 +280,20 @@ const Footer = () => {
                         <p className="ftr-tagline">Crafted with precision in India 🇮🇳</p>
 
                         <p style={{ fontSize: 12, color: "#334155", margin: 0 }}>
-                            Designed by{" "}
-                            <a
+                            {" "}
+                            {/* <a
                                 href="https://www.linkedin.com/in/dhananjaypa"
                                 target="_blank" rel="noopener noreferrer"
                                 className="ftr-designer-link"
                             >
-                                Dhananjay Pandey
-                            </a>
+                                
+                            </a> */}
                         </p>
                     </div>
 
                 </div>
             </div>
-        </footer>
+        </footer >
     );
 };
 

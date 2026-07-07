@@ -394,10 +394,21 @@ const Navbar = () => {
 
             {/* ══ NAVBAR ══ */}
             <nav className={`nav-font sticky top-0 z-[100] transition-all duration-300 ${scrolled
-                    ? "bg-white/95 backdrop-blur-md border-b border-stone-200/80 shadow-lg shadow-zinc-900/[0.06]"
-                    : "bg-white border-b border-stone-100"
+                ? "bg-white/95 backdrop-blur-md border-b border-stone-200/80 shadow-lg shadow-zinc-900/[0.06]"
+                : "bg-white border-b border-stone-100"
                 }`}>
-                <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-3">
+                {/*
+                  ✅ FIX: pehle "gap-3" tha jisse sirf logo aur search ke beech gap milta tha,
+                  lekin "ml-auto" actions ko force right kar deta tha aur search bar ka
+                  max-w-lg chhota hone ki wajah se beech me bahut zyada empty space ban raha tha.
+
+                  Fix:
+                  - max-w-lg -> max-w-2xl (search bar ab zyada width leta hai)
+                  - mx-4 -> mx-6 (thoda balanced spacing)
+                  - ml-auto hata diya search wrapper ke baad se, ab natural flex flow follow hota hai
+                  - actions wrapper me sirf gap-2 rakha, ml-auto nahi (search bar ka flex-1 hi space manage karega)
+                */}
+                <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
 
                     {/* LOGO */}
                     <button onClick={() => go("/")} className="flex items-center gap-2.5 shrink-0 group cursor-pointer">
@@ -408,13 +419,15 @@ const Navbar = () => {
                         </span>
                     </button>
 
-                    {/* DESKTOP SEARCH */}
-                    <div className="hidden md:flex flex-1 max-w-lg mx-4">
+                    {/* DESKTOP SEARCH — flex-1, max-width cap hata di taaki bade screens pe
+                        bhi search bar pura available space le aur cart/login ke beech
+                        khaali gap na bache */}
+                    <div className="hidden md:flex flex-1">
                         <SearchBar onSearch={handleSearch} />
                     </div>
 
-                    {/* DESKTOP ACTIONS */}
-                    <div className="hidden md:flex items-center gap-2 ml-auto">
+                    {/* DESKTOP ACTIONS — ml-auto hata diya, ab search bar ke turant baad aata hai */}
+                    <div className="hidden md:flex items-center gap-2 shrink-0">
                         <button onClick={() => go("/cart")}
                             className="cart-btn relative cursor-pointer p-2.5 rounded-xl hover:bg-amber-50 transition-all duration-200 group">
                             <FaShoppingCart size={17} className="cart-icon text-zinc-500" />

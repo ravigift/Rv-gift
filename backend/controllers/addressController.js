@@ -228,14 +228,11 @@ export const setDefaultAddress = async (req, res) => {
 export const verifyPincode = async (req, res) => {
     try {
         const { pin } = req.params;
+        const queryLat = parseFloat(req.query.lat);
+        const queryLng = parseFloat(req.query.lng);
 
         if (!/^\d{6}$/.test(pin))
             return res.status(400).json({ message: "Invalid pincode format" });
-
-        /* ── Cache hit ── */
-        const cached = pincodeCache.get(pin);
-        if (cached && Date.now() - cached.ts < CACHE_TTL)
-            return res.json(cached.data);
 
         /* ── Postal API ── */
         const postalRes = await fetch(`https://api.postalpincode.in/pincode/${pin}`, {
@@ -248,8 +245,16 @@ export const verifyPincode = async (req, res) => {
 
         const po = postalData[0].PostOffice[0];
 
-        /* ── Lat/Lng via Nominatim ── */
-        const { lat, lng } = await fetchLatLng(pin);
+        /* ── Lat/Lng fallback strategy ── */
+        let lat = !isNaN(queryLat) ? queryLat : null;
+        let lng = !isNaN(queryLng) ? queryLng : null;
+
+        // If GPS coordinates are not provided, fetch from Nominatim
+        if (lat === null || lng === null) {
+            const fetched = await fetchLatLng(pin);
+            lat = fetched.lat;
+            lng = fetched.lng;
+        }
 
         /* ── COD check — backend source of truth ── */
         let codAllowed = false;
@@ -273,7 +278,10 @@ export const verifyPincode = async (req, res) => {
             codAllowed,  // ✅ frontend reads this — backend is source of truth
         };
 
-        pincodeCache.set(pin, { data: result, ts: Date.now() });
+        // Cache update without query params (we don't cache user specific GPS here)
+        if (isNaN(queryLat)) {
+            pincodeCache.set(pin, { data: result, ts: Date.now() });
+        }
         res.json(result);
     } catch (err) {
         console.error("PINCODE VERIFY ERROR:", err.message);

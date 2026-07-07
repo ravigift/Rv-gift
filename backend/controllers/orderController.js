@@ -87,8 +87,11 @@ export const createOrder = async (req, res) => {
             items, customerName, phone, address, email,
             totalAmount, platformFee, deliveryCharge,
             paymentMethod, pincode,
-            latitude, longitude,
+            lat, lng, latitude, longitude,
         } = req.body;
+
+        const finalLat = lat || latitude;
+        const finalLng = lng || longitude;
 
         if (!items?.length)
             return res.status(400).json({ message: "Cart is empty" });
@@ -105,7 +108,7 @@ export const createOrder = async (req, res) => {
             if (!pincode || !/^\d{6}$/.test(pincode.trim()))
                 return res.status(400).json({ message: "Valid pincode required for COD orders" });
 
-            const codCheck = await checkCODEligibility(pincode.trim());
+            const codCheck = await checkCODEligibility(pincode.trim(), finalLat, finalLng);
             if (!codCheck.allowed) {
                 return res.status(400).json({
                     message: `COD not available for this address. ${codCheck.reason}`,

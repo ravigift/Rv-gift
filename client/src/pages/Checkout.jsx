@@ -149,32 +149,63 @@ const AddressForm = ({ initial = emptyForm(), onSave, onCancel, saving }) => {
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
                 try {
-                    const { latitude, longitude } = pos.coords;
+                    const { latitude, longitude, accuracy } = pos.coords;
                     const res = await fetch(
                         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
                         { headers: { "User-Agent": "RVGiftShop/2.0" } }
                     );
                     const data = await res.json();
+                    
+                    // Task 4: Log the raw API response
+                    console.log("🌍 Raw Nominatim GPS Response:", data);
+                    console.log("📡 GPS Accuracy (meters):", accuracy);
+                    
                     const addr = data.address || {};
                     const detectedPin = addr.postcode || "";
+                    
+                    // Task 7 & 9: Prefer district + town over nearest major city matching
+                    const locality = addr.village || addr.town || addr.city || "";
+                    const district = addr.state_district || addr.county || "";
+                    const detectedState = addr.state || "";
+                    
+                    // Construct display names
+                    const formCity = locality || district || "Unknown Location";
+                    const displayLocation = [locality, district].filter(Boolean).filter((v,i,a) => a.indexOf(v)===i).join(", ");
+                    
                     setForm(f => ({
                         ...f,
-                        area: addr.suburb || addr.neighbourhood || addr.road || f.area,
-                        city: addr.city || addr.town || addr.village || f.city,
-                        state: addr.state || f.state,
-                        pincode: detectedPin || f.pincode,
+                        area: addr.suburb || addr.neighbourhood || addr.residential || addr.road || f.area,
+                        city: formCity || f.city,
+                        state: detectedState || f.state,
+                        // GPS ONLY for lat, lng, city, state. Pincode is user-editable and NOT overwritten.
                         lat: latitude,
                         lng: longitude,
                     }));
-                    setGpsMsg(`📍 ${addr.city || addr.town || "Location"} detected`);
-                    if (/^\d{6}$/.test(detectedPin)) checkPincode(detectedPin);
-                } catch {
+                    
+                    let msg = `📍 ${displayLocation || "Location"} detected.`;
+                    
+                    // If accuracy is poor (typically IP-based geolocation on desktop), warn the user
+                    if (accuracy > 5000) {
+                        msg = `⚠️ Low accuracy (${Math.round(accuracy/1000)}km radius). ISP IP detected ${locality || district}. Please enter Pincode manually.`;
+                    } else if (detectedPin && form.pincode && detectedPin !== form.pincode) {
+                         msg += ` (GPS Pin ${detectedPin} ignored)`;
+                    } else if (!form.pincode) {
+                         msg += ` Please enter your pincode manually.`;
+                    }
+                    setGpsMsg(msg);
+                } catch (err) {
+                    console.error("GPS API Error:", err);
                     setGpsMsg("Could not fetch address");
                 }
                 setGpsLoading(false);
             },
-            () => { setGpsMsg("Location permission denied"); setGpsLoading(false); },
-            { timeout: 10000 }
+            (err) => { 
+                console.error("Geolocation Error:", err);
+                setGpsMsg("Location permission denied or unavailable"); 
+                setGpsLoading(false); 
+            },
+            // Task 2: Enforce true GPS hardware usage (fixes IP-based geo jumping to major hubs)
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     };
 
@@ -377,7 +408,10 @@ const Checkout = () => {
 
             try {
                 setCodChecking(true);
-                const { data } = await api.get(`/addresses/pincode/${selectedAddress.pincode}`);
+                const queryLat = selectedAddress.lat ? `?lat=${selectedAddress.lat}` : '';
+                const queryLng = selectedAddress.lng ? (queryLat ? `&lng=${selectedAddress.lng}` : `?lng=${selectedAddress.lng}`) : '';
+                
+                const { data } = await api.get(`/addresses/pincode/${selectedAddress.pincode}${queryLat}${queryLng}`);
                 setCodAllowed(data.codAllowed === true);
                 const lat = data.lat || selectedAddress.lat;
                 const lng = data.lng || selectedAddress.lng;
@@ -481,6 +515,8 @@ const Checkout = () => {
                 email: contact.email || `${contact.phone}@rvgifts.com`,
                 address: getAddress(),
                 pincode: selectedAddress?.pincode || "",  // ✅ backend COD security check
+                lat: selectedAddress?.lat || null,
+                lng: selectedAddress?.lng || null,
                 totalAmount: finalTotal,
                 platformFee: PLATFORM_FEE,
                 deliveryCharge,
