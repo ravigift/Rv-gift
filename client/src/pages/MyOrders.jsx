@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { getMyOrders } from "../features/orders/orderSlice";
 import { FaBoxOpen, FaSync, FaShoppingBag, FaArrowRight, FaCheckCircle, FaFileInvoice } from "react-icons/fa";
 import api from "../api/axios";
+import Loader from "../components/Loader";
 
 const STATUS_CONFIG = {
     PLACED: { label: "Order Placed", color: "text-yellow-600", bg: "bg-yellow-50", border: "border-yellow-200", dot: "bg-yellow-400", icon: "🛒" },
@@ -96,14 +97,10 @@ const MyOrders = () => {
     const filtered = activeFilter === "ALL"
         ? orders
         : orders.filter(o => o.orderStatus === activeFilter);
-
     // ── Full-page loading (only first load, not refresh) ─────────────────────
     if (status === "loading" && !refreshing && orders.length === 0) return (
         <div className="min-h-screen bg-[#f1f3f6] flex items-center justify-center">
-            <div className="text-center">
-                <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                <p className="text-zinc-400 text-sm font-medium">Loading your orders...</p>
-            </div>
+            <Loader size="lg" text="Loading your orders..." subtext="Retrieving your order history..." />
         </div>
     );
 

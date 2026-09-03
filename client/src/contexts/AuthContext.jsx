@@ -116,8 +116,24 @@ export const AuthProvider = ({ children }) => {
         setLocationAsked(false);
     };
 
+    /* ── Update user state & localStorage ── */
+    const updateUser = (updatedUserData) => {
+        try {
+            const stored = localStorage.getItem("auth");
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                const newAuth = {
+                    ...parsed,
+                    user: { ...parsed.user, ...updatedUserData },
+                };
+                localStorage.setItem("auth", JSON.stringify(newAuth));
+                setUser(newAuth.user);
+            }
+        } catch { /* silent */ }
+    };
+
     return (
-        <AuthContext.Provider value={{ user, login, loginWithData, register, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, loginWithData, register, logout, updateUser, loading }}>
             {children}
         </AuthContext.Provider>
     );

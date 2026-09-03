@@ -19,6 +19,9 @@ import contactRoute from "./routes/contact.js";
 // TODO (3 months): Re-enable when Shiprocket integration is active
 // import shiprocketRoutes from "./routes/shiprocketRoutes.js";
 import invoiceRoutes from "./routes/Invoiceroutes.js";
+import bannerRoutes from "./routes/bannerRoutes.js";
+import siteSectionRoutes from "./routes/siteSectionRoutes.js";
+import reportRoutes from "./routes/reportRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -70,7 +73,24 @@ app.use(
 /* ─────────────────────────────
    SECURITY
 ───────────────────────────── */
-app.use(helmet());
+// This service only returns JSON and PDF — it never renders HTML — so a
+// maximally strict CSP is safe and blocks any injected markup from executing.
+app.use(
+    helmet({
+        contentSecurityPolicy: {
+            useDefaults: false,
+            directives: {
+                "default-src": ["'none'"],
+                "frame-ancestors": ["'none'"],
+                "base-uri": ["'none'"],
+                "form-action": ["'none'"],
+            },
+        },
+        crossOriginResourcePolicy: { policy: "cross-origin" }, // PDFs fetched by the SPA
+        referrerPolicy: { policy: "no-referrer" },
+    })
+);
+
 
 /* ─────────────────────────────
    GZIP COMPRESSION
@@ -82,17 +102,59 @@ app.use(compression());
 /* ─────────────────────────────
    RATE LIMIT
 ───────────────────────────── */
-app.use("/api/auth/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { message: "Too many login attempts. Try again later." } }));
-app.use("/api/auth/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { message: "Too many register attempts. Try later." } }));
-app.use("/api", rateLimit({ windowMs: 60 * 1000, max: 100, message: { message: "Too many requests. Slow down." } }));
+const limiter = (windowMs, max, message, opts = {}) =>
+    rateLimit({ windowMs, max, standardHeaders: true, legacyHeaders: false, message: { message }, ...opts });
+
+// Endpoints that send an email / OTP — strict, to stop inbox bombing & OTP abuse
+const emailAbuseLimiter = limiter(15 * 60 * 1000, 5, "Too many requests. Please wait 15 minutes and try again.");
+app.use("/api/auth/register", emailAbuseLimiter);
+app.use("/api/auth/resend-otp", emailAbuseLimiter);
+app.use("/api/auth/forgot-password", emailAbuseLimiter);
+app.use("/api/auth/admin/forgot-password", emailAbuseLimiter);
+app.use("/api/walkin/delete-pin/send-otp", emailAbuseLimiter);
+// Only throttle the PUBLIC form submission (POST). Admin GET/PATCH on /api/contact
+// share this path and must not be rate-limited here.
+app.use("/api/contact", limiter(60 * 60 * 1000, 5, "Too many messages. Please try again later.", {
+    skip: (req) => req.method !== "POST",
+}));
+
+// Public personalisation-photo upload — guard against Cloudinary abuse
+app.use("/api/uploads", limiter(60 * 60 * 1000, 40, "Too many uploads. Please try again in a bit."));
+
+// Credential / OTP verification — brute-force guard (per-account lock is enforced in the controller too)
+app.use("/api/auth/login", limiter(15 * 60 * 1000, 10, "Too many login attempts. Try again later."));
+app.use("/api/auth/verify-otp", limiter(15 * 60 * 1000, 20, "Too many attempts. Try again later."));
+app.use("/api/auth/reset-password", limiter(15 * 60 * 1000, 20, "Too many attempts. Try again later."));
+app.use("/api/auth/admin/reset-password", limiter(15 * 60 * 1000, 20, "Too many attempts. Try again later."));
+
+// Global catch-all
+app.use("/api", limiter(60 * 1000, 100, "Too many requests. Slow down."));
 
 /* ─────────────────────────────
    BODY PARSER
-   webhook needs raw body
+   webhook needs the raw body for signature verification
 ───────────────────────────── */
 app.use("/api/payment/webhook", express.raw({ type: "application/json" }));
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
+/* Strip MongoDB query operators ($ / .) from parsed request bodies —
+   defence-in-depth against NoSQL operator injection. */
+const stripMongoOperators = (obj, depth = 0) => {
+    if (!obj || typeof obj !== "object" || depth > 6) return;
+    for (const key of Object.keys(obj)) {
+        if (key.startsWith("$") || key.includes(".")) {
+            delete obj[key];
+            continue;
+        }
+        stripMongoOperators(obj[key], depth + 1);
+    }
+};
+app.use((req, _res, next) => {
+    if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body))
+        stripMongoOperators(req.body);
+    next();
+});
 
 /* ─────────────────────────────
    REQUEST LOGGER
@@ -129,6 +191,9 @@ app.use("/api/contact", contactRoute);
 // TODO (3 months): Re-enable when Shiprocket integration is active
 // app.use("/api/shipping", shiprocketRoutes);
 app.use("/api/invoice", invoiceRoutes);
+app.use("/api/banners", bannerRoutes);
+app.use("/api/site", siteSectionRoutes);
+app.use("/api/reports", reportRoutes);
 
 /* ─────────────────────────────
    404 HANDLER

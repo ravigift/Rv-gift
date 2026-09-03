@@ -18,6 +18,7 @@ import { getOrderStatusEmailTemplate } from "../utils/orderStatusEmail.js";
 import { adminOrderEmailHTML } from "../utils/adminOrderEmail.js";
 import { generateInvoiceBuffer } from "../utils/invoiceEmailHelper.js";
 import { checkCODEligibility } from "./addressController.js";
+import { buildVerifiedOrder, commitStock, restoreStock } from "../utils/orderPricing.js";
 // import { createShiprocketOrder } from "../utils/Shiprocketservice.js"; // ⏸️ baad me karenge
 
 const razorpay = new Razorpay({
@@ -85,7 +86,6 @@ export const createOrder = async (req, res) => {
     try {
         const {
             items, customerName, phone, address, email,
-            totalAmount, platformFee, deliveryCharge,
             paymentMethod, pincode,
             lat, lng, latitude, longitude,
         } = req.body;
@@ -99,16 +99,14 @@ export const createOrder = async (req, res) => {
             return res.status(400).json({ message: "Customer details missing" });
         if (!/^[6-9]\d{9}$/.test(phone.trim()))
             return res.status(400).json({ message: "Invalid phone number" });
-        if (!totalAmount || Number(totalAmount) <= 0)
-            return res.status(400).json({ message: "Invalid total amount" });
-        if (items.length > 20)
-            return res.status(400).json({ message: "Too many items in cart" });
 
-        if (paymentMethod === "COD") {
+        const method = paymentMethod === "COD" ? "COD" : "RAZORPAY";
+
+        if (method === "COD") {
             if (!pincode || !/^\d{6}$/.test(pincode.trim()))
                 return res.status(400).json({ message: "Valid pincode required for COD orders" });
 
-            const codCheck = await checkCODEligibility(pincode.trim(), finalLat, finalLng);
+            const codCheck = await checkCODEligibility(pincode.trim());
             if (!codCheck.allowed) {
                 return res.status(400).json({
                     message: `COD not available for this address. ${codCheck.reason}`,
@@ -117,35 +115,28 @@ export const createOrder = async (req, res) => {
             }
         }
 
-        for (const item of items) {
-            const qty = Math.min(Math.max(1, Number(item.qty || item.quantity || 1)), 100);
-            const product = await Product.findById(item.productId || item._id);
-            if (!product) continue;
-            if (!product.inStock || product.stock < qty)
-                return res.status(400).json({ message: `"${product.name}" is out of stock` });
-            product.stock -= qty;
-            product.inStock = product.stock > 0;
-            await product.save();
-        }
+        // ✅ SECURITY: prices, delivery, platform fee & total are recomputed
+        //    from the DB here — the client's numbers are ignored entirely.
+        const priced = await buildVerifiedOrder(items, method);
+        if (priced.error)
+            return res.status(400).json({ message: priced.error });
 
-        const formattedItems = items.map(item => ({
-            productId: item.productId || item._id,
-            name: String(item.name || "Product").slice(0, 200),
-            price: Math.max(0, Number(item.price || 0)),
-            mrp: item.mrp ? Number(item.mrp) : null,
-            qty: Math.min(Math.max(1, Number(item.qty || item.quantity || 1)), 100),
-            image: typeof item.image === "string" ? item.image : item.images?.[0]?.url || "",
-            customization: {
-                text: String(item.customization?.text || "").trim().slice(0, 500),
-                imageUrl: String(item.customization?.imageUrl || "").trim().slice(0, 1000),
-                note: String(item.customization?.note || "").trim().slice(0, 1000),
-            },
-        }));
+        const { items: formattedItems, totalAmount, platformFee, deliveryCharge } = priced;
+
+        // ✅ Atomic, all-or-nothing stock deduction (no oversell race)
+        const stock = await commitStock(formattedItems);
+        if (stock.error)
+            return res.status(409).json({ message: stock.error });
 
         const ip = getClientIp(req);
-        const fraudCheck = await checkFraud({ userId: req.user._id, ip, amount: Number(totalAmount) });
-        const method = paymentMethod === "COD" ? "COD" : "RAZORPAY";
-        const invoiceNum = await generateInvoiceNumber();
+        const fraudCheck = await checkFraud({ userId: req.user._id, ip, amount: totalAmount });
+        let invoiceNum;
+        try {
+            invoiceNum = await generateInvoiceNumber();
+        } catch (e) {
+            await restoreStock(formattedItems);
+            throw e;
+        }
 
         const order = new Order({
             user: req.user._id,
@@ -155,11 +146,11 @@ export const createOrder = async (req, res) => {
             phone: phone.trim(),
             address: address.trim().slice(0, 500),
             email: email?.trim().toLowerCase().slice(0, 200) || "",
-            latitude: latitude ? Number(latitude) : undefined,
-            longitude: longitude ? Number(longitude) : undefined,
-            totalAmount: Number(totalAmount),
-            platformFee: Number(platformFee || 11),
-            deliveryCharge: Number(deliveryCharge || 0),
+            latitude: finalLat ? Number(finalLat) : undefined,
+            longitude: finalLng ? Number(finalLng) : undefined,
+            totalAmount,
+            platformFee,
+            deliveryCharge,
             payment: {
                 method,
                 status: "PENDING",
@@ -170,7 +161,7 @@ export const createOrder = async (req, res) => {
             },
             paymentLogs: [{
                 event: "ORDER_PLACED",
-                amount: Number(totalAmount),
+                amount: totalAmount,
                 method,
                 ip,
                 userAgent: req.headers["user-agent"]?.slice(0, 200) || "",
@@ -181,7 +172,13 @@ export const createOrder = async (req, res) => {
             statusTimeline: { placedAt: new Date() },
         });
 
-        const savedOrder = await order.save();
+        let savedOrder;
+        try {
+            savedOrder = await order.save();
+        } catch (e) {
+            await restoreStock(formattedItems); // don't leak stock on a failed write
+            throw e;
+        }
 
         res.status(201).json({
             success: true,
@@ -254,12 +251,7 @@ export const cancelOrder = async (req, res) => {
 
         await order.save();
 
-        for (const item of order.items) {
-            try {
-                const p = await Product.findById(item.productId);
-                if (p) { p.stock += item.qty; p.inStock = p.stock > 0; await p.save(); }
-            } catch (e) { console.warn("Stock restore:", e.message); }
-        }
+        await restoreStock(order.items);
 
         res.json({
             success: true,
@@ -289,7 +281,11 @@ export const cancelOrder = async (req, res) => {
 ══════════════════════════════════════════════ */
 export const getMyOrders = async (req, res) => {
     try {
-        const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 }).lean();
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+        const orders = await Order.find({ user: req.user._id })
+            .sort({ createdAt: -1 })
+            .limit(limit)
+            .lean();
         res.json(orders);
     } catch {
         res.status(500).json({ message: "Failed to fetch orders" });
@@ -315,26 +311,78 @@ export const getOrderById = async (req, res) => {
 };
 
 /* ══════════════════════════════════════════════
+   GET ORDER STATS (ADMIN) — Real-time Counts
+══════════════════════════════════════════════ */
+export const getOrderStats = async (req, res) => {
+    try {
+        const counts = await Order.aggregate([
+            {
+                $group: {
+                    _id: "$orderStatus",
+                    count: { $sum: 1 },
+                },
+            },
+        ]);
+
+        const refundCount = await Order.countDocuments({ "refund.status": "REQUESTED" });
+        const total = await Order.countDocuments({});
+
+        const stats = {
+            ALL: total,
+            PLACED: 0,
+            CONFIRMED: 0,
+            PACKED: 0,
+            SHIPPED: 0,
+            OUT_FOR_DELIVERY: 0,
+            DELIVERED: 0,
+            CANCELLED: 0,
+            REFUND_PENDING: refundCount,
+        };
+
+        counts.forEach((c) => {
+            if (c._id && stats[c._id] !== undefined) {
+                stats[c._id] = c.count;
+            }
+        });
+
+        res.json({ success: true, stats });
+    } catch (err) {
+        console.error("GET ORDER STATS:", err);
+        res.status(500).json({ message: "Failed to fetch stats" });
+    }
+};
+
+/* ══════════════════════════════════════════════
    UPDATE ORDER STATUS (ADMIN)
 ══════════════════════════════════════════════ */
 export const updateOrderStatus = async (req, res) => {
     try {
-        const { status } = req.body;
+        const { status, awbCode, courierName, trackingUrl } = req.body;
         const valid = ["PLACED", "CONFIRMED", "PACKED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"];
         if (!valid.includes(status))
             return res.status(400).json({ message: "Invalid status" });
 
+        const current = await Order.findById(req.params.id).select("payment.method payment.status items");
+        if (!current) return res.status(404).json({ message: "Order not found" });
+
         const update = { orderStatus: status };
         const tMap = {
+            PLACED: "placedAt",
             CONFIRMED: "confirmedAt",
             PACKED: "packedAt",
             SHIPPED: "shippedAt",
+            OUT_FOR_DELIVERY: "outForDeliveryAt",
             DELIVERED: "deliveredAt",
             CANCELLED: "cancelledAt",
         };
         if (tMap[status]) update[`statusTimeline.${tMap[status]}`] = new Date();
 
-        if (status === "DELIVERED") {
+        if (awbCode) update["shipping.awbCode"] = awbCode.trim();
+        if (courierName) update["shipping.courierName"] = courierName.trim();
+        if (trackingUrl) update["shipping.trackingUrl"] = trackingUrl.trim();
+
+        // On delivery, only COD flips to PAID (cash collected)
+        if (status === "DELIVERED" && current.payment?.method === "COD") {
             update["payment.status"] = "PAID";
             update["payment.paidAt"] = new Date();
         }
@@ -348,12 +396,7 @@ export const updateOrderStatus = async (req, res) => {
         if (!order) return res.status(404).json({ message: "Order not found" });
 
         if (status === "CANCELLED") {
-            for (const item of order.items) {
-                try {
-                    const p = await Product.findById(item.productId);
-                    if (p) { p.stock += item.qty; p.inStock = p.stock > 0; await p.save(); }
-                } catch (e) { console.warn("Stock restore:", e.message); }
-            }
+            await restoreStock(order.items);
         }
 
         res.json(order);
@@ -578,14 +621,20 @@ export const retryRefund = async (req, res) => {
 ══════════════════════════════════════════════ */
 export const getFlaggedOrders = async (req, res) => {
     try {
-        const orders = await Order.find({ "payment.flagged": true }).sort({ createdAt: -1 }).lean();
+        const orders = await Order.find({ "payment.flagged": true })
+            .sort({ createdAt: -1 })
+            .limit(200)
+            .lean();
         res.json(orders);
     } catch { res.status(500).json({ message: "Failed" }); }
 };
 
 export const getRefundQueue = async (req, res) => {
     try {
-        const orders = await Order.find({ "refund.status": "REQUESTED" }).sort({ "refund.requestedAt": -1 }).lean();
+        const orders = await Order.find({ "refund.status": "REQUESTED" })
+            .sort({ "refund.requestedAt": -1 })
+            .limit(200)
+            .lean();
         res.json(orders);
     } catch { res.status(500).json({ message: "Failed" }); }
 };

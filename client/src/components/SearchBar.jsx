@@ -16,8 +16,8 @@ const SearchBar = ({ onSearch }) => {
     }, [location.search]);
 
     const triggerSearch = () => {
-        if (input.trim().length < 3) {
-            setError("Enter at least 3 characters");
+        if (input.trim().length < 2) {
+            setError("Enter at least 2 characters");
             return;
         }
         setError("");
@@ -38,11 +38,11 @@ const SearchBar = ({ onSearch }) => {
     };
 
     return (
-        <div className="w-full">
-            <div className="flex w-full rounded-xl overflow-hidden border border-stone-200 bg-white shadow-sm focus-within:ring-2 focus-within:ring-amber-400 focus-within:border-transparent transition-all duration-200">
+        <div className="w-full relative">
+            <div className="flex items-center w-full rounded-full border border-stone-200 bg-stone-50/70 hover:bg-stone-50/90 focus-within:bg-white focus-within:border-amber-400 focus-within:ring-4 focus-within:ring-amber-400/15 shadow-xs transition-all duration-200 p-1 pl-4">
                 {/* Search icon */}
-                <div className="flex items-center pl-4 text-zinc-400">
-                    <FaSearch size={13} />
+                <div className="flex items-center text-zinc-400 shrink-0 mr-2">
+                    <FaSearch size={13} className="text-zinc-400 group-focus-within:text-amber-500" />
                 </div>
 
                 <input
@@ -50,32 +50,36 @@ const SearchBar = ({ onSearch }) => {
                     value={input}
                     onChange={(e) => { setInput(e.target.value); setError(""); }}
                     onKeyDown={handleKeyDown}
-                    placeholder="Search gifts, watches, toys..."
-                    className="flex-1 px-3 py-2.5 text-sm text-zinc-800 placeholder-zinc-400 bg-transparent focus:outline-none"
+                    placeholder="Search gifts, lamps, mugs, custom frames..."
+                    className="flex-1 text-[13px] text-zinc-800 placeholder-zinc-400 bg-transparent focus:outline-none min-w-0 font-medium"
                 />
 
                 {/* Clear button */}
                 {input && (
                     <button
                         onClick={clearSearch}
-                        className="px-2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                        className="px-2 text-zinc-400 hover:text-zinc-600 transition-colors cursor-pointer"
                         aria-label="Clear search"
+                        type="button"
                     >
-                        <FaTimes size={12} />
+                        <FaTimes size={11} />
                     </button>
                 )}
 
                 {/* Search button */}
                 <button
                     onClick={triggerSearch}
-                    className="bg-amber-500 hover:bg-amber-600 active:scale-95 text-white px-5 text-sm font-bold transition-all duration-200"
+                    type="button"
+                    className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 active:scale-95 text-white px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-200 shadow-sm shadow-amber-500/20 cursor-pointer shrink-0"
                 >
                     Search
                 </button>
             </div>
 
             {error && (
-                <p className="text-red-500 text-xs mt-1.5 pl-1">{error}</p>
+                <p className="absolute top-full left-4 text-red-500 text-[11px] font-semibold mt-1 animate-pulse">
+                    {error}
+                </p>
             )}
         </div>
     );

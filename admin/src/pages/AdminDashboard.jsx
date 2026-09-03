@@ -91,22 +91,23 @@ const AdminDashboard = () => {
             // while the rest of the data still loads.
             // onFinally = optional extra callback (e.g. setQueriesLoading(false))
             // so loading state is ALWAYS cleared even if the request fails.
-            const safeGet = async (url, onSuccess, setLoading, onFinally) => {
+            // critical=true → fetchError banner dikhao on failure
+            // critical=false → silently fail (non-essential data)
+            const safeGet = async (url, onSuccess, setLoading, onFinally, critical = false) => {
                 try {
                     const res = await api.get(url);
                     if (isMounted.current) onSuccess(res?.data);
                 } catch (err) {
                     if (err?.response?.status === 401) {
-                        // 401 means token expired / not authenticated.
-                        // Show a dedicated banner instead of staying stuck on skeleton.
                         if (isMounted.current) setSessionExpired(true);
-                    } else if (isMounted.current) {
+                    } else if (critical && isMounted.current) {
                         setFetchError("Kuch data load nahi hua. Refresh karo.");
                     }
+                    // non-critical failures silently ignored
                 } finally {
                     if (isMounted.current) {
                         if (setLoading) setLoading(false);
-                        if (onFinally) onFinally(); // ← queriesLoading & other extras
+                        if (onFinally) onFinally();
                     }
                 }
             };
@@ -117,15 +118,13 @@ const AdminDashboard = () => {
             let totalProducts = 0;
             let recentOrdersList = [];
 
-            // Fire all requests in parallel; each handles its own loading/error state.
+            // Fire all requests in parallel; critical ones show error banner on failure.
             await Promise.all([
                 safeGet("/orders", (data) => {
                     const list = Array.isArray(data) ? data : [];
                     const delivered = list.filter(o => o.orderStatus === "DELIVERED");
                     const pending = list.filter(o => o.orderStatus === "PLACED");
                     const revenue = delivered.reduce((s, o) => s + (o.totalAmount || 0), 0);
-
-                    // ✅ Local variable mein store karo — setStats abhi nahi
                     orderStats = {
                         totalOrders: list.length,
                         revenue,
@@ -135,19 +134,17 @@ const AdminDashboard = () => {
                     };
                     recentOrdersList = list.slice(0, 5);
                     setRecentOrders(recentOrdersList);
-                }, setLoadingOrders),
+                }, setLoadingOrders, null, true), // ← critical
 
                 safeGet("/products", (data) => {
                     const prodList = Array.isArray(data) ? data : [];
-                    // ✅ Local variable mein store karo
                     totalProducts = prodList.length;
-                }, setLoadingProducts),
+                }, setLoadingProducts, null, true), // ← critical
 
                 safeGet("/auth/users", (data) => {
                     const userList = Array.isArray(data) ? data : [];
                     const withLocation = userList.filter(u => u.location?.latitude && u.location?.city);
                     setCustomerLocations(withLocation);
-
                     const cityMap = {};
                     withLocation.forEach(u => {
                         const city = u.location.city;
@@ -159,15 +156,15 @@ const AdminDashboard = () => {
                             .sort((a, b) => b.count - a.count)
                             .slice(0, 8)
                     );
-                }, setLoadingUsers),
+                }, setLoadingUsers, null, false), // ← non-critical: silent fail
 
                 safeGet("/walkin/stats", (data) => {
                     if (data) setPosStats(data);
-                }, setLoadingPos),
+                }, setLoadingPos, null, false), // ← non-critical: silent fail
 
                 safeGet("/contact", (data) => {
                     if (Array.isArray(data)) setQueries(data);
-                }, null, () => setQueriesLoading(false)), // always cleared via finally
+                }, null, () => setQueriesLoading(false), false), // ← non-critical: silent fail
             ]);
 
             // ✅ Race condition fix: dono responses aa jaane ke baad ek baar stats set karo
@@ -289,13 +286,28 @@ const AdminDashboard = () => {
                     </div>
                 )}
 
-                {/* Generic error */}
+                {/* Generic error — dismissible + retry */}
                 {fetchError && (
                     <div style={{
-                        background: "#FEF2F2", border: "1px solid #FECACA", color: "#DC2626",
-                        padding: "12px 16px", borderRadius: 12, fontSize: 13, fontWeight: 500, marginBottom: 20,
+                        background: "#FFFBEB", border: "1px solid #FDE68A", color: "#92400E",
+                        padding: "10px 16px", borderRadius: 12, fontSize: 12.5, fontWeight: 500,
+                        marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap",
                     }}>
-                        ⚠️ {fetchError}
+                        <span>⚠️ Kuch data partially load hua. Baaki sab theek hai.</span>
+                        <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                                onClick={() => window.location.reload()}
+                                style={{ background: "#F59E0B", color: "#fff", border: "none", padding: "5px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                            >
+                                🔄 Retry
+                            </button>
+                            <button
+                                onClick={() => setFetchError(null)}
+                                style={{ background: "transparent", color: "#92400E", border: "1px solid #FDE68A", padding: "5px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                            >
+                                ✕ Dismiss
+                            </button>
+                        </div>
                     </div>
                 )}
 

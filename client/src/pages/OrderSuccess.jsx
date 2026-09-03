@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../api/axios";
 import { imgUrl } from "../utils/imageUrl";
+import Loader from "../components/Loader";
 import {
     FaShoppingBag, FaClipboardList, FaWhatsapp,
     FaCheckCircle, FaMapMarkerAlt, FaPhone, FaUser,
@@ -18,30 +19,28 @@ const OrderSuccess = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const paymentMethod = location.state?.paymentMethod || null;
+    const isDirectBuy = location.state?.isDirectBuy;
+    const paymentMethod = location.state?.paymentMethod || "COD";
 
     useEffect(() => {
-        if (!id) { navigate("/orders"); return; }
-        if (!user) { navigate("/login"); return; }
         const fetchOrder = async () => {
             try {
-                setLoading(true);
-                const { data } = await api.get(`/orders/${id}`);
-                setOrder(data);
-            } catch {
-                setError("Order not found");
-                setTimeout(() => navigate("/orders"), 2000);
-            } finally { setLoading(false); }
+                const res = await api.get(`/orders/${id}`);
+                setOrder(res.data.order);
+            } catch (err) {
+                console.error("Order fetch error:", err);
+                setError("Order not found or access denied");
+                setTimeout(() => navigate("/"), 3000);
+            } finally {
+                setLoading(false);
+            }
         };
         fetchOrder();
     }, [id, user, navigate]);
 
     if (loading) return (
         <div className="min-h-screen bg-[#f1f3f6] flex items-center justify-center">
-            <div className="text-center">
-                <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                <p className="text-zinc-400 text-sm">Processing your order...</p>
-            </div>
+            <Loader size="lg" text="Processing your order..." subtext="Generating invoice & order receipt..." />
         </div>
     );
 

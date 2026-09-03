@@ -1,7 +1,16 @@
 /**
- * createAdmin.js — One-time script
- * Run: node scripts/createAdmin.js
- * Delete this file after running!
+ * createAdmin.js — one-time bootstrap for the first owner account.
+ *
+ * Credentials are read from environment variables — NEVER hard-code them here.
+ *
+ *   ADMIN_NAME="Ravi Verma" \
+ *   ADMIN_BOOTSTRAP_EMAIL="owner@example.com" \
+ *   ADMIN_BOOTSTRAP_PHONE="9999999999" \
+ *   ADMIN_BOOTSTRAP_PASSWORD="a-long-random-password" \
+ *   node scripts/createAdmin.js
+ *
+ * If the account already exists this script does nothing. To change an
+ * existing password use the in-app "Forgot Password" (admin) flow.
  */
 
 import mongoose from "mongoose";
@@ -9,55 +18,57 @@ import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 dotenv.config();
 
-// ── Admin details ──────────────────────────────────────────────
-const ADMIN = {
-    name: "Ravi Verma",
-    email: "officialrvgift@gmail.com",
-    phone: "8299519532",
-    password: "RVGifts@2026",   // ← deploy ke baad change kar lena
-    role: "owner",
+const {
+    ADMIN_NAME = "Owner",
+    ADMIN_BOOTSTRAP_EMAIL,
+    ADMIN_BOOTSTRAP_PHONE,
+    ADMIN_BOOTSTRAP_PASSWORD,
+    MONGO_URI,
+} = process.env;
+
+const fail = (msg) => {
+    console.error(`❌ ${msg}`);
+    process.exit(1);
 };
-// ──────────────────────────────────────────────────────────────
 
 const run = async () => {
+    if (!MONGO_URI) fail("MONGO_URI is not set");
+    if (!ADMIN_BOOTSTRAP_EMAIL || !ADMIN_BOOTSTRAP_PHONE || !ADMIN_BOOTSTRAP_PASSWORD)
+        fail("Set ADMIN_BOOTSTRAP_EMAIL, ADMIN_BOOTSTRAP_PHONE and ADMIN_BOOTSTRAP_PASSWORD env vars");
+    if (ADMIN_BOOTSTRAP_PASSWORD.length < 12)
+        fail("ADMIN_BOOTSTRAP_PASSWORD must be at least 12 characters");
+    if (!/^[6-9]\d{9}$/.test(ADMIN_BOOTSTRAP_PHONE))
+        fail("ADMIN_BOOTSTRAP_PHONE must be a valid 10-digit Indian mobile number");
+
     try {
-        await mongoose.connect(process.env.MONGO_URI);
+        await mongoose.connect(MONGO_URI);
         console.log("✅ Connected to MongoDB");
 
-        // Already exists check
         const { default: User } = await import("../models/User.js");
 
-        const existing = await User.findOne({ email: ADMIN.email });
+        const email = ADMIN_BOOTSTRAP_EMAIL.toLowerCase().trim();
+        const existing = await User.findOne({ email });
         if (existing) {
-            console.log(`⚠️  Admin already exists: ${existing.email} (role: ${existing.role})`);
-            console.log("Agar password reset karna hai toh Security Section use karo.");
+            console.log(`⚠️  Account already exists: ${existing.email} (role: ${existing.role})`);
+            console.log("   Use the admin 'Forgot Password' flow to reset its password.");
             process.exit(0);
         }
 
-        const hashedPassword = await bcrypt.hash(ADMIN.password, 12);
+        const hashedPassword = await bcrypt.hash(ADMIN_BOOTSTRAP_PASSWORD, 12);
 
         await User.create({
-            name: ADMIN.name,
-            email: ADMIN.email,
-            phone: ADMIN.phone,
+            name: ADMIN_NAME.trim(),
+            email,
+            phone: ADMIN_BOOTSTRAP_PHONE.trim(),
             password: hashedPassword,
-            role: ADMIN.role,
+            role: "owner",
             isEmailVerified: true,
         });
 
-        console.log("✅ Admin created successfully!");
-        console.log(`   Name  : ${ADMIN.name}`);
-        console.log(`   Email : ${ADMIN.email}`);
-        console.log(`   Role  : ${ADMIN.role}`);
-        console.log(`   Phone : ${ADMIN.phone}`);
-        console.log("");
-        console.log("⚠️  IMPORTANT: Ab yeh file delete kar do!");
-        console.log("   rm scripts/createAdmin.js");
-
+        console.log(`✅ Owner account created: ${email}`);
         process.exit(0);
     } catch (err) {
-        console.error("❌ Error:", err.message);
-        process.exit(1);
+        fail(err.message);
     }
 };
 

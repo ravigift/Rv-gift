@@ -1,5 +1,6 @@
 import Review from "../models/Review.js";
 import Product from "../models/Product.js";
+import Order from "../models/Order.js";
 
 /* ── helper: recalculate avg rating on Product ── */
 const recalcProductRating = async (productId) => {
@@ -40,12 +41,22 @@ export const addReview = async (req, res) => {
         const { rating, comment } = req.body;
         const productId = req.params.productId;
 
-        if (!rating || Number(rating) < 1 || Number(rating) > 5)
-            return res.status(400).json({ message: "Rating must be between 1 and 5" });
+        const numRating = Number(rating);
+        if (!Number.isInteger(numRating) || numRating < 1 || numRating > 5)
+            return res.status(400).json({ message: "Rating must be a whole number between 1 and 5" });
 
         const product = await Product.findById(productId);
         if (!product)
             return res.status(404).json({ message: "Product not found" });
+
+        // ✅ Verified purchase only — user must have a delivered order with this product
+        const purchased = await Order.exists({
+            user: req.user._id,
+            orderStatus: "DELIVERED",
+            "items.productId": product._id,
+        });
+        if (!purchased)
+            return res.status(403).json({ message: "You can only review products you've purchased and received" });
 
         const review = await Review.findOneAndUpdate(
             { product: productId, user: req.user._id },
@@ -53,8 +64,8 @@ export const addReview = async (req, res) => {
                 product: productId,
                 user: req.user._id,
                 name: req.user.name,
-                rating: Number(rating),
-                comment: comment?.trim() || "",
+                rating: numRating,
+                comment: String(comment || "").trim().slice(0, 2000),
             },
             { upsert: true, new: true, setDefaultsOnInsert: true }
         );
@@ -65,6 +76,34 @@ export const addReview = async (req, res) => {
     } catch (error) {
         console.error("ADD REVIEW ERROR:", error);
         res.status(500).json({ message: "Failed to submit review" });
+    }
+};
+
+/* =====================================================
+   ✅ CAN THIS USER REVIEW?  (logged-in)
+   GET /api/reviews/:productId/eligibility
+===================================================== */
+export const getReviewEligibility = async (req, res) => {
+    try {
+        const productId = req.params.productId;
+
+        const [purchased, mine] = await Promise.all([
+            Order.exists({
+                user: req.user._id,
+                orderStatus: "DELIVERED",
+                "items.productId": productId,
+            }),
+            Review.findOne({ product: productId, user: req.user._id }).lean(),
+        ]);
+
+        res.json({
+            canReview: Boolean(purchased),
+            hasReviewed: Boolean(mine),
+            myReview: mine ? { rating: mine.rating, comment: mine.comment || "" } : null,
+        });
+    } catch (error) {
+        console.error("REVIEW ELIGIBILITY ERROR:", error);
+        res.status(500).json({ message: "Failed to check review eligibility" });
     }
 };
 
@@ -96,7 +135,9 @@ export const deleteReview = async (req, res) => {
         if (!review)
             return res.status(404).json({ message: "Review not found" });
 
-        if (review.user.toString() !== req.user._id.toString())
+        const isOwner = review.user.toString() === req.user._id.toString();
+        const isAdmin = ["admin", "owner"].includes(req.user.role);
+        if (!isOwner && !isAdmin)
             return res.status(403).json({ message: "Not authorized" });
 
         const productId = review.product;

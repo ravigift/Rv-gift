@@ -18,13 +18,13 @@ const AdminResetPassword = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!password.trim()) return setError("Please enter a new password");
-        if (password.length < 6) return setError("Password must be at least 6 characters");
+        if (password.length < 8) return setError("Password must be at least 8 characters");
         if (password !== confirmPassword) return setError("Passwords do not match");
 
         try {
             setLoading(true);
             setError("");
-            await api.post(`/auth/reset-password/${token}`, { password });
+            await api.post(`/auth/admin/reset-password/${token}`, { password });
             setSuccess(true);
             setTimeout(() => navigate("/admin/login"), 3000);
         } catch (err) {
@@ -132,7 +132,7 @@ const AdminResetPassword = () => {
                                             <FaLock size={13} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.3)" }} />
                                             <input
                                                 type={showPassword ? "text" : "password"}
-                                                placeholder="Min. 6 characters"
+                                                placeholder="Min. 8 characters"
                                                 value={password}
                                                 onChange={(e) => { setPassword(e.target.value); setError(""); }}
                                                 className="input-field"

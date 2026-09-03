@@ -35,13 +35,21 @@ router.get("/:invoiceNumber/download", protect, async (req, res) => {
     }
 });
 
-// ── Public Verify Route (QR scan → anyone can verify)
+// ── Public Verify Route (QR scan → anyone can verify authenticity)
 // GET /api/invoice/:invoiceNumber/verify
+// SECURITY: invoice numbers are sequential, so this endpoint must NOT expose
+// customer names, amounts or payment status — that would let anyone enumerate
+// the entire customer/order list. It only confirms the number is genuine.
 router.get("/:invoiceNumber/verify", async (req, res) => {
     try {
-        const order = await Order.findOne({
-            invoiceNumber: req.params.invoiceNumber,
-        }).select("invoiceNumber customerName orderStatus payment createdAt totalAmount _id");
+        const invoiceNumber = String(req.params.invoiceNumber || "").trim();
+        if (!/^INV-\d{4}-\d{2}-\d{4,6}$/.test(invoiceNumber)) {
+            return res.json({ valid: false, message: "Invalid invoice number format." });
+        }
+
+        const order = await Order.findOne({ invoiceNumber })
+            .select("invoiceNumber createdAt orderStatus")
+            .lean();
 
         if (!order) {
             return res.json({
@@ -53,12 +61,8 @@ router.get("/:invoiceNumber/verify", async (req, res) => {
         res.json({
             valid: true,
             invoiceNumber: order.invoiceNumber,
-            orderId: `#${order._id.toString().slice(-8).toUpperCase()}`,
-            customerName: order.customerName,
+            issuedOn: order.createdAt,
             orderStatus: order.orderStatus,
-            paymentStatus: order.payment?.status,
-            totalAmount: order.totalAmount,
-            date: order.createdAt,
             message: "This is an authentic RV Gifts invoice.",
         });
 

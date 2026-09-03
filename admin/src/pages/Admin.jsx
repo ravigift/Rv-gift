@@ -1,32 +1,76 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAdminAuth } from "../auth/AdminAuthContext";
+import api from "../api/adminApi";
 import {
     FaThLarge, FaBox, FaClipboardList,
     FaSignOutAlt, FaGift, FaCashRegister,
-    FaBars, FaTimes, FaChevronRight
+    FaBars, FaTimes, FaChevronRight, FaImage, FaListOl,
+    FaUsers, FaUndo, FaEnvelope, FaShieldAlt, FaChartLine,
 } from "react-icons/fa";
 
-const navItems = [
-    { to: ".", end: true, icon: FaThLarge, label: "Dashboard", accent: "#F59E0B", lightBg: "#FFFBEB", border: "#FDE68A" },
-    { to: "products", icon: FaBox, label: "Products", accent: "#3B82F6", lightBg: "#EFF6FF", border: "#BFDBFE" },
-    { to: "orders", icon: FaClipboardList, label: "Orders", accent: "#10B981", lightBg: "#ECFDF5", border: "#A7F3D0" },
-    { to: "pos", icon: FaCashRegister, label: "Shop POS", accent: "#8B5CF6", lightBg: "#F5F3FF", border: "#DDD6FE" },
+const NAV_GROUPS = [
+    {
+        label: "Overview",
+        items: [
+            { to: ".", end: true, icon: FaThLarge, label: "Dashboard", accent: "#F59E0B", lightBg: "#FFFBEB", border: "#FDE68A" },
+            { to: "reports", icon: FaChartLine, label: "Reports", accent: "#0D9488", lightBg: "#F0FDFA", border: "#99F6E4" },
+        ],
+    },
+    {
+        label: "Storefront",
+        items: [
+            { to: "banners", icon: FaImage, label: "Hero Banners", accent: "#EC4899", lightBg: "#FDF2F8", border: "#FBCFE8" },
+            { to: "home-content", icon: FaListOl, label: "Home Content", accent: "#0EA5E9", lightBg: "#F0F9FF", border: "#BAE6FD" },
+            { to: "products", icon: FaBox, label: "Products", accent: "#3B82F6", lightBg: "#EFF6FF", border: "#BFDBFE" },
+        ],
+    },
+    {
+        label: "Commerce",
+        items: [
+            { to: "orders", icon: FaClipboardList, label: "Orders", accent: "#10B981", lightBg: "#ECFDF5", border: "#A7F3D0" },
+            { to: "refunds", icon: FaUndo, label: "Refunds & Returns", accent: "#F97316", lightBg: "#FFF7ED", border: "#FED7AA" },
+            { to: "pos", icon: FaCashRegister, label: "Shop POS", accent: "#8B5CF6", lightBg: "#F5F3FF", border: "#DDD6FE" },
+        ],
+    },
+    {
+        label: "People",
+        items: [
+            { to: "customers", icon: FaUsers, label: "Customers", accent: "#06B6D4", lightBg: "#ECFEFF", border: "#A5F3FC" },
+            { to: "queries", icon: FaEnvelope, label: "Contact Queries", accent: "#6366F1", lightBg: "#EEF2FF", border: "#C7D2FE", badgeKey: "queries" },
+        ],
+    },
 ];
+
+// flat list for breadcrumb lookup
+const navItems = NAV_GROUPS.flatMap(g => g.items);
 
 const Admin = () => {
     const { admin, logout } = useAdminAuth();
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [unreadQueries, setUnreadQueries] = useState(0);
     const location = useLocation();
+
+    // Fetch unread query count for live badge
+    useEffect(() => {
+        const fetchUnread = async () => {
+            try {
+                const { data } = await api.get("/contact");
+                const unread = Array.isArray(data) ? data.filter(q => !q.isRead).length : 0;
+                setUnreadQueries(unread);
+            } catch { /* silent */ }
+        };
+        fetchUnread();
+        // Refresh every 60s
+        const interval = setInterval(fetchUnread, 60000);
+        return () => clearInterval(interval);
+    }, []);
 
     const currentLabel = (() => {
         const seg = location.pathname.replace(/.*\/admin\/?/, "") || ".";
         return navItems.find(n => n.to === seg || (n.to === "." && seg === "."))?.label || "Dashboard";
     })();
 
-    const roleStyle = admin?.role === "owner"
-        ? { bg: "#FEF9C3", text: "#CA8A04", border: "#FDE68A" }
-        : { bg: "#DBEAFE", text: "#2563EB", border: "#BFDBFE" };
 
     const SidebarContent = () => (
         <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -49,74 +93,61 @@ const Admin = () => {
                 </div>
             </div>
 
-            {/* Profile */}
-            <div style={{ padding: "14px 16px", borderBottom: "1px solid #F1F5F9" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{
-                        width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
-                        background: "linear-gradient(135deg,#F59E0B,#D97706)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontWeight: 800, fontSize: 15, color: "#fff",
-                    }}>
-                        {admin?.name?.[0]?.toUpperCase() || "A"}
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: 13, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {admin?.name || "Admin"}
-                        </div>
-                        <div style={{ fontSize: 10, color: "#94A3B8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {admin?.email}
-                        </div>
-                    </div>
-                </div>
-                <div style={{
-                    marginTop: 10, display: "inline-flex", alignItems: "center", gap: 5,
-                    background: roleStyle.bg, color: roleStyle.text,
-                    border: `1px solid ${roleStyle.border}`,
-                    borderRadius: 20, padding: "3px 10px", fontSize: 10, fontWeight: 700,
-                }}>
-                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: roleStyle.text }} />
-                    {admin?.role?.charAt(0).toUpperCase() + (admin?.role?.slice(1) || "")}
-                </div>
-            </div>
 
-            {/* Nav */}
-            <div style={{ flex: 1, padding: "12px 10px" }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.14em", padding: "0 6px 10px" }}>
-                    MENU
-                </div>
-                <nav style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    {navItems.map(({ to, end, icon: Icon, label, accent, lightBg, border }) => (
-                        <NavLink
-                            key={to} to={to} end={end}
-                            onClick={() => setMobileOpen(false)}
-                            style={({ isActive }) => ({
-                                display: "flex", alignItems: "center", gap: 10,
-                                padding: "10px 12px", borderRadius: 12,
-                                textDecoration: "none", fontWeight: isActive ? 700 : 500, fontSize: 13,
-                                transition: "all 0.15s",
-                                background: isActive ? lightBg : "transparent",
-                                color: isActive ? accent : "#64748B",
-                                border: isActive ? `1px solid ${border}` : "1px solid transparent",
+
+            {/* Nav — Grouped */}
+            <div style={{ flex: 1, padding: "10px 10px", overflowY: "auto" }}>
+                {NAV_GROUPS.map((group) => (
+                    <div key={group.label} style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.14em", padding: "0 6px 8px", textTransform: "uppercase" }}>
+                            {group.label}
+                        </div>
+                        <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            {group.items.map(({ to, end, icon: Icon, label, accent, lightBg, border, badgeKey }) => {
+                                const badge = badgeKey === "queries" ? unreadQueries : 0;
+                                return (
+                                    <NavLink
+                                        key={to} to={to} end={end}
+                                        onClick={() => setMobileOpen(false)}
+                                        style={({ isActive }) => ({
+                                            display: "flex", alignItems: "center", gap: 10,
+                                            padding: "9px 10px", borderRadius: 12,
+                                            textDecoration: "none", fontWeight: isActive ? 700 : 500, fontSize: 13,
+                                            transition: "all 0.15s",
+                                            background: isActive ? lightBg : "transparent",
+                                            color: isActive ? accent : "#64748B",
+                                            border: isActive ? `1px solid ${border}` : "1px solid transparent",
+                                        })}
+                                    >
+                                        {({ isActive }) => (
+                                            <>
+                                                <div style={{
+                                                    width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                                                    background: isActive ? `${accent}20` : "#F8FAFC",
+                                                    border: `1px solid ${isActive ? `${accent}30` : "#E2E8F0"}`,
+                                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                                }}>
+                                                    <Icon size={12} color={isActive ? accent : "#94A3B8"} />
+                                                </div>
+                                                <span style={{ flex: 1, fontSize: 12.5 }}>{label}</span>
+                                                {badge > 0 && (
+                                                    <span style={{
+                                                        minWidth: 18, height: 18, borderRadius: 9,
+                                                        background: "#EF4444", color: "#fff",
+                                                        fontSize: 9, fontWeight: 800,
+                                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                                        padding: "0 5px",
+                                                    }}>{badge > 99 ? "99+" : badge}</span>
+                                                )}
+                                                {isActive && !badge && <FaChevronRight size={8} color={accent} />}
+                                            </>
+                                        )}
+                                    </NavLink>
+                                );
                             })}
-                        >
-                            {({ isActive }) => (
-                                <>
-                                    <div style={{
-                                        width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                                        background: isActive ? `${accent}20` : "#F8FAFC",
-                                        border: `1px solid ${isActive ? `${accent}30` : "#E2E8F0"}`,
-                                        display: "flex", alignItems: "center", justifyContent: "center",
-                                    }}>
-                                        <Icon size={13} color={isActive ? accent : "#94A3B8"} />
-                                    </div>
-                                    <span style={{ flex: 1 }}>{label}</span>
-                                    {isActive && <FaChevronRight size={9} color={accent} />}
-                                </>
-                            )}
-                        </NavLink>
-                    ))}
-                </nav>
+                        </nav>
+                    </div>
+                ))}
             </div>
 
             {/* Sign Out */}

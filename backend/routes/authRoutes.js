@@ -5,6 +5,8 @@ import {
     verifyOtp,
     resendOtp,
     getProfile,
+    updateProfile,
+    changePassword,
     saveLocation,
     getAllUsers,
     forgotPassword,
@@ -35,6 +37,8 @@ router.post("/admin/reset-password/:token", adminResetPassword);
 
 // ── Protected ──────────────────────────────────────────────
 router.get("/profile", protect, getProfile);
+router.put("/profile", protect, updateProfile);
+router.put("/change-password", protect, changePassword);
 
 // ── Admin Only ─────────────────────────────────────────────
 router.get("/users", protect, adminOnly, getAllUsers);

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import api from "../api/axios";
+import Loader from "../components/Loader";
 import {
     FaArrowLeft, FaBoxOpen, FaMapMarkerAlt,
     FaPhone, FaUser, FaShoppingBag,
@@ -128,11 +129,8 @@ const OrderDetails = () => {
     };
 
     if (loading) return (
-        <div className="min-h-screen bg-gradient-to-br from-stone-50 to-amber-50/30 flex items-center justify-center">
-            <div className="text-center">
-                <div className="w-14 h-14 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                <p className="text-zinc-400 text-sm font-medium">Loading order...</p>
-            </div>
+        <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+            <Loader size="lg" text="Loading order details..." subtext="Fetching tracking status..." />
         </div>
     );
 

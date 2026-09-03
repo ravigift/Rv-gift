@@ -44,7 +44,17 @@ const productSchema = new mongoose.Schema(
             ],
             validate: (v) => v.length > 0,
         },
+        sku: {
+            type: String,
+            trim: true,
+            uppercase: true,
+            maxlength: 40,
+            // index defined below as a partial-unique index — don't add `index: true` here
+        },
         tags: { type: [String], default: [] },
+        // Per-product variant options — the label ("Size" / "Volume" / "Pack" …)
+        // and the list of choices are fully custom per product.
+        sizeLabel: { type: String, default: "Size", trim: true, maxlength: 24 },
         sizes: { type: [String], default: [] },
         highlights: { type: Map, of: String, default: {} },
         rating: { type: Number, default: 0, min: 0, max: 5 },
@@ -60,10 +70,16 @@ const productSchema = new mongoose.Schema(
             max: [30000, "Weight cannot exceed 30kg"],
         },
         dimensions: {
-            length: { type: Number, default: 10 },
-            breadth: { type: Number, default: 10 },
-            height: { type: Number, default: 10 },
+            length: { type: Number, default: 10, min: 1, max: 200 },
+            breadth: { type: Number, default: 10, min: 1, max: 200 },
+            height: { type: Number, default: 10, min: 1, max: 200 },
         },
+
+        /* ── Lifecycle / audit ── */
+        isPublished: { type: Boolean, default: true, index: true }, // false = draft, hidden from storefront
+        isArchived: { type: Boolean, default: false, index: true },
+        createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     },
     {
         timestamps: true,
@@ -100,6 +116,13 @@ productSchema.pre("save", function () {
 ───────────────────────────────────────────── */
 productSchema.index({ name: "text", description: "text", tags: "text" });
 productSchema.index({ category: 1, inStock: 1, createdAt: -1 });
+// storefront list: published, not archived, newest first
+productSchema.index({ isPublished: 1, isArchived: 1, createdAt: -1 });
+// a SKU, when set, must be unique
+productSchema.index(
+    { sku: 1 },
+    { unique: true, partialFilterExpression: { sku: { $type: "string" } } }
+);
 
 /* ─────────────────────────────────────────────
    VIRTUAL — discount percent

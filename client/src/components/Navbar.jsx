@@ -408,26 +408,24 @@ const Navbar = () => {
                   - ml-auto hata diya search wrapper ke baad se, ab natural flex flow follow hota hai
                   - actions wrapper me sirf gap-2 rakha, ml-auto nahi (search bar ka flex-1 hi space manage karega)
                 */}
-                <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
+                <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4 sm:gap-6">
 
                     {/* LOGO */}
                     <button onClick={() => go("/")} className="flex items-center gap-2.5 shrink-0 group cursor-pointer">
                         <img src={Logo} alt="RV Gifts"
                             className="h-10 w-10 object-contain rounded-xl group-hover:scale-105 transition-transform duration-200" />
-                        <span className="font-black text-[17px] text-zinc-800 whitespace-nowrap tracking-tight">
+                        <span className="font-black text-[18px] text-zinc-800 whitespace-nowrap tracking-tight">
                             RV<span className="text-amber-500">Gifts</span>
                         </span>
                     </button>
 
-                    {/* DESKTOP SEARCH — flex-1, max-width cap hata di taaki bade screens pe
-                        bhi search bar pura available space le aur cart/login ke beech
-                        khaali gap na bache */}
-                    <div className="hidden md:flex flex-1">
+                    {/* DESKTOP SEARCH — Perfectly proportioned & centered */}
+                    <div className="hidden md:flex flex-1 max-w-md lg:max-w-lg mx-4">
                         <SearchBar onSearch={handleSearch} />
                     </div>
 
-                    {/* DESKTOP ACTIONS — ml-auto hata diya, ab search bar ke turant baad aata hai */}
-                    <div className="hidden md:flex items-center gap-2 shrink-0">
+                    {/* DESKTOP ACTIONS */}
+                    <div className="hidden md:flex items-center gap-2.5 shrink-0">
                         <button onClick={() => go("/cart")}
                             className="cart-btn relative cursor-pointer p-2.5 rounded-xl hover:bg-amber-50 transition-all duration-200 group">
                             <FaShoppingCart size={17} className="cart-icon text-zinc-500" />

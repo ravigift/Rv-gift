@@ -87,37 +87,29 @@ const VerifyInvoice = () => {
                             <p className="text-emerald-100 text-sm mt-1">This is an authentic RV Gifts invoice</p>
                         </div>
 
-                        {/* Details */}
+                        {/* Details — public view intentionally shows no customer/amount data */}
                         <div className="p-6 space-y-3">
                             <Row label="Invoice No" value={data.invoiceNumber} mono />
-                            <Row label="Order ID" value={data.orderId} mono />
-                            <Row label="Customer" value={data.customerName} />
-                            <Row
-                                label="Amount"
-                                value={`Rs. ${Number(data.totalAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`}
-                                bold
-                            />
-                            <Row
-                                label="Date"
-                                value={new Date(data.date).toLocaleDateString("en-IN", {
-                                    day: "2-digit", month: "long", year: "numeric",
-                                })}
-                            />
-                            <div className="flex justify-between items-center py-2 border-b border-stone-100">
-                                <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Order Status</span>
-                                <span className={`text-xs font-bold px-3 py-1 rounded-full ${statusColor[data.orderStatus] || "bg-stone-100 text-zinc-600"}`}>
-                                    {data.orderStatus}
-                                </span>
-                            </div>
-                            <div className="flex justify-between items-center py-2">
-                                <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Payment</span>
-                                <span className={`text-xs font-bold px-3 py-1 rounded-full ${data.paymentStatus === "PAID"
-                                    ? "bg-emerald-100 text-emerald-700"
-                                    : "bg-amber-100 text-amber-700"
-                                    }`}>
-                                    {data.paymentStatus || "PENDING"}
-                                </span>
-                            </div>
+                            {data.issuedOn && (
+                                <Row
+                                    label="Issued On"
+                                    value={new Date(data.issuedOn).toLocaleDateString("en-IN", {
+                                        day: "2-digit", month: "long", year: "numeric",
+                                    })}
+                                />
+                            )}
+                            {data.orderStatus && (
+                                <div className="flex justify-between items-center py-2">
+                                    <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Order Status</span>
+                                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${statusColor[data.orderStatus] || "bg-stone-100 text-zinc-600"}`}>
+                                        {data.orderStatus}
+                                    </span>
+                                </div>
+                            )}
+                            <p className="text-[11px] text-zinc-400 pt-1 leading-relaxed">
+                                For order details, amount or a copy of this invoice, please sign in to your
+                                RV Gifts account or contact support.
+                            </p>
                         </div>
 
                         {/* Footer */}

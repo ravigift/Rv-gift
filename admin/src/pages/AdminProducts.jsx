@@ -39,10 +39,18 @@ const AdminProducts = () => {
     const fetchProducts = useCallback(async () => {
         try {
             setLoading(true); setError(null);
-            const { data } = await api.get("/products");
-            const list = Array.isArray(data) ? data : [];
+            // admin endpoint → includes drafts + archived, paginated shape
+            const { data } = await api.get("/products/admin", { params: { limit: 200 } });
+            const list = Array.isArray(data) ? data : (data?.products || []);
             setProducts(list); setFiltered(list);
-        } catch { setError("Failed to load products"); }
+        } catch {
+            // fallback to the public endpoint (older backend without /products/admin)
+            try {
+                const { data } = await api.get("/products");
+                const list = Array.isArray(data) ? data : [];
+                setProducts(list); setFiltered(list);
+            } catch { setError("Failed to load products"); }
+        }
         finally { setLoading(false); }
     }, []);
 
@@ -59,11 +67,18 @@ const AdminProducts = () => {
     const deleteHandler = async (id) => {
         try {
             setDeletingId(id);
-            await api.delete(`/products/${id}`);
-            setProducts(p => p.filter(x => x._id !== id));
-            setFiltered(p => p.filter(x => x._id !== id));
-            if (paginated.length === 1 && currentPage > 1) setCurrentPage(p => p - 1);
-            showToast("success", "Product deleted!");
+            const { data } = await api.delete(`/products/${id}`);
+            if (data?.archived) {
+                // referenced by orders → archived, not removed
+                setProducts(p => p.map(x => x._id === id ? { ...x, isArchived: true, inStock: false } : x));
+                setFiltered(p => p.map(x => x._id === id ? { ...x, isArchived: true, inStock: false } : x));
+                showToast("success", "Product archived (used in past orders)");
+            } else {
+                setProducts(p => p.filter(x => x._id !== id));
+                setFiltered(p => p.filter(x => x._id !== id));
+                if (paginated.length === 1 && currentPage > 1) setCurrentPage(p => p - 1);
+                showToast("success", "Product deleted!");
+            }
         } catch { showToast("error", "Failed to delete"); }
         finally { setDeletingId(null); setConfirmId(null); }
     };
@@ -107,6 +122,8 @@ const AdminProducts = () => {
         cat?.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase()) || "—";
 
     const stockBadge = (product) => {
+        if (product.isArchived) return { label: "Archived", cls: "text-zinc-500 bg-zinc-100 border-zinc-200" };
+        if (product.isPublished === false) return { label: "Draft", cls: "text-sky-600 bg-sky-50 border-sky-200" };
         const n = Number(product.stock ?? 0);
         if (!product.inStock) return { label: "Out of Stock", cls: "text-red-500 bg-red-50 border-red-200" };
         if (n <= 5) return { label: `${n} left`, cls: "text-amber-600 bg-amber-50 border-amber-200" };

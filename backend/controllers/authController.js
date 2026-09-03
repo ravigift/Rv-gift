@@ -12,7 +12,19 @@ const generateToken = (id, role) =>
     jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
 const generateOtp = () =>
-    Math.floor(100000 + Math.random() * 900000).toString();
+    crypto.randomInt(100000, 1000000).toString(); // CSPRNG, not Math.random
+
+const MAX_OTP_ATTEMPTS = 5;
+
+// Build a clean frontend base URL from env — guarantees an https:// scheme
+// and no trailing slash, so reset links never come out as "undefined/..." .
+const buildFrontendBase = (...candidates) => {
+    const raw = candidates.find((c) => c && c.trim());
+    if (!raw) return null;
+    let url = raw.trim().replace(/\/+$/, "");
+    if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+    return url;
+};
 
 // ══════════════════════════════════════════════
 // REGISTER — sends OTP, no token yet
@@ -36,6 +48,7 @@ export const register = async (req, res) => {
             const otp = generateOtp();
             exists.emailOtp = otp;
             exists.emailOtpExpires = Date.now() + 10 * 60 * 1000;
+            exists.emailOtpAttempts = 0;
             await exists.save({ validateBeforeSave: false });
             await sendOtpEmail(exists.email, exists.name, otp);
             return res.status(200).json({
@@ -91,14 +104,32 @@ export const verifyOtp = async (req, res) => {
 
         if (!user) return res.status(404).json({ message: "User not found" });
         if (user.isEmailVerified) return res.status(400).json({ message: "Email already verified" });
-        if (!user.emailOtp || user.emailOtp !== otp.trim())
-            return res.status(400).json({ message: "Invalid OTP" });
-        if (user.emailOtpExpires < Date.now())
-            return res.status(400).json({ message: "OTP expired. Please register again." });
+
+        if (!user.emailOtp || user.emailOtpExpires < Date.now())
+            return res.status(400).json({ message: "OTP expired. Please request a new one." });
+
+        if ((user.emailOtpAttempts || 0) >= MAX_OTP_ATTEMPTS) {
+            user.emailOtp = undefined;
+            user.emailOtpExpires = undefined;
+            await user.save({ validateBeforeSave: false });
+            return res.status(429).json({ message: "Too many wrong attempts. Please request a new OTP." });
+        }
+
+        const otpMatch =
+            user.emailOtp.length === otp.trim().length &&
+            crypto.timingSafeEqual(Buffer.from(user.emailOtp), Buffer.from(otp.trim()));
+
+        if (!otpMatch) {
+            user.emailOtpAttempts = (user.emailOtpAttempts || 0) + 1;
+            await user.save({ validateBeforeSave: false });
+            const left = Math.max(0, MAX_OTP_ATTEMPTS - user.emailOtpAttempts);
+            return res.status(400).json({ message: `Invalid OTP.${left ? ` ${left} attempt(s) left.` : " Request a new OTP."}` });
+        }
 
         user.isEmailVerified = true;
         user.emailOtp = undefined;
         user.emailOtpExpires = undefined;
+        user.emailOtpAttempts = 0;
         await user.save();
 
         return res.status(200).json({
@@ -132,6 +163,7 @@ export const resendOtp = async (req, res) => {
         const otp = generateOtp();
         user.emailOtp = otp;
         user.emailOtpExpires = Date.now() + 10 * 60 * 1000;
+        user.emailOtpAttempts = 0;
         await user.save({ validateBeforeSave: false });
 
         await sendOtpEmail(user.email, user.name, otp);
@@ -163,6 +195,7 @@ export const login = async (req, res) => {
             const otp = generateOtp();
             user.emailOtp = otp;
             user.emailOtpExpires = Date.now() + 10 * 60 * 1000;
+            user.emailOtpAttempts = 0;
             await user.save({ validateBeforeSave: false });
             await sendOtpEmail(user.email, user.name, otp);
             return res.status(403).json({
@@ -205,6 +238,85 @@ export const getProfile = async (req, res) => {
 };
 
 // ══════════════════════════════════════════════
+// UPDATE PROFILE
+// ══════════════════════════════════════════════
+export const updateProfile = async (req, res) => {
+    try {
+        const { name, phone } = req.body;
+        const updates = {};
+
+        if (name) {
+            const cleanName = String(name).trim();
+            if (cleanName.length < 2 || cleanName.length > 100) {
+                return res.status(400).json({ message: "Name must be between 2 and 100 characters" });
+            }
+            updates.name = cleanName;
+        }
+
+        if (phone !== undefined) {
+            const cleanPhone = String(phone).trim();
+            if (cleanPhone && !/^[6-9]\d{9}$/.test(cleanPhone)) {
+                return res.status(400).json({ message: "Please enter a valid 10-digit mobile number" });
+            }
+            updates.phone = cleanPhone;
+        }
+
+        const user = await User.findByIdAndUpdate(
+            req.user._id,
+            { $set: updates },
+            { new: true, runValidators: true }
+        ).select("-password");
+
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        res.json({
+            success: true,
+            message: "Profile updated successfully",
+            user,
+        });
+    } catch (error) {
+        console.error("UPDATE PROFILE ERROR:", error);
+        res.status(500).json({ message: "Failed to update profile" });
+    }
+};
+
+// ══════════════════════════════════════════════
+// CHANGE PASSWORD
+// ══════════════════════════════════════════════
+export const changePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ message: "Current password and new password are required" });
+        }
+
+        if (newPassword.length < 8) {
+            return res.status(400).json({ message: "New password must be at least 8 characters long" });
+        }
+
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: "Incorrect current password" });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        await user.save();
+
+        res.json({
+            success: true,
+            message: "Password changed successfully",
+        });
+    } catch (error) {
+        console.error("CHANGE PASSWORD ERROR:", error);
+        res.status(500).json({ message: "Failed to change password" });
+    }
+};
+
+// ══════════════════════════════════════════════
 // SAVE LOCATION
 // ══════════════════════════════════════════════
 export const saveLocation = async (req, res) => {
@@ -212,17 +324,20 @@ export const saveLocation = async (req, res) => {
         // ✅ IDOR fix: userId body se nahi, verified token se lo
         const userId = req.user._id;
         const { latitude, longitude, city, state } = req.body;
-        if (latitude && (latitude < -90 || latitude > 90))
+
+        const lat = Number(latitude);
+        const lng = Number(longitude);
+        if (!Number.isFinite(lat) || lat < -90 || lat > 90)
             return res.status(400).json({ message: "Invalid latitude" });
-        if (longitude && (longitude < -180 || longitude > 180))
+        if (!Number.isFinite(lng) || lng < -180 || lng > 180)
             return res.status(400).json({ message: "Invalid longitude" });
 
         await User.findByIdAndUpdate(userId, {
             $set: {
-                "location.latitude": latitude,
-                "location.longitude": longitude,
-                "location.city": city?.trim(),
-                "location.state": state?.trim(),
+                "location.latitude": lat,
+                "location.longitude": lng,
+                "location.city": String(city || "").trim().slice(0, 100),
+                "location.state": String(state || "").trim().slice(0, 100),
                 "location.updatedAt": new Date(),
             },
         });
@@ -267,7 +382,8 @@ export const forgotPassword = async (req, res) => {
         await user.save({ validateBeforeSave: false });
 
         // ✅ User site URL
-        const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+        const base = buildFrontendBase(process.env.FRONTEND_URL, "https://rv-gift.vercel.app");
+        const resetUrl = `${base}/reset-password/${resetToken}`;
 
         const html = `
             <div style="font-family:Arial,sans-serif;background:#f5f7fa;padding:30px">
@@ -363,8 +479,13 @@ export const adminForgotPassword = async (req, res) => {
         admin.passwordResetExpires = Date.now() + 15 * 60 * 1000;
         await admin.save({ validateBeforeSave: false });
 
-        // ✅ ADMIN URL — admin.rvgift.com
-        const resetUrl = `${process.env.ADMIN_FRONTEND_URL}/admin/reset-password/${resetToken}`;
+        // ✅ ADMIN URL — admin panel domain
+        const base = buildFrontendBase(
+            process.env.ADMIN_FRONTEND_URL,
+            process.env.ADMIN_DASHBOARD_URL,
+            "https://rv-gift-admin.vercel.app"
+        );
+        const resetUrl = `${base}/admin/reset-password/${resetToken}`;
 
         const html = `
             <div style="font-family:'DM Sans',Arial,sans-serif;background:#0f0c29;padding:40px 20px">

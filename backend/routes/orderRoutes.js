@@ -8,6 +8,7 @@ import {
     createOrder,
     getMyOrders,
     getAllOrders,
+    getOrderStats,
     getOrderById,
     updateOrderStatus,
     cancelOrder,
@@ -32,7 +33,8 @@ const router = express.Router();
 router.post("/", protect, createOrder);
 router.get("/my", protect, getMyOrders);
 
-/* ── ADMIN QUEUE ROUTES (before /:id) ── */
+/* ── ADMIN QUEUE & STATS ROUTES (before /:id) ── */
+router.get("/admin/stats", protect, adminOnly, getOrderStats);
 router.get("/admin/refunds", protect, adminOnly, getRefundQueue);
 router.get("/admin/flagged", protect, adminOnly, getFlaggedOrders);
 

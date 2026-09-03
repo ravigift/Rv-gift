@@ -7,7 +7,7 @@ import PageTransition from "../components/PageTransition"; // ✅ smooth transit
 import Home from "../pages/Home";
 import Login from "../pages/Login";
 
-// Lazy loaded
+const Products = lazy(() => import("../pages/Products"));
 const Register = lazy(() => import("../pages/Register"));
 const Cart = lazy(() => import("../pages/Cart"));
 const Checkout = lazy(() => import("../pages/Checkout"));
@@ -24,9 +24,11 @@ const TermsConditions = lazy(() => import("../pages/TermsConditions"));
 const RefundPolicy = lazy(() => import("../pages/RefundPolicy"));
 const ContactUs = lazy(() => import("../pages/Contactus")); // ✅ file renamed: no space
 
+import Loader from "../components/Loader";
+
 const PageLoader = () => (
-    <div className="min-h-screen flex items-center justify-center bg-stone-50">
-        <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-[70vh] flex items-center justify-center bg-stone-50/50">
+        <Loader size="lg" text="Loading RV Gifts" subtext="Crafting memories with love..." />
     </div>
 );
 
@@ -44,7 +46,7 @@ const AppRoutes = () => (
                 <Routes>
                     {/* PUBLIC */}
                     <Route path="/" element={<Home />} />
-                    <Route path="/products" element={<Navigate to="/" replace />} />
+                    <Route path="/products" element={<Products />} />
                     <Route path="/products/:id" element={<ProductDetails />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />

@@ -10,6 +10,7 @@
  */
 
 import mongoose from "mongoose";
+import Counter from "./Counter.js";
 
 const orderSchema = new mongoose.Schema(
     {
@@ -31,6 +32,7 @@ const orderSchema = new mongoose.Schema(
                 productId: mongoose.Schema.Types.ObjectId,
                 name: String,
                 price: Number,
+                mrp: { type: Number, default: null },
                 qty: Number,
                 image: String,
                 selectedSize: { type: String, default: "" },
@@ -176,6 +178,7 @@ const orderSchema = new mongoose.Schema(
             confirmedAt: Date,
             packedAt: Date,
             shippedAt: Date,
+            outForDeliveryAt: Date,
             deliveredAt: Date,
             cancelledAt: Date,
             returnRequestedAt: Date,
@@ -192,22 +195,28 @@ orderSchema.index({ orderStatus: 1 });
 orderSchema.index({ "refund.status": 1 });
 orderSchema.index({ "return.status": 1 });
 orderSchema.index({ "payment.flagged": 1 });
-orderSchema.index({ "payment.razorpayPaymentId": 1 }, { sparse: true });
+// unique + sparse → a Razorpay payment id can back at most ONE order (idempotency guard)
+orderSchema.index({ "payment.razorpayPaymentId": 1 }, { unique: true, sparse: true });
 
 /* ─────────────────────────────────────────────
    INVOICE NUMBER GENERATOR
    Format: INV-2026-03-00001
-   Auto-increments per month, resets each month
+   Auto-increments per month via an atomic counter —
+   safe under concurrent order creation (no countDocuments race).
 ───────────────────────────────────────────── */
 export const generateInvoiceNumber = async () => {
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
-    const startOfMonth = new Date(year, now.getMonth(), 1);
-    const count = await mongoose.model("Order").countDocuments({
-        createdAt: { $gte: startOfMonth },
-    });
-    return `INV-${year}-${month}-${String(count + 1).padStart(5, "0")}`;
+    const key = `invoice-${year}-${month}`;
+
+    const counter = await Counter.findByIdAndUpdate(
+        key,
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+    );
+
+    return `INV-${year}-${month}-${String(counter.seq).padStart(5, "0")}`;
 };
 
 export default mongoose.model("Order", orderSchema);

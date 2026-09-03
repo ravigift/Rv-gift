@@ -15,7 +15,7 @@
   "type": "module",
   "dependencies": {
     "bcryptjs": "^3.0.3",
-    "cloudinary": "^1.41.3",
+    "cloudinary": "^2.11.0",
     "compression": "^1.8.1",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
@@ -26,7 +26,6 @@
     "mongoose": "^9.2.1",
     "multer": "^2.0.2",
     "multer-storage-cloudinary": "^4.0.0",
-    "nodemailer": "^8.0.1",
     "pdfkit": "^0.17.2",
     "qrcode": "^1.5.4",
     "razorpay": "^2.9.6",

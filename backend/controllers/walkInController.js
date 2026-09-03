@@ -87,7 +87,8 @@ export const getAllWalkInOrders = async (req, res) => {
             ];
         }
 
-        const orders = await WalkInOrder.find(query).sort({ createdAt: -1 }).lean();
+        const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 200));
+        const orders = await WalkInOrder.find(query).sort({ createdAt: -1 }).limit(limit).lean();
         res.json(orders);
     } catch (err) {
         console.error("GET WALKIN ERROR:", err);
@@ -383,16 +384,22 @@ export const getWalkInStats = async (req, res) => {
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
 
-        const [todayOrders, allOrders] = await Promise.all([
-            WalkInOrder.find({ createdAt: { $gte: today, $lt: tomorrow } }).lean(),
-            WalkInOrder.find({}).lean(),
+        // Aggregate in the DB — never load the whole collection into memory
+        const [todayAgg, allAgg] = await Promise.all([
+            WalkInOrder.aggregate([
+                { $match: { createdAt: { $gte: today, $lt: tomorrow } } },
+                { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: "$grandTotal" } } },
+            ]),
+            WalkInOrder.aggregate([
+                { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: "$grandTotal" } } },
+            ]),
         ]);
 
         res.json({
-            todayBills: todayOrders.length,
-            todayRevenue: todayOrders.reduce((s, o) => s + o.grandTotal, 0),
-            totalBills: allOrders.length,
-            totalRevenue: allOrders.reduce((s, o) => s + o.grandTotal, 0),
+            todayBills: todayAgg[0]?.count || 0,
+            todayRevenue: todayAgg[0]?.revenue || 0,
+            totalBills: allAgg[0]?.count || 0,
+            totalRevenue: allAgg[0]?.revenue || 0,
         });
     } catch {
         res.status(500).json({ message: "Failed to fetch stats" });

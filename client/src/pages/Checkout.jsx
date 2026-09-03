@@ -567,8 +567,9 @@ const Checkout = () => {
                 setPayState("failed"); setLoading(false); return;
             }
 
+            // Server recomputes the amount from these items — the client total is display-only.
             const { data: rpOrder } = await api.post("/payment/create-order", {
-                amount: finalTotal,
+                items: serializeItems(checkoutItems),
                 receipt: `order_${Date.now()}`,
             });
 

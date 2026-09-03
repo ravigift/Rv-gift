@@ -65,6 +65,7 @@ const userSchema = new mongoose.Schema(
         isEmailVerified: { type: Boolean, default: false },
         emailOtp: { type: String, default: undefined },
         emailOtpExpires: { type: Date, default: undefined },
+        emailOtpAttempts: { type: Number, default: 0 }, // wrong-guess counter, resets on new OTP
 
         /* ── GPS Location ── */
         location: {

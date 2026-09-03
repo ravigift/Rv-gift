@@ -9,10 +9,10 @@
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import Order, { generateInvoiceNumber } from "../models/Order.js";
-import Product from "../models/Product.js";
 import { sendEmail } from "../utils/emailService.js";
 import { getOrderStatusEmailTemplate } from "../utils/orderStatusEmail.js";
 import { adminOrderEmailHTML } from "../utils/adminOrderEmail.js";
+import { buildVerifiedOrder, commitStock, restoreStock } from "../utils/orderPricing.js";
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
@@ -24,17 +24,32 @@ const razorpay = new Razorpay({
 ════════════════════════════════════════ */
 export const createRazorpayOrder = async (req, res) => {
     try {
-        const { amount, currency = "INR", receipt } = req.body;
-        if (!amount || Number(amount) <= 0)
-            return res.status(400).json({ message: "Invalid amount" });
+        const { items, receipt } = req.body;
+
+        // ✅ Amount is derived from the DB cart, NOT from the client.
+        const priced = await buildVerifiedOrder(items, "RAZORPAY");
+        if (priced.error)
+            return res.status(400).json({ message: priced.error });
 
         const order = await razorpay.orders.create({
-            amount: Math.round(Number(amount) * 100),
-            currency,
-            receipt: receipt || `rcpt_${Date.now()}`,
+            amount: Math.round(priced.totalAmount * 100),
+            currency: "INR",
+            receipt: (typeof receipt === "string" ? receipt : `rcpt_${Date.now()}`).slice(0, 40),
+            notes: { userId: req.user._id.toString() },
         });
 
-        res.json({ id: order.id, amount: order.amount, currency: order.currency });
+        res.json({
+            id: order.id,
+            amount: order.amount,
+            currency: order.currency,
+            // echo the authoritative breakdown so the UI can display the real numbers
+            breakdown: {
+                itemsTotal: priced.itemsTotal,
+                deliveryCharge: priced.deliveryCharge,
+                platformFee: priced.platformFee,
+                totalAmount: priced.totalAmount,
+            },
+        });
     } catch (err) {
         console.error("RAZORPAY CREATE ORDER:", err);
         res.status(500).json({ message: "Failed to create Razorpay order" });
@@ -53,97 +68,129 @@ export const verifyPaymentAndCreateOrder = async (req, res) => {
             orderData,
         } = req.body;
 
-        // Signature verify
+        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature)
+            return res.status(400).json({ success: false, message: "Missing payment fields" });
+
+        // 1. Signature check — proves this order_id + payment_id pair is genuine
         const expectedSig = crypto
             .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
             .update(`${razorpay_order_id}|${razorpay_payment_id}`)
             .digest("hex");
 
-        if (expectedSig !== razorpay_signature)
-            return res.status(400).json({ message: "Payment verification failed", success: false });
+        const sigOk =
+            expectedSig.length === String(razorpay_signature).length &&
+            crypto.timingSafeEqual(Buffer.from(expectedSig), Buffer.from(String(razorpay_signature)));
+        if (!sigOk)
+            return res.status(400).json({ success: false, message: "Payment verification failed" });
 
-        const {
-            items, customerName, phone, email, address,
-            totalAmount, platformFee, deliveryCharge,
-            latitude, longitude,
-        } = orderData;
-
-        // ✅ Input validation — orderController jaise
-        if (!items?.length || items.length > 20)
-            return res.status(400).json({ message: "Invalid cart", success: false });
-        if (!customerName?.trim() || !phone?.trim() || !address?.trim())
-            return res.status(400).json({ message: "Customer details missing", success: false });
-        if (!/^[6-9]\d{9}$/.test(phone?.trim()))
-            return res.status(400).json({ message: "Invalid phone number", success: false });
-        if (!totalAmount || Number(totalAmount) <= 0)
-            return res.status(400).json({ message: "Invalid total amount", success: false });
-
-        // Stock deduction
-        for (const item of items) {
-            const product = await Product.findById(item.productId || item._id);
-            if (!product) continue;
-            const qty = Math.min(Math.max(1, Number(item.qty || item.quantity || 1)), 100);
-            if (!product.inStock || product.stock < qty)
-                return res.status(400).json({ message: `"${product.name}" is out of stock`, success: false });
-            product.stock -= qty;
-            product.inStock = product.stock > 0;
-            await product.save();
+        // 2. Idempotency — this payment already produced an order? return it, don't double-charge/double-ship
+        const existing = await Order.findOne({ "payment.razorpayPaymentId": razorpay_payment_id }).lean();
+        if (existing) {
+            return res.json({
+                success: true,
+                orderId: existing._id,
+                invoiceNumber: existing.invoiceNumber,
+                paymentId: razorpay_payment_id,
+                duplicate: true,
+            });
         }
 
-        const formattedItems = items.map(i => ({
-            productId: i.productId || i._id,
-            name: String(i.name || "Product").slice(0, 200),
-            price: Math.max(0, Number(i.price || 0)),
-            mrp: i.mrp ? Number(i.mrp) : null,
-            qty: Math.min(Math.max(1, Number(i.qty || i.quantity || 1)), 100),
-            image: typeof i.image === "string" ? i.image : i.images?.[0]?.url || "",
-            customization: {
-                text: String(i.customization?.text || "").trim().slice(0, 500),
-                imageUrl: String(i.customization?.imageUrl || "").trim().slice(0, 1000),
-                note: String(i.customization?.note || "").trim().slice(0, 1000),
-            },
-        }));
+        const { customerName, phone, email, address } = orderData || {};
+        if (!customerName?.trim() || !phone?.trim() || !address?.trim())
+            return res.status(400).json({ success: false, message: "Customer details missing" });
+        if (!/^[6-9]\d{9}$/.test(phone.trim()))
+            return res.status(400).json({ success: false, message: "Invalid phone number" });
 
-        const invoiceNumber = await generateInvoiceNumber();
+        // 3. Recompute the order from the DB — client prices/total are ignored
+        const priced = await buildVerifiedOrder(orderData?.items, "RAZORPAY");
+        if (priced.error)
+            return res.status(400).json({ success: false, message: priced.error });
 
-        const order = await Order.create({
-            user: req.user._id,
-            invoiceNumber,
-            items: formattedItems,
-            customerName,
-            phone,
-            email: email?.trim().toLowerCase() || "",
-            address,
-            totalAmount,
-            platformFee: platformFee || 9,
-            deliveryCharge: deliveryCharge || 0,
-            latitude,
-            longitude,
-            orderStatus: "PLACED",
-            statusTimeline: { placedAt: new Date() },
-            payment: {
-                method: "RAZORPAY",
-                status: "PAID",
-                razorpayOrderId: razorpay_order_id,
-                razorpayPaymentId: razorpay_payment_id,
-                paidAt: new Date(),
-            },
-        });
+        const { items: formattedItems, totalAmount, platformFee, deliveryCharge } = priced;
+
+        // 4. Cross-check against Razorpay: the amount actually captured MUST equal
+        //    our server-computed total. This is what blocks "create a ₹1 order, pay ₹1".
+        let rpOrder, rpPayment;
+        try {
+            [rpOrder, rpPayment] = await Promise.all([
+                razorpay.orders.fetch(razorpay_order_id),
+                razorpay.payments.fetch(razorpay_payment_id),
+            ]);
+        } catch (e) {
+            console.error("[Razorpay] fetch failed:", e.message);
+            return res.status(502).json({ success: false, message: "Could not confirm payment with Razorpay" });
+        }
+
+        const expectedPaise = Math.round(totalAmount * 100);
+        if (Number(rpOrder.amount) !== expectedPaise)
+            return res.status(400).json({ success: false, message: "Payment amount mismatch — order rejected" });
+        if (rpPayment.order_id !== razorpay_order_id)
+            return res.status(400).json({ success: false, message: "Payment does not belong to this order" });
+        if (!["captured", "authorized"].includes(rpPayment.status))
+            return res.status(400).json({ success: false, message: `Payment not completed (${rpPayment.status})` });
+        if (Number(rpPayment.amount) !== expectedPaise)
+            return res.status(400).json({ success: false, message: "Captured amount mismatch — order rejected" });
+
+        // 5. Atomic stock deduction
+        const stock = await commitStock(formattedItems);
+        if (stock.error)
+            return res.status(409).json({ success: false, message: stock.error });
+
+        let order;
+        try {
+            const invoiceNumber = await generateInvoiceNumber();
+            order = await Order.create({
+                user: req.user._id,
+                invoiceNumber,
+                items: formattedItems,
+                customerName: customerName.trim().slice(0, 100),
+                phone: phone.trim(),
+                email: email?.trim().toLowerCase().slice(0, 200) || "",
+                address: address.trim().slice(0, 500),
+                totalAmount,
+                platformFee,
+                deliveryCharge,
+                orderStatus: "PLACED",
+                statusTimeline: { placedAt: new Date() },
+                payment: {
+                    method: "RAZORPAY",
+                    status: "PAID",
+                    razorpayOrderId: razorpay_order_id,
+                    razorpayPaymentId: razorpay_payment_id,
+                    paidAt: new Date(),
+                    ip: req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || "",
+                },
+                paymentLogs: [{
+                    event: "PAYMENT_VERIFIED",
+                    amount: totalAmount,
+                    method: "RAZORPAY",
+                    paymentId: razorpay_payment_id,
+                    at: new Date(),
+                }],
+            });
+        } catch (e) {
+            // unique index on razorpayPaymentId → a concurrent request already created it
+            if (e.code === 11000) {
+                const dup = await Order.findOne({ "payment.razorpayPaymentId": razorpay_payment_id }).lean();
+                if (dup)
+                    return res.json({ success: true, orderId: dup._id, invoiceNumber: dup.invoiceNumber, paymentId: razorpay_payment_id, duplicate: true });
+            }
+            await restoreStock(formattedItems);
+            throw e;
+        }
 
         res.json({
             success: true,
             orderId: order._id,
-            invoiceNumber,
+            invoiceNumber: order.invoiceNumber,
             paymentId: razorpay_payment_id,
         });
 
-        // User email — PLACED confirmation
         if (email && !email.includes("@rvgifts.com")) {
             const mail = getOrderStatusEmailTemplate({ customerName, orderId: order._id, status: "PLACED" });
             sendEmail({ to: email, subject: mail.subject, html: mail.html, label: "User/NewOrder" });
         }
 
-        // Admin email
         sendEmail({
             to: process.env.ADMIN_EMAIL,
             subject: `✅ New Paid Order #${order._id.toString().slice(-6).toUpperCase()} — ₹${totalAmount}`,
@@ -153,7 +200,7 @@ export const verifyPaymentAndCreateOrder = async (req, res) => {
 
     } catch (err) {
         console.error("VERIFY PAYMENT ERROR:", err);
-        res.status(500).json({ message: "Order creation failed" });
+        res.status(500).json({ success: false, message: "Order creation failed" });
     }
 };
 
@@ -163,18 +210,28 @@ export const verifyPaymentAndCreateOrder = async (req, res) => {
 export const razorpayWebhook = async (req, res) => {
     try {
         const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
-        const receivedSig = req.headers["x-razorpay-signature"];
-        const expectedSig = crypto
-            .createHmac("sha256", secret)
-            .update(JSON.stringify(req.body))
-            .digest("hex");
+        if (!secret) {
+            console.error("[Webhook] RAZORPAY_WEBHOOK_SECRET not configured");
+            return res.status(500).json({ message: "Webhook not configured" });
+        }
 
-        if (expectedSig !== receivedSig)
+        const receivedSig = req.headers["x-razorpay-signature"] || "";
+
+        // req.body is a raw Buffer here (express.raw on this route) — HMAC the
+        // exact bytes Razorpay signed, not a re-serialised object.
+        const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body));
+        const expectedSig = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+
+        const sigOk =
+            expectedSig.length === receivedSig.length &&
+            crypto.timingSafeEqual(Buffer.from(expectedSig), Buffer.from(receivedSig));
+        if (!sigOk)
             return res.status(400).json({ message: "Invalid signature" });
 
-        const event = req.body.event;
-        const paymentEntity = req.body.payload?.payment?.entity;
-        const refundEntity = req.body.payload?.refund?.entity;
+        const payload = JSON.parse(rawBody.toString("utf8"));
+        const event = payload.event;
+        const paymentEntity = payload.payload?.payment?.entity;
+        const refundEntity = payload.payload?.refund?.entity;
 
         switch (event) {
             case "payment.failed":

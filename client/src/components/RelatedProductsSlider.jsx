@@ -34,12 +34,12 @@ const RelatedProductsSlider = ({ products }) => {
                 className="flex gap-4 overflow-x-auto scroll-smooth
                            scrollbar-hide px-10"
             >
-                {products.map((product) => (
+                {products.map((product, i) => (
                     <div
                         key={product._id}
-                        className="min-w-64 max-w-64"
+                        className="w-[200px] sm:w-[220px] shrink-0"
                     >
-                        <ProductCard product={product} />
+                        <ProductCard product={product} index={i} />
                     </div>
                 ))}
             </div>

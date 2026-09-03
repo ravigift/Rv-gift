@@ -3,10 +3,14 @@ import {
     addReview,
     getProductReviews,
     deleteReview,
+    getReviewEligibility,
 } from "../controllers/Reviewcontroller.js";
 import { protect } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
+
+// Can the logged-in user review this product? (specific route BEFORE /:productId)
+router.get("/:productId/eligibility", protect, getReviewEligibility);
 
 // GET all reviews for a product (public)
 router.get("/:productId", getProductReviews);

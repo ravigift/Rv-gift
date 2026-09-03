@@ -1,21 +1,39 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/adminApi";
-import { FaArrowLeft, FaUpload, FaTimes, FaPlus, FaTag, FaRupeeSign, FaList, FaBoxes } from "react-icons/fa";
+import { FaArrowLeft, FaUpload, FaTimes, FaPlus, FaTag, FaRupeeSign, FaList, FaBoxes, FaStar } from "react-icons/fa";
 import { CATEGORIES } from "../data/categories";
 
 const inputClass = "w-full px-4 py-3 border border-stone-200 rounded-xl text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all bg-stone-50 focus:bg-white";
 
-const ALL_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
-const HIGHLIGHT_KEYS = ["Fabric", "Sleeve", "Pattern", "Color", "Pack of", "Collar", "Fit", "Material", "Brand"];
+const MAX_IMAGES = 5;
+const fileKey = (f) => `${f.name}_${f.size}_${f.lastModified}`;
+
+// Quick presets for the variant-option chip input (fully editable, not a fixed list)
+const OPTION_LABEL_SUGGESTIONS = ["Size", "Volume", "Weight", "Dimensions", "Pack", "Color", "Flavour", "Length", "Wattage", "Model"];
+const OPTION_VALUE_PRESETS = {
+    Size: ["XS", "S", "M", "L", "XL", "XXL", "3XL"],
+    Volume: ["50 ml", "100 ml", "200 ml", "500 ml", "1 L"],
+    Pack: ["Pack of 1", "Pack of 2", "Pack of 3", "Pack of 6"],
+    Dimensions: ['4x6 in', '5x7 in', '6x8 in', '8x10 in', '8x12 in', 'A4'],
+};
+// Common specification keys — suggestions only (admin can type anything)
+const SPEC_KEY_SUGGESTIONS = [
+    "Material", "Color", "Brand", "Pack of", "Fabric", "Fit", "Pattern",
+    "Fragrance", "Volume", "Bulb Type", "Wattage", "Power Source", "Battery",
+    "Warranty", "Occasion", "Care", "Country of Origin", "Finish", "Shape", "Theme",
+];
 
 const AdminAddProduct = () => {
     const navigate = useNavigate();
 
     const [form, setForm] = useState({
         name: "", description: "", price: "", mrp: "", category: "",
-        isCustomizable: false, tags: "", stock: "",
+        isCustomizable: false, tags: "", stock: "", sku: "", isPublished: true,
+        sizeLabel: "Size",
+        weight: "500", length: "10", breadth: "10", height: "10",
     });
+    const [dirty, setDirty] = useState(false);
 
     const [images, setImages] = useState([]);
     const [previewImages, setPreviewImages] = useState([]);
@@ -24,6 +42,7 @@ const AdminAddProduct = () => {
     const [toast, setToast] = useState(null);
 
     const [selectedSizes, setSelectedSizes] = useState([]);
+    const [sizeInput, setSizeInput] = useState("");
     const [highlights, setHighlights] = useState([{ key: "", value: "" }]);
 
     const showToast = (type, msg) => {
@@ -35,12 +54,38 @@ const AdminAddProduct = () => {
         const { name, value, type, checked } = e.target;
         setForm(prev => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
         setError("");
+        setDirty(true);
     };
 
-    const toggleSize = (size) => {
+    // Warn before leaving with unsaved changes
+    useEffect(() => {
+        const warn = (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } };
+        window.addEventListener("beforeunload", warn);
+        return () => window.removeEventListener("beforeunload", warn);
+    }, [dirty]);
+
+    const addSizeOption = (raw) => {
+        const v = String(raw).replace(/\s+/g, " ").trim().slice(0, 24);
+        if (!v) return;
         setSelectedSizes(prev =>
-            prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
+            prev.some(s => s.toLowerCase() === v.toLowerCase()) || prev.length >= 15
+                ? prev
+                : [...prev, v]
         );
+        setSizeInput("");
+        setDirty(true);
+    };
+    const removeSizeOption = (v) => {
+        setSelectedSizes(prev => prev.filter(s => s !== v));
+        setDirty(true);
+    };
+    const handleSizeKeyDown = (e) => {
+        if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            addSizeOption(sizeInput);
+        } else if (e.key === "Backspace" && !sizeInput && selectedSizes.length) {
+            removeSizeOption(selectedSizes[selectedSizes.length - 1]);
+        }
     };
 
     const updateHighlight = (idx, field, value) => {
@@ -50,21 +95,57 @@ const AdminAddProduct = () => {
     const addHighlight = () => setHighlights(prev => [...prev, { key: "", value: "" }]);
     const removeHighlight = (idx) => setHighlights(prev => prev.filter((_, i) => i !== idx));
 
+    // Previews stay in sync with `images` — rebuilt on every change, old blob URLs revoked
+    useEffect(() => {
+        const urls = images.map(f => URL.createObjectURL(f));
+        setPreviewImages(urls);
+        return () => urls.forEach(u => URL.revokeObjectURL(u));
+    }, [images]);
+
     const handleImageChange = (e) => {
-        const files = Array.from(e.target.files);
-        if (!files.length) return;
-        if (files.length > 5) return setError("Maximum 5 images allowed");
-        for (const file of files) {
-            if (file.size / (1024 * 1024) > 5) return setError(`${file.name} exceeds 5MB limit`);
+        const picked = Array.from(e.target.files);
+        e.target.value = ""; // allow re-selecting the same file later
+        if (!picked.length) return;
+
+        const valid = [];
+        for (const file of picked) {
+            if (!file.type.startsWith("image/")) { setError(`${file.name} is not an image`); continue; }
+            if (file.size / (1024 * 1024) > 5) { setError(`${file.name} exceeds 5MB limit`); continue; }
+            valid.push(file);
         }
-        setImages(files);
-        setPreviewImages(files.map(f => URL.createObjectURL(f)));
-        setError("");
+        if (!valid.length) return;
+
+        setImages(prev => {
+            const seen = new Set(prev.map(fileKey));
+            const merged = [...prev];
+            for (const f of valid) {
+                if (seen.has(fileKey(f))) continue;
+                seen.add(fileKey(f));
+                merged.push(f);
+            }
+            if (merged.length > MAX_IMAGES) {
+                setError(`Maximum ${MAX_IMAGES} images allowed — extra images skipped`);
+                return merged.slice(0, MAX_IMAGES);
+            }
+            setError("");
+            return merged;
+        });
     };
 
     const removeImage = (idx) => {
         setImages(prev => prev.filter((_, i) => i !== idx));
-        setPreviewImages(prev => prev.filter((_, i) => i !== idx));
+        setError("");
+    };
+
+    // Move an image to the front — it becomes the "Main" / cover image
+    const makeMain = (idx) => {
+        setImages(prev => {
+            if (idx <= 0 || idx >= prev.length) return prev;
+            const next = [...prev];
+            const [picked] = next.splice(idx, 1);
+            next.unshift(picked);
+            return next;
+        });
     };
 
     // ✅ Discount % calculation
@@ -74,12 +155,24 @@ const AdminAddProduct = () => {
 
     const submitHandler = async (e) => {
         e.preventDefault();
-        if (!form.name.trim()) return setError("Product name is required");
+        if (!form.name.trim() || form.name.trim().length < 2) return setError("Product name must be at least 2 characters");
+        if (form.name.length > 300) return setError("Product name is too long (max 300)");
+        if (form.description.length > 5000) return setError("Description is too long (max 5000)");
+        if (form.sku.trim() && !/^[A-Za-z0-9][A-Za-z0-9._/-]{0,39}$/.test(form.sku.trim()))
+            return setError("SKU may use letters, numbers, - . _ / (max 40 chars)");
         if (!form.price || Number(form.price) <= 0) return setError("Enter a valid price");
         if (form.mrp && Number(form.mrp) < Number(form.price)) return setError("MRP cannot be less than selling price");
         if (!form.category) return setError("Please select a category");
+        if (!CATEGORIES.some(c => c.value === form.category)) return setError("Please select a valid category");
         if (images.length === 0) return setError("At least one image is required");
-        if (form.stock === "" || Number(form.stock) < 0) return setError("Enter valid stock quantity (0 or more)");
+        if (form.stock === "" || !Number.isInteger(Number(form.stock)) || Number(form.stock) < 0)
+            return setError("Enter a valid whole-number stock quantity (0 or more)");
+        if (!form.weight || Number(form.weight) < 1 || Number(form.weight) > 30000)
+            return setError("Enter a valid weight in grams (1–30000)");
+        for (const [k, label] of [["length", "Length"], ["breadth", "Breadth"], ["height", "Height"]]) {
+            const n = Number(form[k]);
+            if (!n || n < 1 || n > 200) return setError(`${label} must be between 1 and 200 cm`);
+        }
 
         try {
             setLoading(true);
@@ -91,13 +184,25 @@ const AdminAddProduct = () => {
             formData.append("price", Number(form.price));
             if (form.mrp && Number(form.mrp) > 0) formData.append("mrp", Number(form.mrp));
             formData.append("category", form.category);
+            if (form.sku.trim()) formData.append("sku", form.sku.trim());
+            formData.append("isPublished", form.isPublished ? "true" : "false");
             formData.append("isCustomizable", form.isCustomizable ? "true" : "false");
             formData.append("stock", Number(form.stock));
+            formData.append("weight", Number(form.weight));
+            formData.append("length", Number(form.length));
+            formData.append("breadth", Number(form.breadth));
+            formData.append("height", Number(form.height));
             if (form.tags.trim()) formData.append("tags", form.tags.trim());
             images.forEach(img => formData.append("images", img));
 
-            if (selectedSizes.length > 0) {
-                formData.append("sizes", JSON.stringify(selectedSizes));
+            // include a value still sitting in the chip input
+            const pending = sizeInput.replace(/\s+/g, " ").trim();
+            const allSizes = pending && !selectedSizes.some(s => s.toLowerCase() === pending.toLowerCase())
+                ? [...selectedSizes, pending]
+                : selectedSizes;
+            if (allSizes.length > 0) {
+                formData.append("sizeLabel", (form.sizeLabel || "Size").trim());
+                formData.append("sizes", JSON.stringify(allSizes));
             }
 
             const validHighlights = highlights.filter(h => h.key.trim() && h.value.trim());
@@ -108,7 +213,8 @@ const AdminAddProduct = () => {
             }
 
             await api.post("/products", formData);
-            showToast("success", "Product added successfully! 🎉");
+            setDirty(false);
+            showToast("success", form.isPublished ? "Product published! 🎉" : "Product saved as draft");
             setTimeout(() => navigate("/admin/products"), 1500);
         } catch (err) {
             setError(err.response?.data?.message || "Failed to add product");
@@ -166,17 +272,43 @@ const AdminAddProduct = () => {
 
                         {/* Name */}
                         <div>
-                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1.5 block">Product Name *</label>
-                            <input name="name" value={form.name} onChange={handleChange}
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide block">Product Name *</label>
+                                <span className={`text-[11px] ${form.name.length > 300 ? "text-red-500" : "text-zinc-400"}`}>{form.name.length}/300</span>
+                            </div>
+                            <input name="name" value={form.name} onChange={handleChange} maxLength={320}
                                 placeholder="e.g. Premium Leather Wallet" className={inputClass} />
                         </div>
 
                         {/* Description */}
                         <div>
-                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1.5 block">Description</label>
-                            <textarea name="description" value={form.description} onChange={handleChange}
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide block">Description</label>
+                                <span className={`text-[11px] ${form.description.length > 5000 ? "text-red-500" : "text-zinc-400"}`}>{form.description.length}/5000</span>
+                            </div>
+                            <textarea name="description" value={form.description} onChange={handleChange} maxLength={5200}
                                 placeholder="Describe your product..." rows={3}
                                 className={`${inputClass} resize-none`} />
+                        </div>
+
+                        {/* SKU + Publish */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1.5 block">
+                                    SKU <span className="text-zinc-400 font-normal normal-case">(optional, unique)</span>
+                                </label>
+                                <input name="sku" value={form.sku} onChange={handleChange} maxLength={40}
+                                    placeholder="e.g. WALLET-BRN-01"
+                                    className={`${inputClass} uppercase`} style={{ textTransform: "uppercase" }} />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1.5 block">Visibility</label>
+                                <button type="button"
+                                    onClick={() => { setForm(p => ({ ...p, isPublished: !p.isPublished })); setDirty(true); }}
+                                    className={`w-full h-[46px] rounded-xl border text-sm font-bold transition-all cursor-pointer ${form.isPublished ? "bg-emerald-50 border-emerald-300 text-emerald-700" : "bg-stone-100 border-stone-300 text-zinc-500"}`}>
+                                    {form.isPublished ? "● Published (live)" : "○ Draft (hidden)"}
+                                </button>
+                            </div>
                         </div>
 
                         {/* ✅ Price + MRP side by side */}
@@ -248,6 +380,36 @@ const AdminAddProduct = () => {
                             )}
                         </div>
 
+                        {/* Shipping — weight & dimensions (used for delivery charge / courier) */}
+                        <div>
+                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1.5 block">
+                                Shipping Details *
+                                <span className="text-zinc-400 font-normal normal-case ml-1">(used to calculate delivery / courier cost)</span>
+                            </label>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div>
+                                    <span className="text-[11px] text-zinc-400 font-semibold mb-1 block">Weight (g)</span>
+                                    <input type="number" name="weight" value={form.weight} onChange={handleChange}
+                                        min="1" max="30000" placeholder="500" className={inputClass} />
+                                </div>
+                                <div>
+                                    <span className="text-[11px] text-zinc-400 font-semibold mb-1 block">Length (cm)</span>
+                                    <input type="number" name="length" value={form.length} onChange={handleChange}
+                                        min="1" max="200" placeholder="10" className={inputClass} />
+                                </div>
+                                <div>
+                                    <span className="text-[11px] text-zinc-400 font-semibold mb-1 block">Breadth (cm)</span>
+                                    <input type="number" name="breadth" value={form.breadth} onChange={handleChange}
+                                        min="1" max="200" placeholder="10" className={inputClass} />
+                                </div>
+                                <div>
+                                    <span className="text-[11px] text-zinc-400 font-semibold mb-1 block">Height (cm)</span>
+                                    <input type="number" name="height" value={form.height} onChange={handleChange}
+                                        min="1" max="200" placeholder="10" className={inputClass} />
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Tags */}
                         <div>
                             <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1.5 block">
@@ -260,44 +422,66 @@ const AdminAddProduct = () => {
                             </div>
                         </div>
 
-                        {/* Sizes */}
+                        {/* Variant Options — custom per product */}
+                        <datalist id="opt-label-list">
+                            {OPTION_LABEL_SUGGESTIONS.map(l => <option key={l} value={l} />)}
+                        </datalist>
                         <div>
                             <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-2 block">
-                                Available Sizes <span className="text-zinc-400 font-normal normal-case">(optional)</span>
+                                Variant Options <span className="text-zinc-400 font-normal normal-case">(optional — e.g. Size, Volume, Pack)</span>
                             </label>
-                            <div className="flex flex-wrap gap-2">
-                                {ALL_SIZES.map(size => (
-                                    <button key={size} type="button" onClick={() => toggleSize(size)}
-                                        className={`w-12 h-10 rounded-xl text-sm font-bold border transition-all cursor-pointer ${selectedSizes.includes(size)
-                                            ? "bg-zinc-900 text-white border-zinc-900"
-                                            : "bg-white text-zinc-600 border-stone-200 hover:border-zinc-400"
-                                            }`}>
-                                        {size}
-                                    </button>
-                                ))}
+                            <div className="flex gap-2 mb-2">
+                                <input list="opt-label-list" value={form.sizeLabel} name="sizeLabel" onChange={handleChange}
+                                    placeholder="Option name (Size / Volume …)"
+                                    className={`${inputClass} max-w-[200px]`} maxLength={24} />
                             </div>
-                            {selectedSizes.length > 0 && (
-                                <p className="text-xs text-zinc-400 mt-1.5">
-                                    Selected: <span className="font-bold text-zinc-600">{selectedSizes.join(", ")}</span>
-                                </p>
+                            <div className="flex flex-wrap items-center gap-2 px-3 py-2 border border-stone-200 rounded-xl bg-stone-50 focus-within:ring-2 focus-within:ring-amber-400 min-h-[46px]">
+                                {selectedSizes.map(s => (
+                                    <span key={s} className="inline-flex items-center gap-1 bg-zinc-900 text-white text-xs font-bold px-2.5 py-1 rounded-lg">
+                                        {s}
+                                        <button type="button" onClick={() => removeSizeOption(s)} className="hover:text-red-300 cursor-pointer">
+                                            <FaTimes size={9} />
+                                        </button>
+                                    </span>
+                                ))}
+                                <input value={sizeInput}
+                                    onChange={e => setSizeInput(e.target.value)}
+                                    onKeyDown={handleSizeKeyDown}
+                                    onBlur={() => sizeInput.trim() && addSizeOption(sizeInput)}
+                                    placeholder={selectedSizes.length ? "Add another…" : `Type a ${(form.sizeLabel || "size").toLowerCase()} value, press Enter`}
+                                    className="flex-1 min-w-[140px] bg-transparent text-sm outline-none py-1"
+                                    maxLength={24} />
+                            </div>
+                            {OPTION_VALUE_PRESETS[form.sizeLabel]?.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                    {OPTION_VALUE_PRESETS[form.sizeLabel]
+                                        .filter(p => !selectedSizes.some(s => s.toLowerCase() === p.toLowerCase()))
+                                        .map(p => (
+                                            <button key={p} type="button" onClick={() => addSizeOption(p)}
+                                                className="text-[11px] font-semibold text-zinc-500 border border-dashed border-stone-300 rounded-lg px-2 py-0.5 hover:border-amber-400 hover:text-amber-600 cursor-pointer">
+                                                + {p}
+                                            </button>
+                                        ))}
+                                </div>
                             )}
                         </div>
 
-                        {/* Highlights */}
+                        {/* Specifications — free-form key/value */}
+                        <datalist id="spec-key-list">
+                            {SPEC_KEY_SUGGESTIONS.map(k => <option key={k} value={k} />)}
+                        </datalist>
                         <div>
                             <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-2 block">
-                                Product Highlights <span className="text-zinc-400 font-normal normal-case">(optional)</span>
+                                Specifications <span className="text-zinc-400 font-normal normal-case">(optional — any key / value)</span>
                             </label>
                             <div className="space-y-2">
                                 {highlights.map((h, idx) => (
                                     <div key={idx} className="flex gap-2 items-center">
-                                        <select value={h.key} onChange={e => updateHighlight(idx, "key", e.target.value)}
-                                            className="flex-1 px-3 py-2.5 border border-stone-200 rounded-xl text-sm bg-stone-50 focus:outline-none focus:ring-2 focus:ring-amber-400 text-zinc-700">
-                                            <option value="">Select key</option>
-                                            {HIGHLIGHT_KEYS.map(k => <option key={k} value={k}>{k}</option>)}
-                                        </select>
+                                        <input list="spec-key-list" value={h.key} onChange={e => updateHighlight(idx, "key", e.target.value)}
+                                            placeholder="Key (e.g. Material)" maxLength={40}
+                                            className="flex-1 px-3 py-2.5 border border-stone-200 rounded-xl text-sm bg-stone-50 focus:outline-none focus:ring-2 focus:ring-amber-400 text-zinc-700" />
                                         <input value={h.value} onChange={e => updateHighlight(idx, "value", e.target.value)}
-                                            placeholder="Value"
+                                            placeholder="Value" maxLength={200}
                                             className="flex-1 px-3 py-2.5 border border-stone-200 rounded-xl text-sm bg-stone-50 focus:outline-none focus:ring-2 focus:ring-amber-400 text-zinc-700" />
                                         {highlights.length > 1 && (
                                             <button type="button" onClick={() => removeHighlight(idx)}
@@ -309,7 +493,7 @@ const AdminAddProduct = () => {
                                 ))}
                                 <button type="button" onClick={addHighlight}
                                     className="flex items-center gap-1.5 text-xs text-amber-600 font-bold hover:text-amber-700 mt-1 cursor-pointer">
-                                    <FaPlus size={9} /> Add highlight
+                                    <FaPlus size={9} /> Add specification
                                 </button>
                             </div>
                         </div>
@@ -317,14 +501,18 @@ const AdminAddProduct = () => {
                         {/* Images */}
                         <div>
                             <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1.5 block">
-                                Product Images * <span className="text-zinc-400 font-normal normal-case">(max 5, each under 5MB)</span>
+                                Product Images * <span className="text-zinc-400 font-normal normal-case">(max {MAX_IMAGES}, each under 5MB · {images.length}/{MAX_IMAGES} added)</span>
                             </label>
-                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-stone-300 rounded-xl cursor-pointer hover:border-amber-400 hover:bg-amber-50 transition-all group">
-                                <FaUpload size={20} className="text-stone-400 group-hover:text-amber-500 mb-2 transition-colors" />
-                                <p className="text-sm text-zinc-500 group-hover:text-amber-600 font-medium">Click to upload images</p>
-                                <p className="text-xs text-zinc-400 mt-0.5">PNG, JPG, WEBP supported</p>
-                                <input type="file" multiple accept="image/*" onChange={handleImageChange} className="hidden" />
-                            </label>
+                            {images.length < MAX_IMAGES && (
+                                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-stone-300 rounded-xl cursor-pointer hover:border-amber-400 hover:bg-amber-50 transition-all group">
+                                    <FaUpload size={20} className="text-stone-400 group-hover:text-amber-500 mb-2 transition-colors" />
+                                    <p className="text-sm text-zinc-500 group-hover:text-amber-600 font-medium">
+                                        {images.length === 0 ? "Click to upload images" : "Click to add more images"}
+                                    </p>
+                                    <p className="text-xs text-zinc-400 mt-0.5">PNG, JPG, WEBP · select one or many</p>
+                                    <input type="file" multiple accept="image/*" onChange={handleImageChange} className="hidden" />
+                                </label>
+                            )}
                             {previewImages.length > 0 && (
                                 <div className="grid grid-cols-4 gap-3 mt-3">
                                     {previewImages.map((img, i) => (
@@ -335,12 +523,17 @@ const AdminAddProduct = () => {
                                                 className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                                                 <FaTimes size={8} />
                                             </button>
-                                            {i === 0 && (
+                                            {i === 0 ? (
                                                 <span className="absolute bottom-1 left-1 bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">Main</span>
+                                            ) : (
+                                                <button type="button" onClick={() => makeMain(i)}
+                                                    className="absolute bottom-1 left-1 flex items-center gap-1 bg-black/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                                    <FaStar size={7} /> Set main
+                                                </button>
                                             )}
                                         </div>
                                     ))}
-                                    {previewImages.length < 5 && (
+                                    {previewImages.length < MAX_IMAGES && (
                                         <label className="w-full h-20 border-2 border-dashed border-stone-200 rounded-xl flex items-center justify-center cursor-pointer hover:border-amber-400 transition-colors">
                                             <FaPlus size={16} className="text-stone-400" />
                                             <input type="file" multiple accept="image/*" onChange={handleImageChange} className="hidden" />
